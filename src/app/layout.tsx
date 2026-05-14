@@ -1,0 +1,81 @@
+import type { Metadata, Viewport } from "next";
+import { Fraunces, Manrope } from "next/font/google";
+import "./globals.css";
+import { TopNav } from "@/components/layout/TopNav";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { SmartSearch } from "@/components/SmartSearch";
+import { CurrencyProvider } from "@/components/CurrencyProvider";
+import { getCurrentUser } from "@/lib/auth";
+import { getServerCurrencyContext } from "@/lib/currencyServer";
+
+// Display face — Fraunces is a variable, fashion-forward serif with an
+// expressive italic. Used for headlines, prices, hero copy.
+const display = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+// Body face — Manrope is a tight, geometric sans with a confident rhythm.
+// Reads cleanly at small sizes and pairs well with Fraunces's curves.
+const body = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+export const metadata: Metadata = {
+  title: "StreekMart — Fashion Marketplace",
+  description: "Materials, ready-to-wear, and designer content — fashion only.",
+};
+
+// Viewport is its own export in Next 14 (was in metadata previously).
+// We don't lock zoom — users with low vision should be able to pinch-zoom.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0a0a14",
+};
+
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [user, currencyCtx] = await Promise.all([
+    getCurrentUser(),
+    getServerCurrencyContext(),
+  ]);
+  return (
+    <html lang="en" className={`${display.variable} ${body.variable}`}>
+      <body className="font-sans">
+        {/*
+          CurrencyProvider seeds the client with the same context the server
+          used to render initial prices, so SSR and hydration always agree.
+          The user can override the auto-detected currency via the selector
+          in the TopNav; that POSTs to /api/currency and a router.refresh()
+          re-renders everything with the new context.
+        */}
+        <CurrencyProvider ctx={currencyCtx}>
+          <TopNav user={user} />
+          {/*
+            Full-bleed layout. We add only minimal side padding and cap content
+            at 3xl on enormous screens to keep line-lengths sane. The pb-28 on
+            mobile leaves clearance for the bottom nav + the FAB.
+          */}
+          <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:pb-10">
+            {children}
+          </main>
+          <BottomNav user={user} />
+          {/* SmartSearch renders its own desktop launcher (bottom-right) and
+              listens for the "upclo:open-search" event from the BottomNav FAB
+              on mobile. */}
+          <SmartSearch />
+        </CurrencyProvider>
+      </body>
+    </html>
+  );
+}

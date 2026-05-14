@@ -1,0 +1,15 @@
+# Don't ship local artefacts into the build context.
+.git
+.next
+node_modules
+npm-debug.log
+.env
+.env.local
+.env.*.local
+prisma/dev.db
+prisma/dev.db-journal
+public/uploads
+.vscode
+.idea
+*.log
+README.md

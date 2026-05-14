@@ -1,0 +1,485 @@
+// UpClo — fashion marketplace data model
+// SQLite for local dev; swap provider to "postgresql" for production.
+// SQLite has no native enums; status fields are stored as strings. Type safety
+// is provided by `src/lib/enums.ts`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------- Users & Auth --------------------
+// Every account is implicitly a BUYER. Users opt-in to additional permissions:
+// `isSeller` (can list products) and/or `isDesigner` (can publish posts + use
+// sketch studio). Both can be true simultaneously.
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  // Nullable — Google OAuth accounts have no password. At least one of
+  // (passwordHash, googleId) is expected to be set; the login endpoints
+  // enforce that on their respective paths.
+  passwordHash String?
+  // Google OAuth subject ID. Unique so a single Google identity can only
+  // claim one UpClo account. Linked at OAuth callback time.
+  googleId     String?  @unique
+  // Which provider minted the account: "password" or "google".
+  authProvider String   @default("password")
+  name         String
+  // URL-friendly handle for the public profile (/u/<slug>). Auto-generated
+  // from `name` at signup; users can change it from Account settings.
+  // Nullable for legacy rows; backfilled by the seed and the slug helper.
+  slug         String?  @unique
+  isSeller     Boolean  @default(false)
+  isDesigner   Boolean  @default(false)
+  // Verification flags — only verified sellers/designers get a badge in UI.
+  sellerVerified   Boolean @default(false)
+  designerVerified Boolean @default(false)
+  // Audit for verification decisions — set when an admin approves the request.
+  verifiedAt   DateTime?
+  verifiedBy   String?
+  // Platform admin flag — gates /admin and the /api/admin/* endpoints.
+  isAdmin      Boolean  @default(false)
+  // Trusted-buyer flag — set by an admin once a buyer has completed enough
+  // delivery-confirmed orders. Required to use Pay-on-Delivery at checkout.
+  trustedBuyer Boolean  @default(false)
+  bio          String?
+  avatarUrl    String?
+  // Aggregate exposure score driving feed ranking + recommendations.
+  exposureScore Float   @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  products       Product[]         @relation("SellerProducts")
+  posts          Post[]            @relation("DesignerPosts")
+  ordersAsBuyer  Order[]           @relation("BuyerOrders")
+  ordersAsSeller Order[]           @relation("SellerOrders")
+  sentMessages   Message[]         @relation("MessageSender")
+  chatMembers    ChatParticipant[]
+  favorites      Favorite[]
+  likes          Like[]
+  sketches       Sketch[]
+  promotions     Promotion[]
+  cart           Cart?
+  comments       Comment[]
+  followedBy     Follow[]          @relation("FollowedDesigner")
+  following      Follow[]          @relation("Follower")
+  // Wallet (1:1 — provisioned at first sale or first wallet view).
+  wallet         Wallet?
+  // Account/shop manager links — accounts this user OWNS, and accounts
+  // they MANAGE for someone else.
+  managedAccounts Manager[]        @relation("Owner")
+  managingFor     Manager[]        @relation("ManagerUser")
+  verificationRequests VerificationRequest[]
+  payoutRequests PayoutRequest[]
+}
+
+// -------------------- Wallet & payouts --------------------
+
+// One wallet per user. Balance stored in cents (integer USD-cents) so we
+// never lose precision to float math. Display goes through the local-
+// currency formatter the same way Product.price does.
+model Wallet {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceCents Int      @default(0)
+  // Funds credited from a sale that hasn't been delivered to the buyer yet.
+  // Withdrawable balance = balanceCents - heldCents. Decreases when the
+  // related order moves to COMPLETED (release) or CANCELLED (claw back).
+  heldCents    Int      @default(0)
+  // The wallet operates in USD internally — currency display happens at the
+  // UI layer via the CurrencyProvider context.
+  currencyCode String   @default("USD")
+  transactions WalletTransaction[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Append-only ledger. Sales credit the seller (positive), platform fee
+// debits (negative), payouts debit, refunds credit, etc.
+model WalletTransaction {
+  id          String   @id @default(cuid())
+  walletId    String
+  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  // Signed amount in cents. Positive = credit, negative = debit.
+  amountCents Int
+  // SALE_CREDIT | PLATFORM_FEE | WITHDRAWAL | WITHDRAWAL_FEE | REFUND | ADJUSTMENT
+  type        String
+  description String
+  // PENDING | COMPLETED | FAILED
+  status      String   @default("COMPLETED")
+  // Optional reference to the related row (orderId, payoutRequestId, etc.).
+  refType     String?
+  refId       String?
+  createdAt   DateTime @default(now())
+
+  @@index([walletId, createdAt])
+}
+
+// Withdrawal request — captures bank details and tracks Monnify status.
+model PayoutRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountCents     Int
+  // Bank details serialised as JSON: { bankCode, accountNumber, accountName }
+  destinationJson String
+  // PENDING | PROCESSING | PAID | FAILED | CANCELLED
+  status          String   @default("PENDING")
+  // External reference returned by Monnify (transactionReference).
+  externalRef     String?
+  failureReason   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+// -------------------- Account / shop managers --------------------
+
+// Links an owner (seller/designer) to a manager (another User account)
+// with a JSON list of permission keys. Unique per (owner, manager) pair so
+// a manager can't be added twice.
+model Manager {
+  id              String   @id @default(cuid())
+  ownerId         String
+  owner           User     @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  managerId       String
+  manager         User     @relation("ManagerUser", fields: [managerId], references: [id], onDelete: Cascade)
+  // JSON array of permission strings, e.g. ["edit_products","manage_orders","reply_messages"]
+  // See PERMISSION_KEYS in src/lib/managers.ts.
+  permissionsJson String   @default("[]")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([ownerId, managerId])
+  @@index([managerId])
+}
+
+// -------------------- Verification --------------------
+
+// A request a seller/designer files to be verified by the platform.
+// Admins approve or reject; on approve, sellerVerified/designerVerified
+// flips on the User row.
+model VerificationRequest {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SELLER | DESIGNER
+  kind          String
+  // PENDING | APPROVED | REJECTED
+  status        String    @default("PENDING")
+  // Free-text from the requester explaining why they should be verified.
+  notes         String?
+  // JSON array of {label, url} document references.
+  documentsJson String    @default("[]")
+  reviewerId    String?
+  reviewedAt    DateTime?
+  decisionNote  String?
+  createdAt     DateTime  @default(now())
+
+  @@index([status, createdAt])
+}
+
+// -------------------- Products --------------------
+
+model Product {
+  id          String   @id @default(cuid())
+  sellerId    String
+  seller      User     @relation("SellerProducts", fields: [sellerId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  price       Float
+  // Optional sale price for flash-sale / discount display.
+  salePrice   Float?
+  // Category from the fashion-only allowlist in src/lib/enums.ts → CATEGORIES.
+  category    String
+  // Higher-level grouping used on the homepage rails.
+  // Values: "MATERIAL" (fabrics + sewing supplies) or "PRODUCT" (everything else).
+  kind        String   @default("PRODUCT")
+  // DRAFT | ACTIVE | SOLD_OUT | ARCHIVED
+  status      String   @default("ACTIVE")
+  // JSON-encoded array of image URLs (SQLite has no native string[]).
+  imagesJson  String   @default("[]")
+  // JSON array of dominant hex colors extracted from product images at upload
+  // time. Used by the deterministic SmartSearch image matcher. Empty by default
+  // — older products without colors fall back to text-only matching.
+  dominantColorsJson String @default("[]")
+  // Free-form lowercase tags for the search bot (e.g. ["oversized", "boho",
+  // "linen"]). Sellers can leave blank; bot still works on name+description.
+  tagsJson    String   @default("[]")
+  // Lightweight stock counter for the cart flow.
+  stock       Int      @default(99)
+  // Engagement counters used for ranking.
+  viewCount   Int      @default(0)
+  likeCount   Int      @default(0)
+  saveCount   Int      @default(0)
+  salesCount  Int      @default(0)
+  // Average rating (computed in app code from Review aggregations).
+  ratingAvg   Float    @default(0)
+  ratingCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders     Order[]
+  favorites  Favorite[]
+  likes      Like[]
+  promotions Promotion[]
+  sketches   Sketch[]
+  cartItems  CartItem[]
+  reviews    Review[]
+}
+
+// -------------------- Posts (Designers) --------------------
+
+model Post {
+  id         String   @id @default(cuid())
+  authorId   String
+  author     User     @relation("DesignerPosts", fields: [authorId], references: [id], onDelete: Cascade)
+  title      String
+  body       String
+  imagesJson String   @default("[]")
+  tagsJson   String   @default("[]")
+  viewCount  Int      @default(0)
+  likeCount  Int      @default(0)
+  saveCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  favorites  Favorite[]
+  likes      Like[]
+  promotions Promotion[]
+  sketches   Sketch[]
+  comments   Comment[]
+}
+
+// -------------------- Comments on posts --------------------
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+// -------------------- Follows (buyers/sellers follow designers) --------------------
+
+model Follow {
+  id           String   @id @default(cuid())
+  followerId   String
+  follower     User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  designerId   String
+  designer     User     @relation("FollowedDesigner", fields: [designerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([followerId, designerId])
+}
+
+// -------------------- Cart --------------------
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@unique([cartId, productId])
+}
+
+// -------------------- Orders --------------------
+
+model Order {
+  id              String   @id @default(cuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  buyerId         String
+  buyer           User     @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId        String
+  seller          User     @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Cascade)
+  quantity        Int      @default(1)
+  totalPrice      Float
+  // PENDING | PAID | SHIPPED | COMPLETED | CANCELLED
+  status          String   @default("PENDING")
+  shippingAddress String?
+  notes           String?
+  // "DIRECT" (pay upfront via Monnify) | "ON_DELIVERY" (pay cash on arrival).
+  // ON_DELIVERY is gated on User.trustedBuyer — see /api/cart/checkout.
+  paymentMethod   String   @default("DIRECT")
+  // Set when payment is confirmed. `expectedDeliveryBy` is the deadline after
+  // which buyers can self-cancel a paid-but-undelivered order; default window
+  // is 14 days from paidAt (see DELIVERY_WINDOW_DAYS in lib/orders.ts).
+  paidAt          DateTime?
+  expectedDeliveryBy DateTime?
+  completedAt     DateTime?
+  // Shared by every Order in a single checkout group. Used to correlate
+  // Monnify webhook events (which arrive per paymentReference, not per order)
+  // back to the rows that need to be finalised.
+  paymentReference String?
+  // External transaction reference returned by Monnify after a successful
+  // payment. Stored for support / reconciliation.
+  paymentTxnRef   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([paymentReference])
+}
+
+// -------------------- Reviews --------------------
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  authorId  String
+  rating    Int      // 1..5
+  body      String?
+  createdAt DateTime @default(now())
+
+  @@unique([productId, authorId])
+}
+
+// -------------------- Chat / Messaging --------------------
+
+model Chat {
+  id           String            @id @default(cuid())
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  participants ChatParticipant[]
+  messages     Message[]
+}
+
+model ChatParticipant {
+  id       String   @id @default(cuid())
+  chatId   String
+  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([chatId, userId])
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  chatId    String
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User      @relation("MessageSender", fields: [senderId], references: [id])
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([chatId, createdAt])
+}
+
+// -------------------- Favorites / Wishlist & Likes --------------------
+
+// A "favorite" doubles as the buyer wishlist for products and a saved-posts list.
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@unique([userId, postId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@unique([userId, postId])
+}
+
+// -------------------- Promotions --------------------
+
+model Promotion {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  boost     Float    @default(1.5)
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([active, endsAt])
+}
+
+// -------------------- Search learning log --------------------
+
+// Records every search the bot serves, plus which result the user clicked.
+// The ranker reads recent rows to bias future results toward what worked
+// for similar queries. This is the "controlled learning" — it's a stats
+// table, not an opaque model, so behavior is predictable and auditable.
+model SearchLog {
+  id              String   @id @default(cuid())
+  // Lowercased, normalized text query (or "image" for image-only searches).
+  queryNorm       String
+  // Which top-level signal triggered the search ("text", "image").
+  source          String   @default("text")
+  userId          String?
+  // The first product the user clicked from this query, if any. Null if
+  // they never clicked — those rows still teach the bot the query gave
+  // poor results.
+  clickedProductId String?
+  createdAt       DateTime @default(now())
+
+  @@index([queryNorm, createdAt])
+  @@index([clickedProductId])
+}
+
+// -------------------- Sketches --------------------
+
+model Sketch {
+  id        String   @id @default(cuid())
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title     String
+  // Garment hint for the (eventual) 3D mockup pipeline.
+  // Values: shirt | gown | hoodie | trousers | skirt | agbada | dress | native | other
+  garment   String   @default("other")
+  imageData String
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id])
+  createdAt DateTime @default(now())
+}

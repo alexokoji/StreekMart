@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 251 250 254; /* warm off-white with a violet tint */
+  --foreground: 10 10 20;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial display rhythm — Fraunces opsz axis nudges large heads
+   wider and tighter, small text taller. */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+h1 { font-variation-settings: "opsz" 144, "SOFT" 30; }
+h2 { font-variation-settings: "opsz" 96, "SOFT" 40; }
+h3 { font-variation-settings: "opsz" 60, "SOFT" 50; }
+
+/* Disable iOS rubber-band on the body so bottom nav feels native. */
+body { overscroll-behavior-y: none; }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn text-white shadow-glow;
+    background-image: linear-gradient(135deg, #7c3aed 0%, #d946ef 100%);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-image: linear-gradient(135deg, #6d28d9 0%, #c026d3 100%);
+  }
+  .btn-gold {
+    @apply btn text-ink-900;
+    background-image: linear-gradient(135deg, #f3e6b8 0%, #cf9f32 100%);
+  }
+  .btn-secondary {
+    @apply btn bg-white border border-ink-200 text-ink-800 hover:border-violet-400 hover:text-violet-700;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-ink-700 hover:bg-violet-50 hover:text-violet-700;
+  }
+  .btn-danger {
+    @apply btn bg-burgundy-700 text-white hover:bg-burgundy-500;
+  }
+  .input {
+    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm transition-all focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-200/60;
+  }
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wide text-ink-600 mb-1.5;
+  }
+  .card {
+    @apply bg-white rounded-2xl border border-ink-100 shadow-sm;
+  }
+  .card-glow {
+    @apply card shadow-soft;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-violet-400 hover:text-violet-700;
+  }
+  .chip-active {
+    @apply chip border-violet-500 bg-violet-50 text-violet-700;
+  }
+  .product-card {
+    @apply card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-soft;
+  }
+  /* Heading helper — pairs Fraunces italic with a gold underline for editorial moments */
+  .h-display {
+    @apply font-display font-bold tracking-tight;
+  }
+  .h-italic-gold {
+    @apply font-display italic text-transparent bg-clip-text;
+    background-image: linear-gradient(135deg, #cf9f32 0%, #d946ef 100%);
+  }
+  /* Glassy surface for floating UI */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/40;
+  }
+  /* iOS-style safe-area bottom padding for the mobile tab bar */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  }
+}
+
+/* Aurora text — the wordmark on the hero */
+.aurora-text {
+  background-image: linear-gradient(120deg, #4c1d95, #7c3aed 30%, #d946ef 60%, #cf9f32);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Subtle ambient glow used behind hero badges */
+.glow-violet {
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.18), 0 12px 40px -12px rgba(124, 58, 237, 0.5);
+}

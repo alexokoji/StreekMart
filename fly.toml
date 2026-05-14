@@ -1,0 +1,64 @@
+# Fly.io app config for UpClo.
+#
+# - `app` is what fly assigns when you run `fly launch` — change this to the
+#   slug Fly gave you (or pre-set it before running `fly launch --no-deploy`).
+# - `primary_region` should be the closest Fly region to your seller base.
+#   "iad" (Ashburn, US East) is a fine default; "lhr" (London) for EU,
+#   "jnb" (Johannesburg) for African traffic.
+# - The `[mounts]` block attaches a persistent volume named `upclo_data` at
+#   /data. Create it once with:
+#     fly volumes create upclo_data --size 1 --region <your-region>
+# - `[[services]]` exposes the standalone Next.js server on port 3000 behind
+#   Fly's HTTPS proxy.
+
+app = "upclo"
+primary_region = "iad"
+kill_signal = "SIGINT"
+kill_timeout = 10
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+  # The entrypoint sets DATABASE_URL to file:/data/upclo.db unless you
+  # override it with a `fly secrets set DATABASE_URL=...` later (e.g. when
+  # migrating off SQLite to a hosted Postgres).
+
+[[mounts]]
+  source = "upclo_data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  auto_stop_machines = true
+  auto_start_machines = true
+  # Keep at least one machine warm so the first request after idle isn't a
+  # full cold start. Set to 0 if you want to lean fully on auto-stop.
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  # HTTP healthcheck so Fly notices if the server hangs.
+  [[services.http_checks]]
+    interval = "30s"
+    grace_period = "20s"
+    method = "get"
+    path = "/api/health"
+    protocol = "http"
+    timeout = "5s"
+    tls_skip_verify = false
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
