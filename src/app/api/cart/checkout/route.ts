@@ -7,6 +7,7 @@ import { requireApiUser } from "@/lib/auth";
 import { initTransaction, isLiveMode } from "@/lib/monnify";
 import { finalizePaidOrders } from "@/lib/orders";
 import { availableBalanceCents, chargeWalletForPurchase } from "@/lib/wallet";
+import { resolveDeliveryQuote } from "@/lib/location";
 
 // POST /api/cart/checkout — converts cart items into Orders (one per
 // seller×product) under a single payment group.
@@ -63,9 +64,43 @@ export async function POST(req: Request) {
     }
   }
 
+  const buyer = await prisma.user.findUnique({
+    where: { id: guard.session.sub },
+    select: { country: true, city: true, region: true },
+  });
+  if (!buyer?.country || !buyer.city) {
+    return NextResponse.json(
+      {
+        error:
+          "Add your country and city in Account settings before checking out — we use them to calculate delivery.",
+      },
+      { status: 400 },
+    );
+  }
+
   const cart = await prisma.cart.findUnique({
     where: { userId: guard.session.sub },
-    include: { items: { include: { product: true } } },
+    include: {
+      items: {
+        include: {
+          product: {
+            include: {
+              seller: {
+                select: {
+                  id: true,
+                  country: true,
+                  city: true,
+                  region: true,
+                  deliveryWithinCityCents: true,
+                  deliveryOutsideCityCents: true,
+                  deliveryOutsideCountryCents: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   if (!cart || cart.items.length === 0) {
     return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
@@ -83,16 +118,70 @@ export async function POST(req: Request) {
   // sibling order and finalise them together.
   const paymentReference = `UPCLO_${randomBytes(8).toString("hex").toUpperCase()}`;
 
+  // Resolve a delivery quote for every distinct seller in the cart. We do
+  // this BEFORE creating any Order rows so an international / unsupported-
+  // city blocker rejects the whole checkout with a clean error instead of
+  // half-creating PENDING rows.
+  const uniqueSellerIds = Array.from(new Set(live.map((it) => it.product.seller.id)));
+  const sellerRiderCounts = await prisma.manager.groupBy({
+    by: ["ownerId"],
+    where: { role: "rider", ownerId: { in: uniqueSellerIds } },
+    _count: { _all: true },
+  });
+  const hasRiderByOwner = new Map(
+    sellerRiderCounts.map((r) => [r.ownerId, (r._count?._all ?? 0) > 0] as const),
+  );
+
+  // Per-seller quote + which order in the group carries the fee.
+  type Quote = { feeCents: number; zone: string; fulfiller: "PLATFORM" | "SELLER" };
+  const quoteBySellerId = new Map<string, Quote>();
+  for (const sellerId of uniqueSellerIds) {
+    const seller = live.find((it) => it.product.seller.id === sellerId)!.product.seller;
+    const quote = await resolveDeliveryQuote({
+      buyer,
+      seller,
+      sellerHasRider: hasRiderByOwner.get(sellerId) ?? false,
+    });
+    if (quote.fulfiller === "BLOCKED") {
+      return NextResponse.json(
+        { error: quote.blockedReason ?? "Delivery isn't available for this seller." },
+        { status: 400 },
+      );
+    }
+    quoteBySellerId.set(sellerId, {
+      feeCents: quote.feeCents,
+      zone: quote.zone,
+      fulfiller: quote.fulfiller,
+    });
+  }
+
+  // Charge delivery once per seller in this checkout group — buying two
+  // items from the same shop should be one shipment, not two. The first
+  // order from each seller carries the full fee + fulfiller; the rest get
+  // 0 and inherit the same fulfiller (kept on every row for analytics).
+  const sellerSeen = new Set<string>();
+
   const orders = await prisma.$transaction(
     live.map((it) => {
       const unitPrice = it.product.salePrice ?? it.product.price;
+      const quote = quoteBySellerId.get(it.product.seller.id)!;
+      const sellerKey = it.product.seller.id;
+      const isFirstFromSeller = !sellerSeen.has(sellerKey);
+      if (isFirstFromSeller) sellerSeen.add(sellerKey);
+      const deliveryFeeCents = isFirstFromSeller ? quote.feeCents : 0;
+
       return prisma.order.create({
         data: {
           productId: it.product.id,
           buyerId: guard.session.sub,
           sellerId: it.product.sellerId,
           quantity: it.quantity,
-          totalPrice: unitPrice * it.quantity,
+          // totalPrice includes delivery so the seller's wallet credit and
+          // the gateway charge stay in sync with what the buyer was shown.
+          totalPrice: unitPrice * it.quantity + deliveryFeeCents / 100,
+          deliveryFeeCents,
+          deliveryZone: quote.zone,
+          deliveryFulfiller: quote.fulfiller,
           status: OrderStatus.PENDING,
           shippingAddress: parsed.data.shippingAddress,
           notes: parsed.data.notes,

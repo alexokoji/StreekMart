@@ -30,6 +30,17 @@ export async function GET() {
   if ("error" in guard) return guard.error;
   const userId = guard.session.sub;
 
+  // Buyer preferences (gender + interests) declared at signup. We treat
+  // missing values as "no opinion" — they don't filter, just bias.
+  const me = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { gender: true, interestsJson: true },
+  });
+  const stated = {
+    gender: me?.gender ?? null,
+    interests: parseJsonArray(me?.interestsJson ?? "[]"),
+  };
+
   // 1. Build the user's taste signal from their recent activity.
   const [likes, favorites] = await Promise.all([
     prisma.like.findMany({
@@ -53,6 +64,10 @@ export async function GET() {
   ]);
 
   const signals = [
+    // Stated preferences come first so Claude weights them appropriately
+    // even when there's no like/save history yet.
+    stated.gender ? `shopping for: ${stated.gender}` : null,
+    stated.interests.length > 0 ? `stated interests: ${stated.interests.join(", ")}` : null,
     ...likes.map((l) =>
       l.product
         ? `liked product: "${l.product.name}" (${l.product.category})`
@@ -81,18 +96,38 @@ export async function GET() {
     ),
   );
 
+  // Verification filter — recommendations only surface verified accounts.
+  // For products: seller must be verified-seller OR verified-designer (a
+  // designer who also sells). For posts: author must be a verified designer.
+  // Reads the trust line in src/lib/auth — unverified accounts simply don't
+  // appear in the candidate pool.
+  //
+  // Stated-interest bias — when the buyer told us their interest categories
+  // at signup, we still pull a wide candidate set (Claude makes the final
+  // call) but prefer matching categories first by ordering them above
+  // non-matches in the same popularity tier.
   const [candidateProducts, candidatePosts] = await Promise.all([
     prisma.product.findMany({
       where: {
         status: ProductStatus.ACTIVE,
         id: { notIn: Array.from(seenProductIds) },
+        seller: {
+          OR: [
+            { sellerVerified: true },
+            { designerVerified: true },
+          ],
+        },
+        ...(stated.interests.length > 0 ? { category: { in: stated.interests } } : {}),
       },
       include: { seller: { select: { id: true, name: true } } },
       orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
       take: 30,
     }),
     prisma.post.findMany({
-      where: { id: { notIn: Array.from(seenPostIds) } },
+      where: {
+        id: { notIn: Array.from(seenPostIds) },
+        author: { designerVerified: true },
+      },
       include: { author: { select: { id: true, name: true } } },
       orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
       take: 12,

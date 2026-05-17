@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "@/components/forms/ImageUploader";
+import { COUNTRIES } from "@/lib/location";
 
 type Initial = {
   name: string;
@@ -12,6 +13,9 @@ type Initial = {
   slug: string | null;
   isSeller: boolean;
   isDesigner: boolean;
+  country: string | null;
+  city: string | null;
+  region: string | null;
 };
 
 // Shared profile editor used by both /seller/settings and /designer/settings.
@@ -24,6 +28,9 @@ export function ProfileSettingsForm({ initial }: { initial: Initial }) {
   const [bio, setBio] = useState(initial.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl ?? "");
   const [slug, setSlug] = useState(initial.slug ?? "");
+  const [country, setCountry] = useState(initial.country ?? "");
+  const [city, setCity] = useState(initial.city ?? "");
+  const [region, setRegion] = useState(initial.region ?? "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -37,6 +44,9 @@ export function ProfileSettingsForm({ initial }: { initial: Initial }) {
       if (email !== initial.email) payload.email = email;
       if (slug && slug !== initial.slug) payload.slug = slug;
       if (password) payload.password = password;
+      if (country && country !== initial.country) payload.country = country;
+      if (city !== (initial.city ?? "")) payload.city = city;
+      if (region !== (initial.region ?? "")) payload.region = region;
 
       const res = await fetch("/api/account/profile", {
         method: "PATCH",
@@ -104,6 +114,52 @@ export function ProfileSettingsForm({ initial }: { initial: Initial }) {
           placeholder="A line or two about your label or aesthetic."
         />
         <p className="mt-1 text-[11px] text-ink-500">{bio.length}/500</p>
+      </div>
+
+      <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-ink-500">
+          Location
+        </p>
+        <p className="mt-1 text-[11px] text-ink-500">
+          Drives delivery zones at checkout — buyers see fees specific to your
+          city and country.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">Country</label>
+            <select
+              className="input"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+            >
+              <option value="">Select…</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">City</label>
+            <input
+              className="input"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              maxLength={80}
+              placeholder="e.g. Lagos"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">
+              State / Region <span className="text-xs text-ink-400">(optional)</span>
+            </label>
+            <input
+              className="input"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              maxLength={80}
+            />
+          </div>
+        </div>
       </div>
 
       <div>

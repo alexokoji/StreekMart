@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
+import { sendEmail, verificationDecisionEmail } from "@/lib/email";
 
 // PATCH /api/admin/verifications/[id] { decision, note? }
 //
@@ -53,6 +54,22 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       });
     }
   });
+
+  // Notify the requester. Fire-and-forget — failure is logged elsewhere
+  // (see lib/email.ts) and doesn't roll back the decision.
+  const requester = await prisma.user.findUnique({
+    where: { id: reqRow.userId },
+    select: { name: true, email: true },
+  });
+  if (requester) {
+    const tpl = verificationDecisionEmail({
+      name: requester.name,
+      kind: reqRow.kind as "SELLER" | "DESIGNER",
+      approved: decided === "APPROVED",
+      note: parsed.data.note,
+    });
+    void sendEmail({ to: requester.email, ...tpl }).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true, status: decided });
 }

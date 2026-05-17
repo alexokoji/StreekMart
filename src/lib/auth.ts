@@ -55,6 +55,12 @@ export async function getCurrentUser() {
       bio: true,
       avatarUrl: true,
       exposureScore: true,
+      country: true,
+      region: true,
+      city: true,
+      deliveryWithinCityCents: true,
+      deliveryOutsideCityCents: true,
+      deliveryOutsideCountryCents: true,
     },
   });
 }

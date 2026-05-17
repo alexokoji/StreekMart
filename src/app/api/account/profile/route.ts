@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession, setSessionCookie } from "@/lib/auth";
 import { validateSlug } from "@/lib/slug";
+import { isValidCountryCode } from "@/lib/location";
 
 // PATCH /api/account/profile { name?, bio?, avatarUrl?, email?, password?, slug? }
 //
@@ -21,6 +22,11 @@ const Body = z.object({
   email: z.string().email().optional(),
   password: z.string().min(8).max(200).optional(),
   slug: z.string().min(3).max(30).optional(),
+  // Location updates — useful both for buyers (delivery matching) and
+  // sellers (defines the "within city" zone for their delivery rates).
+  country: z.string().length(2).optional(),
+  city: z.string().min(2).max(80).optional(),
+  region: z.string().max(80).optional(),
 });
 
 export async function PATCH(req: Request) {
@@ -55,6 +61,15 @@ export async function PATCH(req: Request) {
   if (parsed.data.avatarUrl !== undefined) data.avatarUrl = parsed.data.avatarUrl || null;
   if (parsed.data.email) data.email = parsed.data.email;
   if (parsed.data.slug) data.slug = parsed.data.slug;
+  if (parsed.data.country) {
+    const code = parsed.data.country.toUpperCase();
+    if (!isValidCountryCode(code)) {
+      return NextResponse.json({ error: "Pick a supported country" }, { status: 400 });
+    }
+    data.country = code;
+  }
+  if (parsed.data.city !== undefined) data.city = parsed.data.city.trim();
+  if (parsed.data.region !== undefined) data.region = parsed.data.region.trim() || null;
   if (parsed.data.password) {
     const bcrypt = await import("bcryptjs");
     data.passwordHash = await bcrypt.hash(parsed.data.password, 10);

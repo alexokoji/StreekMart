@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CATEGORY_GROUPS } from "@/lib/enums";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { ImageUploader } from "@/components/forms/ImageUploader";
+import { PRODUCT_UNITS, type ProductUnit, unitConfig } from "@/lib/units";
 
 type ProductStatusValue = "DRAFT" | "ACTIVE" | "SOLD_OUT" | "ARCHIVED";
 
@@ -17,6 +18,7 @@ type ProductFormInitial = {
   category?: string;
   status?: string;
   stock?: number;
+  unit?: string;
   images?: string[];
 };
 
@@ -64,6 +66,9 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
     (initial?.status as ProductStatusValue) ?? "ACTIVE",
   );
   const [stock, setStock] = useState<number>(initial?.stock ?? 99);
+  const [unit, setUnit] = useState<ProductUnit>(
+    (initial?.unit as ProductUnit) ?? "piece",
+  );
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [aiNotes, setAiNotes] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -85,6 +90,7 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
         category,
         status,
         stock: Number(stock),
+        unit,
         images,
       };
 
@@ -224,7 +230,10 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>
           <label className="label">
-            Price <span className="text-[11px] font-normal text-ink-500">({ctx.flag} {ctx.code})</span>
+            Price{" "}
+            <span className="text-[11px] font-normal text-ink-500">
+              ({ctx.flag} {ctx.code} per {unitConfig(unit).longLabel})
+            </span>
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-500">
@@ -242,6 +251,22 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
           </div>
           <p className="mt-1 text-[11px] text-ink-500">
             Stored as USD; auto-converts to other currencies for buyers.
+          </p>
+        </div>
+        <div>
+          <label className="label">Pricing unit</label>
+          <select
+            className="input"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value as ProductUnit)}
+          >
+            {PRODUCT_UNITS.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-[11px] text-ink-500">
+            Pick &ldquo;yard&rdquo; / &ldquo;meter&rdquo; for fabrics so buyers can pick the
+            length they want.
           </p>
         </div>
         <div>

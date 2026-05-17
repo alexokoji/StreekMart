@@ -4,7 +4,12 @@
 // is provided by `src/lib/enums.ts`.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Turso (libSQL) connectivity in production goes through the
+  // @prisma/adapter-libsql driver adapter — see src/lib/db.ts. The
+  // datasource below stays "sqlite" so local dev with a dev.db file is
+  // unchanged.
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -47,8 +52,26 @@ model User {
   // Trusted-buyer flag — set by an admin once a buyer has completed enough
   // delivery-confirmed orders. Required to use Pay-on-Delivery at checkout.
   trustedBuyer Boolean  @default(false)
+  // Location — collected at registration so buyers can be matched with
+  // nearby sellers and sellers know where they're shipping. ISO-3166 alpha-2
+  // for `country`. Nullable on legacy rows; the UI prompts users to fill in.
+  country      String?
+  region       String?
+  city         String?
+  // Seller delivery rates (cents). Apply when this user is the seller on an
+  // order. Buyers don't write to these — they're seller-side shop config.
+  // Stored in USD-cents like every other money field on the platform.
+  deliveryWithinCityCents      Int @default(0)
+  deliveryOutsideCityCents     Int @default(0)
+  deliveryOutsideCountryCents  Int @default(0)
   bio          String?
   avatarUrl    String?
+  // Buyer preferences captured at signup or in account settings. Used by
+  // the recommendations + smart-search ranker to bias picks toward the
+  // shopper's stated taste. `interestsJson` is a JSON array of category
+  // slugs from CATEGORY_GROUPS in src/lib/enums.ts.
+  gender         String?    // "female" | "male" | "nonbinary" | "prefer-not-to-say"
+  interestsJson  String     @default("[]")
   // Aggregate exposure score driving feed ranking + recommendations.
   exposureScore Float   @default(0)
   createdAt    DateTime @default(now())
@@ -151,6 +174,12 @@ model Manager {
   owner           User     @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
   managerId       String
   manager         User     @relation("ManagerUser", fields: [managerId], references: [id], onDelete: Cascade)
+  // "manager" (default) | "rider"  — controls which surface they see when
+  // they log in. Riders land on /rider; managers stay on the regular
+  // dashboards their permissions allow.
+  role            String   @default("manager")
+  // Optional contact number — useful for delivery riders so buyers can call.
+  phone           String?
   // JSON array of permission strings, e.g. ["edit_products","manage_orders","reply_messages"]
   // See PERMISSION_KEYS in src/lib/managers.ts.
   permissionsJson String   @default("[]")
@@ -159,6 +188,7 @@ model Manager {
 
   @@unique([ownerId, managerId])
   @@index([managerId])
+  @@index([ownerId, role])
 }
 
 // -------------------- Verification --------------------
@@ -174,9 +204,23 @@ model VerificationRequest {
   kind          String
   // PENDING | APPROVED | REJECTED
   status        String    @default("PENDING")
-  // Free-text from the requester explaining why they should be verified.
+  // Business fields — replace the old free-text "tell us about yourself" with
+  // structured intake so admins can decide in seconds.
+  businessName    String?
+  businessAddress String?
+  // True when the requester has a brick-and-mortar shop (image of storefront
+  // becomes the primary evidence). False when they're online-only (CAC
+  // certificate becomes mandatory).
+  hasPhysicalStore Boolean @default(false)
+  // CDN URL for the storefront photo (required if hasPhysicalStore).
+  storeImageUrl   String?
+  // CDN URL for the CAC certificate PDF/image (required if !hasPhysicalStore;
+  // optional otherwise).
+  cacDocumentUrl  String?
+  // Free-text from the requester — kept as supplemental context.
   notes         String?
-  // JSON array of {label, url} document references.
+  // JSON array of extra {label, url} document references the requester wants
+  // to share (press, certifications, etc.).
   documentsJson String    @default("[]")
   reviewerId    String?
   reviewedAt    DateTime?
@@ -184,6 +228,51 @@ model VerificationRequest {
   createdAt     DateTime  @default(now())
 
   @@index([status, createdAt])
+}
+
+// -------------------- Order updates (tracking timeline) --------------------
+// Lightweight timeline so buyers can watch their order move toward them
+// without DMing the seller. The seller posts an update from /seller/orders/[id];
+// the buyer sees it on /account/orders/[id].
+model OrderUpdate {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // STATUS | DISPATCHED | ARRIVING | NOTE
+  kind      String
+  // Human-readable text the seller wrote — shown verbatim in the timeline.
+  message   String
+  // Optional ETA for arrival; populated for "DISPATCHED" / "ARRIVING" kinds.
+  etaAt     DateTime?
+  // Author — the seller or a manager acting on their behalf.
+  createdById String
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+// -------------------- Admin email broadcasts --------------------
+// Tracks bulk emails the admin sends from the dashboard so we have an audit
+// trail of who got what. The actual delivery goes through src/lib/email.ts.
+model EmailBroadcast {
+  id          String   @id @default(cuid())
+  createdById String
+  subject     String
+  // Plain text / HTML body. Stored verbatim so re-sends are reproducible.
+  body        String
+  // ALL | BUYERS | SELLERS | DESIGNERS | VERIFIED | SPECIFIC
+  audience    String
+  // When audience=SPECIFIC, the resolved recipient userIds (JSON array).
+  recipientIdsJson String @default("[]")
+  recipientCount Int      @default(0)
+  // Number actually accepted by the provider (Resend etc.).
+  sentCount   Int      @default(0)
+  // STUB | SENT | PARTIAL | FAILED
+  status      String   @default("STUB")
+  errorNote   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // -------------------- Products --------------------
@@ -202,6 +291,11 @@ model Product {
   // Higher-level grouping used on the homepage rails.
   // Values: "MATERIAL" (fabrics + sewing supplies) or "PRODUCT" (everything else).
   kind        String   @default("PRODUCT")
+  // The unit `price` is quoted in. Defaults to "piece" so existing rows keep
+  // their meaning; sellers of fabrics pick "yard" / "meter" / "foot" so the
+  // cart can render qty + unit and multiply correctly. Whitelist lives in
+  // src/lib/units.ts (PRODUCT_UNITS).
+  unit        String   @default("piece")
   // DRAFT | ACTIVE | SOLD_OUT | ARCHIVED
   status      String   @default("ACTIVE")
   // JSON-encoded array of image URLs (SQLite has no native string[]).
@@ -301,7 +395,9 @@ model CartItem {
   cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  quantity  Int      @default(1)
+  // Float so fabrics can be added by the half-yard / fraction. For
+  // piece-priced products the API still rejects fractional values.
+  quantity  Float    @default(1)
   createdAt DateTime @default(now())
 
   @@unique([cartId, productId])
@@ -317,7 +413,8 @@ model Order {
   buyer           User     @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
   sellerId        String
   seller          User     @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Cascade)
-  quantity        Int      @default(1)
+  // Float to mirror CartItem.quantity — fabric orders can be 2.5 yards.
+  quantity        Float    @default(1)
   totalPrice      Float
   // PENDING | PAID | SHIPPED | COMPLETED | CANCELLED
   status          String   @default("PENDING")
@@ -339,6 +436,25 @@ model Order {
   // External transaction reference returned by Monnify after a successful
   // payment. Stored for support / reconciliation.
   paymentTxnRef   String?
+  // Delivery fee snapshotted at order time so a later seller-side rate
+  // change doesn't retroactively alter what the buyer was charged.
+  deliveryFeeCents Int     @default(0)
+  // "WITHIN_CITY" | "OUTSIDE_CITY" | "OUTSIDE_COUNTRY" | "UNKNOWN"
+  deliveryZone    String   @default("UNKNOWN")
+  // Who carries out the delivery: "PLATFORM" (admin-supported city + seller
+  // has no rider) or "SELLER" (seller's own rider; fee credited to wallet
+  // minus admin's DELIVERY_PLATFORM_CUT_BPS).
+  deliveryFulfiller String @default("SELLER")
+  // 4-char alphanumeric code the buyer shares with the dispatch rider on
+  // arrival. The rider confirms delivery by entering this code — released
+  // funds + COMPLETED status all flow from a verified match. Stored as a
+  // string so leading zeros / letters are preserved.
+  deliveryCode    String?
+  // True when delivery was confirmed by a rider keying in the deliveryCode;
+  // false when the buyer pressed "Confirm delivery" themselves. Useful for
+  // analytics + dispute resolution.
+  completedByRider Boolean @default(false)
+  updates         OrderUpdate[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -482,4 +598,41 @@ model Sketch {
   postId    String?
   post      Post?    @relation(fields: [postId], references: [id])
   createdAt DateTime @default(now())
+}
+
+// -------------------- Delivery cities (platform-served) --------------------
+// A whitelist of (country, city) pairs the platform offers in-house delivery
+// in. Admin manages this. When BOTH the buyer and seller are in the same
+// entry, checkout uses the admin's `feeCents` (with a platform cut taken
+// off the top). Outside this list, sellers must use their own riders and
+// rates. See src/lib/location.ts → resolveDeliveryQuote.
+model DeliveryCity {
+  id        String   @id @default(cuid())
+  // ISO-3166 alpha-2 country code (matches User.country).
+  country   String
+  // Display name. Comparisons are case-insensitive + trimmed; see normCity
+  // helper in location.ts.
+  name      String
+  region    String?
+  // Platform-set delivery fee for within-city orders in this city, USD-cents.
+  feeCents  Int      @default(0)
+  // Soft-disable without deleting (keeps historical orders interpretable).
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([country, name])
+  @@index([active])
+}
+
+// -------------------- SiteSetting (admin-editable runtime config) --------------------
+// Key/value overrides for things that used to be plain env vars. The
+// getter in src/lib/settings.ts checks this table first and falls back to
+// process.env. Only a curated whitelist of keys is exposed in the admin UI
+// (see SETTINGS_DEFINITIONS) — secrets like JWT_SECRET stay env-only.
+model SiteSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
 }

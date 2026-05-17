@@ -1,0 +1,15 @@
+# Same exclusions as .dockerignore — what Render doesn't need to pull.
+.git
+.next
+node_modules
+npm-debug.log
+.env
+.env.local
+.env.*.local
+prisma/dev.db
+prisma/dev.db-journal
+public/uploads
+.vscode
+.idea
+*.log
+.turso

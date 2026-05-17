@@ -1,0 +1,16 @@
+# Same exclusions as .dockerignore — what Cloud Build doesn't need to upload.
+.git
+.next
+node_modules
+npm-debug.log
+.env
+.env.local
+.env.*.local
+prisma/dev.db
+prisma/dev.db-journal
+public/uploads
+.vscode
+.idea
+*.log
+README.md
+.turso

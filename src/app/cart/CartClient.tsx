@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Price } from "@/components/Price";
+import { formatQuantity, perUnitLabel, unitConfig } from "@/lib/units";
 
 type Item = {
   id: string;
@@ -17,6 +18,7 @@ type Item = {
     image: string | null;
     seller: { id: string; name: string };
     stock: number;
+    unit: string;
   };
 };
 
@@ -26,7 +28,7 @@ export function CartClient({ items: initial }: { items: Item[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function setQty(itemId: string, qty: number) {
-    if (qty < 1) return;
+    if (qty <= 0) return;
     setBusyId(itemId);
     try {
       const res = await fetch(`/api/cart/items/${itemId}`, {
@@ -57,60 +59,85 @@ export function CartClient({ items: initial }: { items: Item[] }) {
 
   return (
     <ul className="card divide-y">
-      {items.map((it) => (
-        <li key={it.id} className="flex gap-4 p-4">
-          <Link href={`/products/${it.product.id}`} className="block h-24 w-24 shrink-0 overflow-hidden rounded-md bg-gray-100">
-            {it.product.image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={it.product.image} alt={it.product.name} className="h-full w-full object-cover" />
-            )}
-          </Link>
-          <div className="flex-1 min-w-0">
-            <Link href={`/products/${it.product.id}`} className="font-medium hover:underline">
-              {it.product.name}
-            </Link>
-            <p className="text-xs text-gray-500">Sold by {it.product.seller.name}</p>
-            <p className="mt-1 text-sm">
-              <span className="font-semibold"><Price amount={it.product.effectivePrice} /></span>
-              {it.product.salePrice !== null && (
-                <span className="ml-2 text-xs text-gray-400 line-through"><Price amount={it.product.price} /></span>
+      {items.map((it) => {
+        const cfg = unitConfig(it.product.unit);
+        const isMeasured = it.product.unit !== "piece";
+        return (
+          <li key={it.id} className="flex gap-4 p-4">
+            <Link href={`/products/${it.product.id}`} className="block h-24 w-24 shrink-0 overflow-hidden rounded-md bg-gray-100">
+              {it.product.image && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={it.product.image} alt={it.product.name} className="h-full w-full object-cover" />
               )}
-            </p>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="inline-flex items-center rounded-md border border-gray-300">
+            </Link>
+            <div className="flex-1 min-w-0">
+              <Link href={`/products/${it.product.id}`} className="font-medium hover:underline">
+                {it.product.name}
+              </Link>
+              <p className="text-xs text-gray-500">Sold by {it.product.seller.name}</p>
+              <p className="mt-1 text-sm">
+                <span className="font-semibold"><Price amount={it.product.effectivePrice} /></span>
+                {isMeasured && (
+                  <span className="ml-1 text-xs text-gray-500">{perUnitLabel(it.product.unit)}</span>
+                )}
+                {it.product.salePrice !== null && (
+                  <span className="ml-2 text-xs text-gray-400 line-through"><Price amount={it.product.price} /></span>
+                )}
+              </p>
+              <div className="mt-3 flex items-center gap-3">
+                <div className="inline-flex items-center rounded-md border border-gray-300">
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
+                    onClick={() => setQty(it.id, Number((it.quantity - cfg.step).toFixed(2)))}
+                    disabled={busyId === it.id || it.quantity <= cfg.step}
+                  >
+                    −
+                  </button>
+                  {isMeasured ? (
+                    <input
+                      type="number"
+                      step={cfg.step}
+                      min={cfg.step}
+                      max={it.product.stock}
+                      className="w-16 border-x border-gray-300 bg-transparent px-1 py-1 text-center text-sm focus:outline-none"
+                      value={it.quantity}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (Number.isFinite(v) && v > 0) setQty(it.id, Number(v.toFixed(2)));
+                      }}
+                    />
+                  ) : (
+                    <span className="min-w-[2rem] px-2 text-center text-sm">{it.quantity}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
+                    onClick={() => setQty(it.id, Number((it.quantity + cfg.step).toFixed(2)))}
+                    disabled={busyId === it.id || it.quantity >= it.product.stock}
+                  >
+                    +
+                  </button>
+                </div>
+                <span className="text-xs text-ink-500">
+                  {formatQuantity(it.quantity, it.product.unit)}
+                </span>
                 <button
                   type="button"
-                  className="px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
-                  onClick={() => setQty(it.id, it.quantity - 1)}
-                  disabled={busyId === it.id || it.quantity <= 1}
+                  className="ml-auto text-xs text-gray-500 hover:text-red-600"
+                  onClick={() => remove(it.id)}
+                  disabled={busyId === it.id}
                 >
-                  −
-                </button>
-                <span className="min-w-[2rem] px-2 text-center text-sm">{it.quantity}</span>
-                <button
-                  type="button"
-                  className="px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-40"
-                  onClick={() => setQty(it.id, it.quantity + 1)}
-                  disabled={busyId === it.id || it.quantity >= it.product.stock}
-                >
-                  +
+                  Remove
                 </button>
               </div>
-              <button
-                type="button"
-                className="text-xs text-gray-500 hover:text-red-600"
-                onClick={() => remove(it.id)}
-                disabled={busyId === it.id}
-              >
-                Remove
-              </button>
             </div>
-          </div>
-          <p className="shrink-0 text-right text-sm font-semibold">
-            <Price amount={it.product.effectivePrice * it.quantity} />
-          </p>
-        </li>
-      ))}
+            <p className="shrink-0 text-right text-sm font-semibold">
+              <Price amount={it.product.effectivePrice * it.quantity} />
+            </p>
+          </li>
+        );
+      })}
     </ul>
   );
 }

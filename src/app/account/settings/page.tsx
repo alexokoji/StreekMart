@@ -29,6 +29,9 @@ export default async function BuyerAccountSettingsPage() {
             slug: user.slug,
             isSeller: user.isSeller,
             isDesigner: user.isDesigner,
+            country: user.country,
+            city: user.city,
+            region: user.region,
           }}
         />
       </div>

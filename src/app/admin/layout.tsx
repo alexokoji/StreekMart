@@ -6,8 +6,15 @@ const NAV = [
   { href: "/admin/users", label: "Users" },
   { href: "/admin/verifications", label: "Verifications" },
   { href: "/admin/products", label: "Products" },
+  { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/refunds", label: "Refunds" },
+  { href: "/admin/delivery", label: "Delivery rates" },
+  { href: "/admin/delivery-cities", label: "Delivery cities" },
+  { href: "/admin/locations", label: "Locations" },
   { href: "/admin/payouts", label: "Payouts" },
+  { href: "/admin/email", label: "Email broadcasts" },
   { href: "/admin/fees", label: "Platform fees" },
+  { href: "/admin/settings", label: "Site settings" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

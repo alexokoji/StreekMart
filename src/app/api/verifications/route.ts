@@ -4,20 +4,42 @@ import { Permission } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 
-// POST /api/verifications  — file a request to be verified.
-// Sellers ask for a SELLER badge, designers for a DESIGNER badge. A user
-// can only have one PENDING request per kind at a time.
+// POST /api/verifications  — file a verification request.
+// GET  /api/verifications  — list the requesting user's own requests.
 //
-// GET /api/verifications  — list the requesting user's own requests.
+// Robust intake: business name + address are required for everyone; the
+// hasPhysicalStore toggle decides which piece of evidence is mandatory.
 
-const Body = z.object({
-  kind: z.enum(["SELLER", "DESIGNER"]),
-  notes: z.string().max(2000).optional(),
-  documents: z
-    .array(z.object({ label: z.string().min(1).max(80), url: z.string().url() }))
-    .max(8)
-    .optional(),
-});
+const Body = z
+  .object({
+    kind: z.enum(["SELLER", "DESIGNER"]),
+    businessName: z.string().min(2).max(120),
+    businessAddress: z.string().min(5).max(500),
+    hasPhysicalStore: z.boolean(),
+    storeImageUrl: z.string().url().optional().or(z.literal("")),
+    cacDocumentUrl: z.string().url().optional().or(z.literal("")),
+    notes: z.string().max(2000).optional(),
+    documents: z
+      .array(z.object({ label: z.string().min(1).max(80), url: z.string().url() }))
+      .max(8)
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasPhysicalStore && !data.storeImageUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["storeImageUrl"],
+        message: "Upload a photo of your storefront with your business name visible.",
+      });
+    }
+    if (!data.hasPhysicalStore && !data.cacDocumentUrl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cacDocumentUrl"],
+        message: "Upload your CAC certificate to verify an online-only business.",
+      });
+    }
+  });
 
 export async function POST(req: Request) {
   const guard = await requireApiUser([Permission.SELLER, Permission.DESIGNER]);
@@ -25,9 +47,13 @@ export async function POST(req: Request) {
 
   const json = await req.json().catch(() => null);
   const parsed = Body.safeParse(json);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+      { status: 400 },
+    );
+  }
 
-  // Check the requester actually has the permission they're asking to verify.
   const me = await prisma.user.findUnique({ where: { id: guard.session.sub } });
   if (!me) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (parsed.data.kind === "SELLER" && !me.isSeller) {
@@ -55,6 +81,11 @@ export async function POST(req: Request) {
     data: {
       userId: me.id,
       kind: parsed.data.kind,
+      businessName: parsed.data.businessName,
+      businessAddress: parsed.data.businessAddress,
+      hasPhysicalStore: parsed.data.hasPhysicalStore,
+      storeImageUrl: parsed.data.storeImageUrl || null,
+      cacDocumentUrl: parsed.data.cacDocumentUrl || null,
       notes: parsed.data.notes,
       documentsJson: JSON.stringify(parsed.data.documents ?? []),
     },

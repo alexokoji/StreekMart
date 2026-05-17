@@ -11,7 +11,10 @@
 import { OrderStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { exposureDelta } from "@/lib/ranking";
-import { recordSale } from "@/lib/wallet";
+import { recordSale, recordTransaction } from "@/lib/wallet";
+import { generateDeliveryCode } from "@/lib/deliveryCode";
+import { orderPlacedEmail, sendEmail } from "@/lib/email";
+import { platformDeliveryCutBps } from "@/lib/location";
 
 // How many days a buyer has to wait between payment and the option to
 // self-cancel an undelivered order. Conservative default — long enough for
@@ -47,7 +50,8 @@ export async function finalizePaidOrders(args: {
 
   // Move every pending order in this group into PAID atomically and stamp
   // both `paidAt` and `expectedDeliveryBy` so the buyer-cancel rule has a
-  // deadline to compare against.
+  // deadline to compare against. Each order also gets a unique 4-char
+  // delivery code the buyer will share with the dispatch rider.
   const paidAt = new Date();
   const expectedDeliveryBy = new Date(
     paidAt.getTime() + DELIVERY_WINDOW_DAYS * 24 * 60 * 60 * 1000,
@@ -61,6 +65,9 @@ export async function finalizePaidOrders(args: {
           paymentTxnRef: args.paymentTxnRef ?? o.paymentTxnRef,
           paidAt,
           expectedDeliveryBy,
+          // Only assign if missing — preserves any code already set on a
+          // re-fired webhook (idempotent finalisation).
+          deliveryCode: o.deliveryCode ?? generateDeliveryCode(),
         },
       }),
     ),
@@ -70,6 +77,14 @@ export async function finalizePaidOrders(args: {
   // product's *current* status is irrelevant here — the buyer already paid,
   // so the seller must be credited even if the listing was archived in the
   // meantime.
+  //
+  // Delivery fee split (introduced when the platform took over fees):
+  //   - PLATFORM fulfiller → fee stays with platform; seller gets only the
+  //     product portion credited.
+  //   - SELLER fulfiller   → seller's wallet gets (fee − platform cut)
+  //     credited as a separate DELIVERY entry.
+  const cutBps = await platformDeliveryCutBps();
+
   for (const o of pending) {
     await prisma.$transaction([
       prisma.product.update({
@@ -81,12 +96,48 @@ export async function finalizePaidOrders(args: {
         data: { exposureScore: { increment: exposureDelta("sale") * o.quantity } },
       }),
     ]);
+
+    // Product-only credit (subtract delivery from the total so we don't
+    // double-count it; `recordSale` applies the product-side PLATFORM_FEE_BPS).
+    const totalCents = Math.round(o.totalPrice * 100);
+    const productCents = totalCents - o.deliveryFeeCents;
     await recordSale({
       sellerId: o.sellerId,
-      grossCents: Math.round(o.totalPrice * 100),
+      grossCents: productCents,
       productName: o.product.name,
       orderId: o.id,
     });
+
+    // Delivery credit — only when the seller is the fulfiller. Held
+    // alongside the product credit; releases together when buyer/rider
+    // confirms delivery.
+    if (o.deliveryFeeCents > 0 && o.deliveryFulfiller === "SELLER") {
+      const cut = Math.round((o.deliveryFeeCents * cutBps) / 10000);
+      const netDelivery = o.deliveryFeeCents - cut;
+      await recordTransaction({
+        userId: o.sellerId,
+        amountCents: netDelivery,
+        type: "SALE_CREDIT",
+        description: `Delivery fee (net of platform cut) for order #${o.id.slice(0, 8)}`,
+        refType: "order",
+        refId: o.id,
+      });
+      if (cut > 0) {
+        await recordTransaction({
+          userId: o.sellerId,
+          amountCents: -cut,
+          type: "PLATFORM_FEE",
+          description: `Delivery platform cut (${(cutBps / 100).toFixed(2)}%)`,
+          refType: "order",
+          refId: o.id,
+        });
+      }
+      // Add the delivery net to held funds — released when delivery confirms.
+      await prisma.wallet.update({
+        where: { userId: o.sellerId },
+        data: { heldCents: { increment: netDelivery } },
+      });
+    }
   }
 
   // Clear the buyer's cart of anything that just got finalised. Same buyer
@@ -97,6 +148,31 @@ export async function finalizePaidOrders(args: {
     await prisma.cartItem.deleteMany({
       where: { cartId: cart.id, productId: { in: pending.map((o) => o.productId) } },
     });
+  }
+
+  // Send the buyer one confirmation email per order in this checkout group.
+  // Each order has its own delivery code; sending separately keeps the code
+  // visually obvious in the inbox. Fire-and-forget — email failure mustn't
+  // roll back the payment.
+  const buyer = await prisma.user.findUnique({
+    where: { id: buyerId },
+    select: { email: true, name: true },
+  });
+  if (buyer?.email) {
+    const fresh = await prisma.order.findMany({
+      where: { id: { in: pending.map((o) => o.id) } },
+      include: { product: { select: { name: true } } },
+    });
+    for (const o of fresh) {
+      const tpl = orderPlacedEmail({
+        name: buyer.name,
+        orderId: o.id,
+        productName: o.product.name,
+        deliveryCode: o.deliveryCode,
+        totalDisplay: `$${o.totalPrice.toFixed(2)}`,
+      });
+      void sendEmail({ to: buyer.email, ...tpl }).catch(() => {});
+    }
   }
 
   return {

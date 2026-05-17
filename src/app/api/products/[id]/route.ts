@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managers";
 import { convertToUsd } from "@/lib/currencyServer";
+import { PRODUCT_UNITS } from "@/lib/units";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const product = await prisma.product.findUnique({
@@ -33,6 +34,10 @@ const UpdateBody = z.object({
   status: z.nativeEnum(ProductStatus).optional(),
   stock: z.number().int().nonnegative().optional(),
   images: z.array(z.string()).optional(),
+  // Pricing unit — see src/lib/units.ts. Editing this changes how cart
+  // quantities are validated for *future* additions; existing cart rows
+  // keep whatever quantity they were saved with.
+  unit: z.enum(PRODUCT_UNITS as [typeof PRODUCT_UNITS[number], ...typeof PRODUCT_UNITS[number][]]).optional(),
   // ISO-4217 — currency the seller typed `price`/`salePrice` in. When
   // present and not USD, the values are converted to USD before storage.
   currency: z.string().length(3).optional(),

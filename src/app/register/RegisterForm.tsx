@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { COUNTRIES } from "@/lib/location";
+import { CATEGORY_GROUPS } from "@/lib/enums";
+
+const INTEREST_OPTIONS = Object.values(CATEGORY_GROUPS).flat();
+
+type Gender = "female" | "male" | "nonbinary" | "prefer-not-to-say";
 
 export function RegisterForm() {
   // Google button always renders. If GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
@@ -13,10 +19,19 @@ export function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
+  const [region, setRegion] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
+  const [interests, setInterests] = useState<string[]>([]);
   const [isSeller, setIsSeller] = useState(false);
   const [isDesigner, setIsDesigner] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  function toggleInterest(c: string) {
+    setInterests((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,7 +41,18 @@ export function RegisterForm() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, isSeller, isDesigner }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          country,
+          city,
+          region: region || undefined,
+          gender: gender || undefined,
+          interests: interests.length > 0 ? interests : undefined,
+          isSeller,
+          isDesigner,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -84,6 +110,117 @@ export function RegisterForm() {
           <label className="label" htmlFor="email">Email</label>
           <input id="email" type="email" required className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="country">Country</label>
+            <select
+              id="country"
+              required
+              className="input"
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+            >
+              <option value="">Select…</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="city">City</label>
+            <input
+              id="city"
+              required
+              minLength={2}
+              maxLength={80}
+              className="input"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="e.g. Lagos"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="region">
+              State / Region <span className="text-xs text-gray-400">(optional)</span>
+            </label>
+            <input
+              id="region"
+              maxLength={80}
+              className="input"
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              placeholder="e.g. Lagos State"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Helps buyers in big countries narrow down delivery zones.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-ink-100 bg-violet-50/30 p-3">
+          <p className="label">Tell us what you love <span className="text-xs text-ink-400">(optional)</span></p>
+          <p className="-mt-0.5 text-xs text-ink-500">
+            We use this to curate the homepage and search suggestions for you. You can
+            change it later from Account settings.
+          </p>
+
+          <div className="mt-3">
+            <label className="label">Shopping for</label>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["female", "Womenswear"],
+                  ["male", "Menswear"],
+                  ["nonbinary", "Unisex"],
+                  ["prefer-not-to-say", "Skip"],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setGender(v)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium ${
+                    gender === v
+                      ? "border-violet-500 bg-violet-100 text-violet-700"
+                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="label">Interests</label>
+            <div className="flex flex-wrap gap-1.5">
+              {INTEREST_OPTIONS.map((c) => {
+                const on = interests.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleInterest(c)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                      on
+                        ? "border-violet-500 bg-violet-100 text-violet-700"
+                        : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[11px] text-ink-500">
+              {interests.length === 0 ? "Pick any that fit" : `${interests.length} selected`}
+            </p>
+          </div>
+        </div>
+
         <div>
           <label className="label" htmlFor="password">Password</label>
           <input id="password" type="password" required minLength={8} className="input" value={password} onChange={(e) => setPassword(e.target.value)} />

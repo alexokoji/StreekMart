@@ -8,12 +8,21 @@ import { PERMISSION_KEYS, type PermissionKey } from "@/lib/managers";
 // GET /api/managers — list managers attached to the calling user.
 // POST /api/managers — create a new manager User account + the link.
 //
-// The "create + link" pattern means owners hand their manager a fresh login
-// (email + password) instead of inviting an existing StreekMart account. That's
-// closer to how a real shop would onboard a part-timer: the owner sets up
-// the credentials and shares them. Manager users get a Buyer-only account
-// (no isSeller/isDesigner) but inherit owner-scoped capabilities through
-// the Manager join row.
+// `role` = "manager" (default) | "rider".
+//
+//   - role="manager" works as before. Owner picks the permission keys to
+//     grant. Examples: a shop assistant with `edit_products`+`manage_orders`.
+//
+//   - role="rider" is the new delivery-rider flow:
+//       * Only verified sellers / designers can create them — the gate keeps
+//         random accounts from spinning up fake fleets.
+//       * Permissions are forced to ["manage_deliveries"] regardless of what
+//         the client sends. Riders shouldn't have shop-management access.
+//       * Optional `phone` is stored on the Manager row for buyer contact.
+//
+// In both cases the manager gets a real User account (buyer-only) plus a
+// Manager link to the owner. Login URL: /login as normal; riders land on
+// /rider, regular managers on /account.
 
 export async function GET() {
   const guard = await requireApiUser([Permission.SELLER, Permission.DESIGNER]);
@@ -30,6 +39,8 @@ export async function GET() {
   return NextResponse.json({
     managers: rows.map((r) => ({
       id: r.id,
+      role: r.role,
+      phone: r.phone,
       manager: r.manager,
       permissions: safeParseKeys(r.permissionsJson),
       createdAt: r.createdAt,
@@ -41,7 +52,11 @@ const CreateBody = z.object({
   name: z.string().min(2).max(80),
   email: z.string().email(),
   password: z.string().min(8).max(200),
-  permissions: z.array(z.enum(PERMISSION_KEYS as readonly [PermissionKey, ...PermissionKey[]])),
+  role: z.enum(["manager", "rider"]).default("manager"),
+  phone: z.string().max(40).optional(),
+  permissions: z
+    .array(z.enum(PERMISSION_KEYS as readonly [PermissionKey, ...PermissionKey[]]))
+    .default([]),
 });
 
 export async function POST(req: Request) {
@@ -57,6 +72,26 @@ export async function POST(req: Request) {
     );
   }
 
+  // Rider creation is gated on verification — only sellers / designers with
+  // an approved badge can spin up delivery accounts. This keeps the trust
+  // chain end-to-end: a buyer ordering from a verified shop knows the rider
+  // belongs to a verified outfit.
+  if (parsed.data.role === "rider") {
+    const owner = await prisma.user.findUnique({
+      where: { id: guard.session.sub },
+      select: { sellerVerified: true, designerVerified: true },
+    });
+    if (!owner?.sellerVerified && !owner?.designerVerified) {
+      return NextResponse.json(
+        {
+          error:
+            "Only verified sellers or designers can create delivery rider accounts. Submit a verification request first.",
+        },
+        { status: 403 },
+      );
+    }
+  }
+
   // Email must be unique across the whole platform — manager accounts are
   // real Users, not a parallel namespace.
   const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
@@ -66,6 +101,11 @@ export async function POST(req: Request) {
       { status: 409 },
     );
   }
+
+  // Force the rider permission set; ignore whatever the client sent. For
+  // regular managers, use the client-supplied permissions.
+  const finalPermissions: PermissionKey[] =
+    parsed.data.role === "rider" ? ["manage_deliveries"] : parsed.data.permissions;
 
   const passwordHash = await hashPassword(parsed.data.password);
   const result = await prisma.$transaction(async (tx) => {
@@ -84,7 +124,9 @@ export async function POST(req: Request) {
       data: {
         ownerId: guard.session.sub,
         managerId: manager.id,
-        permissionsJson: JSON.stringify(parsed.data.permissions),
+        role: parsed.data.role,
+        phone: parsed.data.phone ?? null,
+        permissionsJson: JSON.stringify(finalPermissions),
       },
     });
     return { manager, link };
@@ -92,7 +134,9 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     manager: result.manager,
-    permissions: parsed.data.permissions,
+    role: parsed.data.role,
+    phone: parsed.data.phone ?? null,
+    permissions: finalPermissions,
     linkId: result.link.id,
   });
 }

@@ -22,6 +22,9 @@ export const PERMISSION_KEYS = [
   // Shared
   "reply_messages",
   "view_wallet",
+  // Delivery rider — pick up + drop off orders, post tracking updates.
+  // Granted automatically when a manager is created with role="rider".
+  "manage_deliveries",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -35,6 +38,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   use_sketch_studio: "Use the Sketch Studio",
   reply_messages: "Reply to messages",
   view_wallet: "View the wallet (read-only)",
+  manage_deliveries: "Pick up & confirm deliveries",
 };
 
 // Parse the JSON column on Manager.permissionsJson into a typed array.
@@ -64,8 +68,19 @@ export async function listManagedAccounts(managerId: string) {
   return rows.map((r) => ({
     ownerId: r.ownerId,
     owner: r.owner,
+    role: r.role,
     permissions: parsePermissions(r.permissionsJson),
   }));
+}
+
+// Returns just the owner IDs a user is a rider for. Empty list means the
+// user isn't a delivery rider anywhere — used by /rider to gate the page.
+export async function listRiderOwnerIds(managerId: string): Promise<string[]> {
+  const rows = await prisma.manager.findMany({
+    where: { managerId, role: "rider" },
+    select: { ownerId: true },
+  });
+  return rows.map((r) => r.ownerId);
 }
 
 // Convenience: does `actorId` have permission `key` on `ownerId`'s store?

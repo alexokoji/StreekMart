@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Permission } from "@/lib/enums";
 import { requireUser } from "@/lib/auth";
 import { ProfileSettingsForm } from "@/components/forms/ProfileSettingsForm";
+import { DeliveryFeesForm } from "@/components/dashboard/DeliveryFeesForm";
 import { ShareButton } from "@/components/ShareButton";
 
 export default async function SellerSettingsPage() {
@@ -36,8 +37,28 @@ export default async function SellerSettingsPage() {
             slug: user.slug,
             isSeller: user.isSeller,
             isDesigner: user.isDesigner,
+            country: user.country,
+            city: user.city,
+            region: user.region,
           }}
         />
+      </div>
+
+      <div className="card p-6">
+        <h2 className="font-display text-lg font-semibold">Delivery rates</h2>
+        <p className="text-sm text-ink-600">
+          Set what buyers pay for delivery, by zone. Your shop&apos;s city is used to
+          decide which rate applies — set it under Location above.
+        </p>
+        <div className="mt-4">
+          <DeliveryFeesForm
+            initial={{
+              withinCityCents: user.deliveryWithinCityCents,
+              outsideCityCents: user.deliveryOutsideCityCents,
+              outsideCountryCents: user.deliveryOutsideCountryCents,
+            }}
+          />
+        </div>
       </div>
     </div>
   );

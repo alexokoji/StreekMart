@@ -1,0 +1,84 @@
+# Cloud Build pipeline: docker build → push to Artifact Registry → deploy to Cloud Run.
+#
+# Usage from the repo root:
+#   gcloud builds submit --config=cloudbuild.yaml \
+#     --substitutions=_REGION=us-central1,_REPO=streekmart,_SERVICE=streekmart
+#
+# Prereqs:
+#   gcloud auth login
+#   gcloud config set project <your-project-id>
+#   gcloud services enable artifactregistry.googleapis.com run.googleapis.com cloudbuild.googleapis.com
+#   gcloud artifacts repositories create $_REPO --location=$_REGION --repository-format=docker
+#
+# Secrets (Anthropic, Cloudinary, Monnify, Google OAuth, JWT, Turso) live in
+# Secret Manager — see scripts/cloud-run-setup.sh for the one-time creation.
+
+substitutions:
+  _REGION: us-central1
+  _REPO: streekmart
+  _SERVICE: streekmart
+
+steps:
+  # 1) Build the image, tagged with the Cloud Build trigger SHA.
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+
+  # 2) Push both tags to Artifact Registry.
+  - name: gcr.io/cloud-builders/docker
+    id: push-sha
+    args: [push, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA"]
+  - name: gcr.io/cloud-builders/docker
+    id: push-latest
+    args: [push, "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest"]
+
+  # 3) Deploy to Cloud Run. All secrets are pulled from Secret Manager — they
+  # never appear in build logs. `min-instances=0` keeps the service inside
+  # the free tier.
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=3000
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=4
+      - --concurrency=80
+      - --timeout=60
+      - --set-env-vars=NODE_ENV=production,NEXT_TELEMETRY_DISABLED=1,FEATURE_SKETCH_3D=1
+      - --set-secrets=JWT_SECRET=jwt-secret:latest
+      - --set-secrets=ANTHROPIC_API_KEY=anthropic-api-key:latest
+      - --set-secrets=TURSO_DATABASE_URL=turso-database-url:latest
+      - --set-secrets=TURSO_AUTH_TOKEN=turso-auth-token:latest
+      - --set-secrets=CLOUDINARY_CLOUD_NAME=cloudinary-cloud-name:latest
+      - --set-secrets=CLOUDINARY_API_KEY=cloudinary-api-key:latest
+      - --set-secrets=CLOUDINARY_API_SECRET=cloudinary-api-secret:latest
+      - --set-secrets=GOOGLE_CLIENT_ID=google-client-id:latest
+      - --set-secrets=GOOGLE_CLIENT_SECRET=google-client-secret:latest
+      - --set-secrets=MONNIFY_API_KEY=monnify-api-key:latest
+      - --set-secrets=MONNIFY_SECRET_KEY=monnify-secret-key:latest
+      - --set-secrets=MONNIFY_CONTRACT_CODE=monnify-contract-code:latest
+      - --set-secrets=MONNIFY_WALLET_ID=monnify-wallet-id:latest
+      - --set-secrets=MONNIFY_WEBHOOK_HASH=monnify-webhook-hash:latest
+      - --set-secrets=NEXT_PUBLIC_APP_URL=app-url:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

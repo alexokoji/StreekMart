@@ -6,6 +6,7 @@ import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
 import { ProductCard, type ProductCardData } from "@/components/storefront/ProductCard";
 import { CategoryRail } from "@/components/storefront/CategoryRail";
+import { SmartSuggestions } from "@/components/SmartSuggestions";
 
 export const dynamic = "force-dynamic";
 
@@ -224,6 +225,9 @@ export default async function HomePage() {
           <CardGrid items={bestSellers.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
+
+      {/* Smart suggestions — personalised for signed-in users, trending for guests. */}
+      <SmartSuggestions />
 
       {/* Top designers */}
       <section>

@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { validateQuantity } from "@/lib/units";
 
-const PatchBody = z.object({ quantity: z.number().int().positive().max(20) });
+// Float quantity — see CartItem.quantity in schema.prisma. The unit's step
+// rule is enforced after we look up the product (we need product.unit).
+const PatchBody = z.object({ quantity: z.number().positive().max(1000) });
 
 // PATCH /api/cart/items/[id] — set quantity for a cart line item.
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -21,6 +24,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!item || item.cart.userId !== guard.session.sub) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const stepError = validateQuantity(parsed.data.quantity, item.product.unit);
+  if (stepError) return NextResponse.json({ error: stepError }, { status: 400 });
 
   const qty = Math.min(item.product.stock, parsed.data.quantity);
   const updated = await prisma.cartItem.update({ where: { id: item.id }, data: { quantity: qty } });

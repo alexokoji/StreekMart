@@ -42,19 +42,66 @@ export default async function AdminVerificationsPage() {
             {requests.map((r) => (
               <li key={r.id} className="card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-display text-lg font-semibold">
                       {r.user.name}
                       <span className="ml-2 badge bg-violet-50 text-violet-700">{r.kind}</span>
+                      <span className="ml-2 badge bg-ink-50 text-ink-700">
+                        {r.hasPhysicalStore ? "Physical store" : "Online-only"}
+                      </span>
                     </p>
                     <p className="text-xs text-ink-500">
                       {r.user.email} · requested {timeAgo(r.createdAt)}
                     </p>
-                    {r.user.bio && (
-                      <p className="mt-1 max-w-xl text-xs italic text-ink-500">{r.user.bio}</p>
-                    )}
+
+                    <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+                      <div>
+                        <dt className="font-semibold uppercase tracking-widest text-ink-500">Business</dt>
+                        <dd className="mt-0.5 font-medium">{r.businessName ?? "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="font-semibold uppercase tracking-widest text-ink-500">Address</dt>
+                        <dd className="mt-0.5 whitespace-pre-wrap">{r.businessAddress ?? "—"}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {r.storeImageUrl && (
+                        <a
+                          href={r.storeImageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group block"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={r.storeImageUrl}
+                            alt="Storefront"
+                            className="h-28 w-40 rounded-lg border border-ink-200 object-cover group-hover:border-violet-400"
+                          />
+                          <p className="mt-1 text-[10px] text-ink-500">Storefront photo</p>
+                        </a>
+                      )}
+                      {r.cacDocumentUrl && (
+                        <a
+                          href={r.cacDocumentUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group block"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={r.cacDocumentUrl}
+                            alt="CAC certificate"
+                            className="h-28 w-40 rounded-lg border border-ink-200 object-cover group-hover:border-violet-400"
+                          />
+                          <p className="mt-1 text-[10px] text-ink-500">CAC certificate</p>
+                        </a>
+                      )}
+                    </div>
+
                     {r.notes && (
-                      <p className="mt-2 max-w-2xl whitespace-pre-wrap text-sm text-ink-700">{r.notes}</p>
+                      <p className="mt-3 max-w-2xl whitespace-pre-wrap text-sm text-ink-700">{r.notes}</p>
                     )}
                   </div>
                   <VerificationDecisionRow id={r.id} />

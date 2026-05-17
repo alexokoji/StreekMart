@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { OrderStatusActions } from "./OrderStatusActions";
+import { TrackingUpdater } from "./TrackingUpdater";
 
 export default async function ViewOrderPage({ params }: { params: { id: string } }) {
   const user = await requireUser("SELLER");
@@ -76,8 +77,22 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
             <p className="text-lg font-semibold">{order.status}</p>
             <OrderStatusActions orderId={order.id} status={order.status} />
           </div>
+
+          {order.deliveryCode && (
+            <div className="card p-6">
+              <h2 className="mb-2 text-sm font-semibold uppercase text-gray-500">Delivery code</h2>
+              <p className="font-mono text-2xl font-bold tracking-[0.4em]">{order.deliveryCode}</p>
+              <p className="mt-2 text-xs text-ink-500">
+                Buyer reads this to the rider at the door. Rider keys it in at{" "}
+                <code className="rounded bg-ink-50 px-1">{`/deliver/${order.id.slice(0, 8)}…`}</code>{" "}
+                to mark the order delivered.
+              </p>
+            </div>
+          )}
         </aside>
       </div>
+
+      <TrackingUpdater orderId={order.id} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
+import { deliveryFeeCentsFor, deliveryZoneFor, deliveryZoneLabel } from "@/lib/location";
 import { CartClient } from "./CartClient";
 
 export default async function CartPage() {
@@ -16,7 +17,22 @@ export default async function CartPage() {
     include: {
       items: {
         include: {
-          product: { include: { seller: { select: { id: true, name: true } } } },
+          product: {
+            include: {
+              seller: {
+                select: {
+                  id: true,
+                  name: true,
+                  country: true,
+                  city: true,
+                  region: true,
+                  deliveryWithinCityCents: true,
+                  deliveryOutsideCityCents: true,
+                  deliveryOutsideCountryCents: true,
+                },
+              },
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
       },
@@ -35,6 +51,7 @@ export default async function CartPage() {
       image: parseJsonArray(it.product.imagesJson)[0] ?? null,
       seller: it.product.seller,
       stock: it.product.stock,
+      unit: it.product.unit,
     },
   }));
 
@@ -54,6 +71,30 @@ export default async function CartPage() {
 
   const subtotal = items.reduce((s, it) => s + it.product.effectivePrice * it.quantity, 0);
 
+  // Delivery preview — same per-seller bundling rule the checkout endpoint
+  // applies. Only computed when the buyer has filled in their address.
+  const buyer = { country: user.country, city: user.city, region: user.region };
+  const buyerHasAddress = !!buyer.country && !!buyer.city;
+  const deliverySellerSeen = new Set<string>();
+  type DeliveryLine = { sellerName: string; zoneLabel: string; cents: number };
+  const deliveryBreakdown: DeliveryLine[] = [];
+  if (buyerHasAddress) {
+    for (const it of cart.items) {
+      const sellerId = it.product.seller.id;
+      if (deliverySellerSeen.has(sellerId)) continue;
+      deliverySellerSeen.add(sellerId);
+      const zone = deliveryZoneFor(buyer, it.product.seller);
+      const cents = deliveryFeeCentsFor(it.product.seller, zone);
+      deliveryBreakdown.push({
+        sellerName: it.product.seller.name,
+        zoneLabel: deliveryZoneLabel(zone),
+        cents,
+      });
+    }
+  }
+  const deliveryTotalCents = deliveryBreakdown.reduce((s, d) => s + d.cents, 0);
+  const grandTotal = subtotal + deliveryTotalCents / 100;
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-3">
@@ -71,13 +112,38 @@ export default async function CartPage() {
             <dt>Subtotal</dt>
             <dd className="font-medium"><Price amount={subtotal} /></dd>
           </div>
-          <div className="flex justify-between text-gray-500">
-            <dt>Shipping</dt>
-            <dd>Calculated at checkout</dd>
-          </div>
+
+          {buyerHasAddress ? (
+            deliveryBreakdown.length > 0 ? (
+              <div className="border-t pt-2">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-500">
+                  Delivery
+                </p>
+                {deliveryBreakdown.map((d) => (
+                  <div key={d.sellerName} className="flex justify-between">
+                    <dt className="text-gray-600">
+                      {d.sellerName}
+                      <span className="ml-1 text-[10px] text-gray-400">· {d.zoneLabel}</span>
+                    </dt>
+                    <dd>{d.cents > 0 ? <Price amount={d.cents / 100} /> : "Free"}</dd>
+                  </div>
+                ))}
+              </div>
+            ) : null
+          ) : (
+            <div className="flex justify-between text-gray-500">
+              <dt>Delivery</dt>
+              <dd className="text-right">
+                <Link href="/account/settings" className="text-violet-700 hover:underline">
+                  Add address →
+                </Link>
+              </dd>
+            </div>
+          )}
+
           <div className="mt-3 flex justify-between border-t pt-3 text-base">
-            <dt className="font-semibold">Estimated total</dt>
-            <dd className="font-bold"><Price amount={subtotal} /></dd>
+            <dt className="font-semibold">{buyerHasAddress ? "Total" : "Subtotal so far"}</dt>
+            <dd className="font-bold"><Price amount={grandTotal} /></dd>
           </div>
         </dl>
         <Link href="/cart/checkout" className="btn-primary mt-6 w-full text-center">

@@ -7,6 +7,8 @@ import { Price } from "@/components/Price";
 import { isAiEnabled } from "@/lib/ai";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { OutfitPairings } from "@/components/OutfitPairings";
+import { SameCitySuggestions } from "@/components/SameCitySuggestions";
+import { perUnitLabel } from "@/lib/units";
 
 export default async function PublicProductPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -19,6 +21,7 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           isSeller: true, isDesigner: true,
           sellerVerified: true, designerVerified: true,
           exposureScore: true,
+          country: true, city: true,
         },
       },
     },
@@ -78,6 +81,9 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           {onSale && (
             <p className="text-lg text-gray-400 line-through"><Price amount={product.price} /></p>
           )}
+          {product.unit !== "piece" && (
+            <p className="pb-1 text-sm font-medium text-ink-500">{perUnitLabel(product.unit)}</p>
+          )}
         </div>
 
         <p className="mt-4 whitespace-pre-wrap text-gray-700">{product.description}</p>
@@ -88,7 +94,12 @@ export default async function PublicProductPage({ params }: { params: { id: stri
 
         <div className="mt-6 flex gap-2">
           {product.stock > 0 && (
-            <AddToCartButton productId={product.id} disabled={isOwnListing} />
+            <AddToCartButton
+              productId={product.id}
+              unit={product.unit}
+              stock={product.stock}
+              disabled={isOwnListing}
+            />
           )}
           {user && !isOwnListing && (
             <Link href={`/messages?with=${product.seller.id}`} className="btn-secondary">
@@ -102,6 +113,16 @@ export default async function PublicProductPage({ params }: { params: { id: stri
             <OutfitPairings productId={product.id} />
           </div>
         )}
+      </div>
+
+      {/* Same-city alternatives — only renders when the viewer is in a
+          different city / country from the seller. Helps buyers find a
+          local match instead of getting blocked at checkout. */}
+      <div className="lg:col-span-2">
+        <SameCitySuggestions
+          buyer={user ? { country: user.country, city: user.city } : null}
+          product={product}
+        />
       </div>
     </div>
   );

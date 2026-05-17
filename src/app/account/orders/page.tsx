@@ -87,6 +87,27 @@ export default async function BuyerOrdersPage() {
                       </span>
                     )}
                   </p>
+                  {/* Delivery code — buyer shares this with the rider at the
+                      door so the rider can confirm via /deliver/[orderId]. */}
+                  {o.deliveryCode && (o.status === "PAID" || o.status === "SHIPPED") && (
+                    <p className="mt-1 text-xs">
+                      <span className="text-ink-500">Delivery code:</span>{" "}
+                      <span className="rounded-md border border-ink-200 bg-ink-50 px-2 py-0.5 font-mono text-sm font-bold tracking-widest text-ink-800">
+                        {o.deliveryCode}
+                      </span>
+                      <span className="ml-2 text-[11px] text-ink-500">
+                        Share with the dispatch rider on arrival.
+                      </span>
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs">
+                    <Link
+                      href={`/account/orders/${o.id}`}
+                      className="text-violet-700 hover:underline"
+                    >
+                      View tracking →
+                    </Link>
+                  </p>
                   <OrderActions
                     orderId={o.id}
                     status={o.status}

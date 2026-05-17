@@ -4,6 +4,7 @@ import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
+import { unitConfig, validateQuantity } from "@/lib/units";
 
 // Get-or-create the current user's cart (lazy provisioning).
 async function getOrCreateCart(userId: string) {
@@ -38,6 +39,7 @@ export async function GET() {
         salePrice: it.product.salePrice,
         effectivePrice,
         category: it.product.category,
+        unit: it.product.unit,
         image: parseJsonArray(it.product.imagesJson)[0] ?? null,
         seller: it.product.seller,
         stock: it.product.stock,
@@ -52,14 +54,18 @@ export async function GET() {
   return NextResponse.json({
     items: shaped,
     subtotal,
-    itemCount: shaped.reduce((n, it) => n + it.quantity, 0),
+    // Distinct line items, not summed quantity — for "yard" / "meter" units a
+    // sum-of-quantities badge would be misleading ("3.5 items in cart").
+    itemCount: shaped.length,
   });
 }
 
 // POST /api/cart { productId, quantity? } → add to cart (or increment quantity).
 const AddBody = z.object({
   productId: z.string(),
-  quantity: z.number().int().positive().max(20).optional(),
+  // Float so fabric units (yard/meter/etc.) accept fractions. The unit's
+  // step rule is enforced below against the product's `unit` field.
+  quantity: z.number().positive().max(1000).optional(),
 });
 
 export async function POST(req: Request) {
@@ -79,7 +85,12 @@ export async function POST(req: Request) {
   }
 
   const cart = await getOrCreateCart(guard.session.sub);
-  const qty = parsed.data.quantity ?? 1;
+  const qty = parsed.data.quantity ?? unitConfig(product.unit).step;
+  // Per-unit step + positivity check.
+  const stepError = validateQuantity(qty, product.unit);
+  if (stepError) {
+    return NextResponse.json({ error: stepError }, { status: 400 });
+  }
 
   // Upsert keeps add-twice from creating duplicate rows; existing rows get the
   // requested quantity added on top.
