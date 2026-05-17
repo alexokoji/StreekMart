@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { resolveActingOwner } from "@/lib/managers";
+import { resolveActingOwner } from "@/lib/managersServer";
 
 // GET /api/sketches — current user's sketches.
 export async function GET() {

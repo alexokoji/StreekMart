@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Permission, ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { hasManagerPermission } from "@/lib/managers";
+import { hasManagerPermission } from "@/lib/managersServer";
 
 // PATCH /api/products/[id]/status { status }
 //

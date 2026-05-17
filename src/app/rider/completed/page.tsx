@@ -1,7 +1,7 @@
 import { OrderStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { listRiderOwnerIds } from "@/lib/managers";
+import { listRiderOwnerIds } from "@/lib/managersServer";
 import { Price } from "@/components/Price";
 import { timeAgo } from "@/lib/utils";
 

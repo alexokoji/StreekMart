@@ -7,7 +7,7 @@ import { requireApiUser } from "@/lib/auth";
 import { initTransaction, isLiveMode } from "@/lib/monnify";
 import { finalizePaidOrders } from "@/lib/orders";
 import { availableBalanceCents, chargeWalletForPurchase } from "@/lib/wallet";
-import { resolveDeliveryQuote } from "@/lib/location";
+import { resolveDeliveryQuote } from "@/lib/locationServer";
 
 // POST /api/cart/checkout — converts cart items into Orders (one per
 // seller×product) under a single payment group.

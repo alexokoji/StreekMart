@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { requireUser } from "@/lib/auth";
-import { listRiderOwnerIds } from "@/lib/managers";
+import { listRiderOwnerIds } from "@/lib/managersServer";
 
 const NAV = [
   { href: "/rider", label: "Active deliveries", matchExact: true },

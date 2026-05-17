@@ -14,7 +14,7 @@ import { exposureDelta } from "@/lib/ranking";
 import { recordSale, recordTransaction } from "@/lib/wallet";
 import { generateDeliveryCode } from "@/lib/deliveryCode";
 import { orderPlacedEmail, sendEmail } from "@/lib/email";
-import { platformDeliveryCutBps } from "@/lib/location";
+import { platformDeliveryCutBps } from "@/lib/locationServer";
 
 // How many days a buyer has to wait between payment and the option to
 // self-cancel an undelivered order. Conservative default — long enough for

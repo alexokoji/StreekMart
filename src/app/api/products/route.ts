@@ -4,7 +4,7 @@ import { z } from "zod";
 import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { resolveActingOwner } from "@/lib/managers";
+import { resolveActingOwner } from "@/lib/managersServer";
 import { convertToUsd } from "@/lib/currencyServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 import { FASHION_VALIDATOR_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";

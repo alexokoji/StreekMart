@@ -21,6 +21,12 @@ const nextConfig = {
       "@anthropic-ai/sdk",
       "@prisma/client",
       "bcryptjs",
+      // libsql + the Prisma adapter ship native .node binaries and dynamic
+      // requires that Webpack can't trace. Keep them out of the bundle so
+      // Next.js loads them via require() at runtime on the server.
+      "@prisma/adapter-libsql",
+      "@libsql/client",
+      "libsql",
     ],
   },
 };

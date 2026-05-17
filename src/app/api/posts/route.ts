@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Permission } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { resolveActingOwner } from "@/lib/managers";
+import { resolveActingOwner } from "@/lib/managersServer";
 
 // GET /api/posts?mine=1
 export async function GET(req: Request) {

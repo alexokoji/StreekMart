@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Permission } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { hasManagerPermission } from "@/lib/managers";
+import { hasManagerPermission } from "@/lib/managersServer";
 
 // POST /api/promotions { kind, id, days, boost? }
 // Sellers can promote their products; designers their posts.

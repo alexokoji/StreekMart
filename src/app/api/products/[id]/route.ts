@@ -3,7 +3,7 @@ import { z } from "zod";
 import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { hasManagerPermission } from "@/lib/managers";
+import { hasManagerPermission } from "@/lib/managersServer";
 import { convertToUsd } from "@/lib/currencyServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 

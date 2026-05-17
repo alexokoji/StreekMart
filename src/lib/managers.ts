@@ -1,12 +1,12 @@
-// Account / shop manager permission system.
+// Client-safe pieces of the manager / rider permission system.
 //
-// Sellers and designers can grant a separate User account ("the manager") a
-// scoped set of capabilities on their store/portfolio. The manager logs in
-// with their own credentials; whenever they act, route handlers check
-// `effectiveOwner(user)` to figure out *whose* data they're touching, and
-// `hasManagerPermission(user, owner, key)` to confirm they're allowed.
-
-import { prisma } from "./db";
+// PERMISSION_KEYS + PERMISSION_LABELS + the PermissionKey type + the pure
+// `parsePermissions` helper. No prisma here — keeping it pure lets client
+// components like ManagersPanel + the rider dashboard render without
+// dragging the libsql driver into the browser bundle.
+//
+// The DB-touching helpers (listManagedAccounts, listRiderOwnerIds,
+// hasManagerPermission, resolveActingOwner) live in src/lib/managersServer.ts.
 
 // The full vocabulary of permissions. Add to this list to expand what
 // managers can do; UI checkboxes generate from PERMISSION_KEYS.
@@ -42,6 +42,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
 };
 
 // Parse the JSON column on Manager.permissionsJson into a typed array.
+// Pure — usable from client + server.
 export function parsePermissions(json: string): PermissionKey[] {
   try {
     const parsed = JSON.parse(json);
@@ -52,65 +53,4 @@ export function parsePermissions(json: string): PermissionKey[] {
   } catch {
     return [];
   }
-}
-
-// Returns every (owner, permissions[]) pair the given user can act on as
-// a manager. Cheap query — Manager rows are sparse.
-export async function listManagedAccounts(managerId: string) {
-  const rows = await prisma.manager.findMany({
-    where: { managerId },
-    include: {
-      owner: {
-        select: { id: true, name: true, isSeller: true, isDesigner: true },
-      },
-    },
-  });
-  return rows.map((r) => ({
-    ownerId: r.ownerId,
-    owner: r.owner,
-    role: r.role,
-    permissions: parsePermissions(r.permissionsJson),
-  }));
-}
-
-// Returns just the owner IDs a user is a rider for. Empty list means the
-// user isn't a delivery rider anywhere — used by /rider to gate the page.
-export async function listRiderOwnerIds(managerId: string): Promise<string[]> {
-  const rows = await prisma.manager.findMany({
-    where: { managerId, role: "rider" },
-    select: { ownerId: true },
-  });
-  return rows.map((r) => r.ownerId);
-}
-
-// Convenience: does `actorId` have permission `key` on `ownerId`'s store?
-// Owners always pass for their own data.
-export async function hasManagerPermission(
-  actorId: string,
-  ownerId: string,
-  key: PermissionKey,
-): Promise<boolean> {
-  if (actorId === ownerId) return true;
-  const link = await prisma.manager.findUnique({
-    where: { ownerId_managerId: { ownerId, managerId: actorId } },
-  });
-  if (!link) return false;
-  return parsePermissions(link.permissionsJson).includes(key);
-}
-
-// Resolve the *acting owner* for a write request. The actor either:
-//   - omits `actAsOwnerId` (or sets it to themselves) → they're the owner.
-//   - passes a different `actAsOwnerId` → they're acting as a manager and
-//     must hold `key` on that owner.
-// Returns the resolved owner ID on success, or null if the actor is not
-// authorised. Callers should 403 on null.
-export async function resolveActingOwner(
-  actorId: string,
-  actAsOwnerId: string | undefined,
-  key: PermissionKey,
-): Promise<string | null> {
-  const ownerId = actAsOwnerId ?? actorId;
-  if (ownerId === actorId) return actorId;
-  const ok = await hasManagerPermission(actorId, ownerId, key);
-  return ok ? ownerId : null;
 }

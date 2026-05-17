@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { hasManagerPermission } from "@/lib/managers";
+import { hasManagerPermission } from "@/lib/managersServer";
 
 // GET  /api/orders/[id]/updates — timeline (buyer or seller of the order)
 // POST /api/orders/[id]/updates — append an update (seller / manager only)

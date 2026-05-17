@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { hasManagerPermission } from "@/lib/managers";
+import { hasManagerPermission } from "@/lib/managersServer";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const post = await prisma.post.findUnique({
