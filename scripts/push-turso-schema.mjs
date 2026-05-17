@@ -10,8 +10,17 @@
 // below, so re-running on a populated DB is safe. CREATE INDEX statements
 // already work that way in libsql; uniqueness violations are swallowed.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { createClient } from "@libsql/client";
+
+// Tiny .env loader so plain `node` picks up TURSO_* like Next.js does.
+// Only sets keys that aren't already in process.env (env wins over file).
+if (existsSync(".env")) {
+  for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(?:"([^"]*)"|(.*))$/i);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2] ?? m[3] ?? "";
+  }
+}
 
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;

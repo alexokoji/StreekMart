@@ -117,11 +117,15 @@ export function BottomNav({ user }: { user: NavUser }) {
         </ul>
       </nav>
 
-      {/* Center FAB — sits in the notch above the bar. Opens SmartSearch. */}
+      {/* Center FAB — sits in the notch above the bar. Opens SmartSearch.
+          `clip-path: circle(50%)` makes the hit area an actual circle so
+          the invisible corners of the bounding box don't intercept taps
+          on adjacent nav columns on narrow screens. */}
       <button
         type="button"
         onClick={openSearch}
         aria-label="Open smart search"
+        style={{ clipPath: "circle(50%)" }}
         className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+1.25rem)] left-1/2 z-40 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-500 to-gold-400 text-white shadow-glow transition-transform active:scale-95 md:hidden"
       >
         <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -144,13 +148,18 @@ type Tab = {
 function NavItem({ tab, pathname }: { tab: Tab; pathname: string }) {
   const Icon = tab.icon;
   const active = tab.match(pathname);
+  // `flex` on the li + `w-full` on the Link makes the whole column a
+  // single tap target — otherwise the Link only sizes to its icon+label
+  // content (~60px wide) and the surrounding ~15px on each side does
+  // nothing on tap. `relative z-10` puts the link above the masked nav
+  // background so the cutout never eats clicks.
   return (
-    <li>
+    <li className="relative z-10 flex">
       <Link
         href={tab.href}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+          "relative flex w-full flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
           active ? "text-violet-700" : "text-ink-500 hover:text-ink-800",
         )}
       >

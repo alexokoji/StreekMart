@@ -32,11 +32,23 @@ export async function TopNav({ user }: { user: NavUser }) {
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b border-ink-100 bg-white/85 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-[1800px] items-center gap-3 px-4 py-3 sm:px-6 lg:px-10">
-        <Link href="/" aria-label="StreekMart home" className="flex items-center gap-2">
-          <Logo size={28} />
-          <span className="hidden text-[11px] font-medium uppercase tracking-[0.3em] text-ink-400 sm:inline">
+    // `overflow-x-clip` keeps any wide child (account name, currency chip)
+    // from making the whole page horizontally scrollable on small phones.
+    <header className="sticky top-0 z-20 overflow-x-clip border-b border-ink-100 bg-white/85 backdrop-blur-xl">
+      <div className="mx-auto flex w-full max-w-[1800px] items-center gap-2 px-3 py-3 sm:gap-3 sm:px-6 lg:px-10">
+        {/* Brand — icon-only below sm, full wordmark from sm up. */}
+        <Link
+          href="/"
+          aria-label="StreekMart home"
+          className="flex shrink-0 items-center gap-2"
+        >
+          <span className="sm:hidden">
+            <Logo size={28} showWordmark={false} />
+          </span>
+          <span className="hidden sm:inline-flex">
+            <Logo size={28} />
+          </span>
+          <span className="hidden text-[11px] font-medium uppercase tracking-[0.3em] text-ink-400 lg:inline">
             · fashion
           </span>
         </Link>
@@ -62,8 +74,10 @@ export async function TopNav({ user }: { user: NavUser }) {
           </div>
         </form>
 
-        {/* Right cluster — pushed to the end on mobile, secondary nav on desktop. */}
-        <div className="ml-auto flex items-center gap-1 sm:gap-2 md:gap-3">
+        {/* Right cluster — pushed to the end on mobile, secondary nav on desktop.
+            min-w-0 lets the inner items shrink instead of forcing horizontal
+            overflow. shrink-0 on each child below opts back IN where needed. */}
+        <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2 md:gap-3">
           {/* Mobile-only search icon */}
           <Link
             href="/search"
@@ -111,9 +125,19 @@ export async function TopNav({ user }: { user: NavUser }) {
               </span>
             </>
           ) : (
-            <div className="flex items-center gap-2">
-              <Link href="/login" className="btn-ghost text-sm">Log in</Link>
-              <Link href="/register" className="btn-primary text-sm">Sign up</Link>
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <Link
+                href="/login"
+                className="rounded-lg px-2 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 hover:text-violet-700 sm:px-3 sm:text-sm"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-lg bg-violet-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 sm:px-3 sm:text-sm"
+              >
+                Sign up
+              </Link>
             </div>
           )}
         </div>
