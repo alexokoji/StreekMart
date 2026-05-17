@@ -67,6 +67,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # Prisma schema + generated client for runtime engine resolution.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Belt-and-suspenders: explicitly copy the libsql native packages into the
+# standalone node_modules. next.config.js's outputFileTracingIncludes is
+# supposed to handle this, but the platform-specific binary subpackages
+# (@libsql/linux-x64-musl, etc.) are loaded via a dynamic require that the
+# Next.js tracer can miss. Copying them outright is cheap (~5 MB) and
+# guarantees the runtime can resolve `@libsql/linux-x64-musl`.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@libsql ./node_modules/@libsql
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/libsql ./node_modules/libsql
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/adapter-libsql ./node_modules/@prisma/adapter-libsql
 
 COPY --chown=nextjs:nodejs scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 # Strip Windows CRLF if the file was authored on Windows — otherwise the

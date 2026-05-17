@@ -3,11 +3,12 @@ import { PrismaClient } from "@prisma/client";
 // Prisma client wrapper.
 //
 // Local dev → falls back to the SQLite file at `DATABASE_URL` (dev.db).
-// Production (Cloud Run, Vercel, etc.) → uses the libSQL driver adapter to
-// talk to Turso, sourced from TURSO_DATABASE_URL + TURSO_AUTH_TOKEN.
+// Production (Render, Cloud Run, Vercel) → uses the libSQL driver adapter
+// to talk to Turso, sourced from TURSO_DATABASE_URL + TURSO_AUTH_TOKEN.
 //
-// We lazy-require the adapter packages so devs without Turso credentials
-// don't pay the import cost in `npm run dev`.
+// On @prisma/client@6 + @prisma/adapter-libsql@6 the adapter is a factory
+// that takes the libsql connection config directly. No separate
+// createClient call, no `as any` cast — interfaces line up.
 
 function buildClient(): PrismaClient {
   const tursoUrl = process.env.TURSO_DATABASE_URL;
@@ -16,23 +17,10 @@ function buildClient(): PrismaClient {
     process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"];
 
   if (tursoUrl) {
-    // libSQL adapter for Turso — production path. We construct the libsql
-    // client first and hand it to the Prisma adapter (v5-compatible API).
-    //
-    // The `as any` cast is a known minor-version interface drift between
-    // @prisma/adapter-libsql@5.4.3 and @prisma/client@5.22.0 — the runtime
-    // contract holds but the types declare an extra property. Removable
-    // when we bump to Prisma 6 (which moves driverAdapters out of preview
-    // and unifies the interface).
-    //
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { PrismaLibSQL } = require("@prisma/adapter-libsql") as typeof import("@prisma/adapter-libsql");
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { createClient } = require("@libsql/client") as typeof import("@libsql/client");
-    const libsql = createClient({ url: tursoUrl, authToken: tursoToken });
-    const adapter = new PrismaLibSQL(libsql);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return new PrismaClient({ adapter: adapter as any, log });
+    const adapter = new PrismaLibSQL({ url: tursoUrl, authToken: tursoToken });
+    return new PrismaClient({ adapter, log });
   }
 
   // Local dev — plain sqlite file at DATABASE_URL.

@@ -4,12 +4,11 @@
 // is provided by `src/lib/enums.ts`.
 
 generator client {
-  provider        = "prisma-client-js"
-  // Turso (libSQL) connectivity in production goes through the
-  // @prisma/adapter-libsql driver adapter — see src/lib/db.ts. The
-  // datasource below stays "sqlite" so local dev with a dev.db file is
-  // unchanged.
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
+  // Driver adapters are GA in Prisma 6, no preview flag needed. Turso
+  // connectivity in production goes through @prisma/adapter-libsql —
+  // see src/lib/db.ts. The datasource below stays "sqlite" so local dev
+  // with a dev.db file is unchanged.
 }
 
 datasource db {

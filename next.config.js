@@ -28,6 +28,10 @@ const nextConfig = {
       "@libsql/client",
       "libsql",
     ],
+    // (Removed `outputFileTracingIncludes` — it was triggering a Prisma
+    // adapter init crash at build-time page-data collection. The Dockerfile
+    // now copies @libsql + libsql + adapter-libsql into the runner stage
+    // explicitly; that's what actually ships the native binary.)
   },
 };
 
