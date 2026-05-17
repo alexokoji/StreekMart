@@ -57,6 +57,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="file:/tmp/build-placeholder.db"
 RUN npx prisma db push --skip-generate --accept-data-loss && npm run build
 
+# Pre-generate the Turso schema SQL so the runtime entrypoint can apply it
+# on boot without needing the Prisma CLI in the runner image. Idempotent —
+# every statement is rewritten to `IF NOT EXISTS` by the push script.
+RUN mkdir -p .turso \
+ && npx prisma migrate diff \
+      --from-empty \
+      --to-schema-datamodel prisma/schema.prisma \
+      --script > .turso/schema.sql
+
 # ---------- 3) runner ----------
 FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
@@ -86,6 +95,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@libsql ./node_modules/@libsql
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/libsql ./node_modules/libsql
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/adapter-libsql ./node_modules/@prisma/adapter-libsql
+# Pre-generated Turso schema SQL + the push script so the entrypoint can
+# self-heal a fresh DB on boot (idempotent — uses CREATE TABLE IF NOT EXISTS).
+COPY --from=builder --chown=nextjs:nodejs /app/.turso ./.turso
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/push-turso-schema.mjs ./scripts/push-turso-schema.mjs
 
 COPY --chown=nextjs:nodejs scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 # Strip Windows CRLF if authored on Windows — otherwise the shebang reads

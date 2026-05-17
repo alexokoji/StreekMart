@@ -8,20 +8,37 @@ async function main() {
 
   const password = await bcrypt.hash("password123", 10);
 
-  // Wipe demo accounts so the seed can be re-run idempotently.
-  await prisma.user.deleteMany({
-    where: {
-      email: {
-        in: [
-          "admin@upclo.dev",
-          "buyer@upclo.dev",
-          "seller@upclo.dev",
-          "designer@upclo.dev",
-          "pro@upclo.dev",
-        ],
-      },
-    },
-  });
+  // Wipe everything in child-first order so the seed can be re-run
+  // idempotently. We can't just `deleteMany` users — Turso/libSQL doesn't
+  // cascade through every relation reliably (Message.senderId,
+  // Promotion.ownerId, Follow, PayoutRequest, Sketch, Comment don't all
+  // have onDelete: Cascade in the schema). Wiping in dependency order is
+  // bulletproof and doesn't touch admin-configured SiteSetting /
+  // DeliveryCity rows which live independently.
+  await prisma.$transaction([
+    prisma.message.deleteMany(),
+    prisma.chatParticipant.deleteMany(),
+    prisma.chat.deleteMany(),
+    prisma.orderUpdate.deleteMany(),
+    prisma.order.deleteMany(),
+    prisma.cartItem.deleteMany(),
+    prisma.cart.deleteMany(),
+    prisma.favorite.deleteMany(),
+    prisma.like.deleteMany(),
+    prisma.comment.deleteMany(),
+    prisma.follow.deleteMany(),
+    prisma.promotion.deleteMany(),
+    prisma.sketch.deleteMany(),
+    prisma.walletTransaction.deleteMany(),
+    prisma.wallet.deleteMany(),
+    prisma.payoutRequest.deleteMany(),
+    prisma.verificationRequest.deleteMany(),
+    prisma.manager.deleteMany(),
+    prisma.product.deleteMany(),
+    prisma.post.deleteMany(),
+    prisma.searchLog.deleteMany(),
+    prisma.user.deleteMany(),
+  ]);
 
   // Platform admin — gates /admin and /api/admin/*.
   await prisma.user.create({
