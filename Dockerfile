@@ -16,9 +16,13 @@ ARG NODE_VERSION=20-alpine
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
-COPY package.json package-lock.json ./
+# .npmrc carries `legacy-peer-deps=true` to satisfy
+# @prisma/adapter-libsql@5.4.3's stale peer range for @libsql/client. The
+# explicit flag on `npm ci` is belt-and-suspenders for any environment that
+# doesn't read .npmrc (e.g. some buildpacks).
+COPY package.json package-lock.json .npmrc ./
 COPY prisma ./prisma
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 # ---------- 2) build ----------
 FROM node:${NODE_VERSION} AS builder
