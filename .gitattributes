@@ -1,0 +1,8 @@
+# Force LF line endings on every shell script + Dockerfile, regardless of
+# whether the contributor's git config converts on commit. Containers run
+# Linux; CRLF on a shebang line silently breaks the container with a
+# "no such file" error on /bin/sh.
+*.sh         text eol=lf
+Dockerfile   text eol=lf
+.dockerignore text eol=lf
+.npmrc       text eol=lf

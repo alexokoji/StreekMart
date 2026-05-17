@@ -69,7 +69,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 COPY --chown=nextjs:nodejs scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Strip Windows CRLF if the file was authored on Windows — otherwise the
+# shebang reads as `#!/bin/sh\r` and the container exits silently with
+# "no such file or directory" on /bin/sh.
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+ && chmod +x /usr/local/bin/entrypoint.sh
 
 USER nextjs
 EXPOSE 3000
