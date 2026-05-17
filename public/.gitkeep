@@ -1,0 +1,4 @@
+# Reserved for Next.js static assets (favicons, robots.txt, etc.).
+# Anything in here is served at the root URL — e.g. public/foo.png → /foo.png.
+# This .gitkeep makes sure the directory exists for the Docker build's
+# `COPY /app/public ./public` step even when no static files have been added.

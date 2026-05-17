@@ -30,6 +30,11 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Defensive: Next.js doesn't require a public/ dir but our runner stage
+# unconditionally copies it. If the repo doesn't ship one (no favicons,
+# robots.txt, etc.), make sure an empty one exists so the COPY step in
+# the runner stage doesn't fail with "not found".
+RUN mkdir -p public
 
 # Generate the Prisma client (uses the local sqlite datasource for codegen;
 # at runtime the libSQL adapter takes over when TURSO_DATABASE_URL is set).
