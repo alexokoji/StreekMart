@@ -36,7 +36,13 @@ COPY . .
 RUN npx prisma generate
 
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+# Build-time-only DB: Next.js pre-renders some API/page routes during
+# `next build`. Those routes call Prisma, so we point Prisma at a throwaway
+# SQLite file and push the schema to it before building. The runtime libSQL
+# adapter (configured via TURSO_DATABASE_URL) takes over before any
+# production request touches Prisma.
+ENV DATABASE_URL="file:/tmp/build-placeholder.db"
+RUN npx prisma db push --skip-generate --accept-data-loss && npm run build
 
 # ---------- 3) runner ----------
 FROM node:${NODE_VERSION} AS runner
