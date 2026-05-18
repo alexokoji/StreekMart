@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Price } from "@/components/Price";
+import { useCurrency } from "@/components/CurrencyProvider";
 import { timeAgo } from "@/lib/utils";
 
 type Txn = {
@@ -172,7 +173,12 @@ function PayoutForm({
   maxCents: number;
   onDone: () => void;
 }) {
-  const [amount, setAmount] = useState<string>(((maxCents / 100) * 0.5).toFixed(2));
+  // Seller types the payout amount in their active currency; we convert to
+  // USD-cents on submit (wallet is USD-canonical). The max-amount default
+  // is half the available balance, also in local currency.
+  const ctx = useCurrency();
+  const maxLocal = (maxCents / 100) * ctx.rate;
+  const [amount, setAmount] = useState<string>((maxLocal * 0.5).toFixed(2));
   const [bankCode, setBankCode] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [accountName, setAccountName] = useState("");
@@ -182,11 +188,14 @@ function PayoutForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    const cents = Math.round(Number(amount) * 100);
-    if (!Number.isFinite(cents) || cents <= 0) {
+    const localAmount = Number(amount);
+    if (!Number.isFinite(localAmount) || localAmount <= 0) {
       setErr("Enter a valid amount.");
       return;
     }
+    // local → USD → cents
+    const usdAmount = ctx.code === "USD" ? localAmount : localAmount / ctx.rate;
+    const cents = Math.round(usdAmount * 100);
     setBusy(true);
     try {
       const res = await fetch("/api/wallet/payout", {
@@ -210,16 +219,23 @@ function PayoutForm({
       <h3 className="font-display text-lg font-semibold">Withdraw to bank</h3>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="label">Amount (USD)</label>
-          <input
-            type="number"
-            min={1}
-            step="0.01"
-            max={maxCents / 100}
-            className="input"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
+          <label className="label">
+            Amount <span className="text-xs font-normal text-ink-500">({ctx.flag} {ctx.code})</span>
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-500">
+              {ctx.symbol}
+            </span>
+            <input
+              type="number"
+              min={1}
+              step="0.01"
+              max={maxLocal}
+              className="input pl-8"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
           <p className="mt-1 text-[11px] text-ink-500">
             Max <Price amount={maxCents / 100} />
           </p>

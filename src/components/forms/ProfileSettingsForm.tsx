@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUploader } from "@/components/forms/ImageUploader";
-import { COUNTRIES } from "@/lib/location";
+import { LocationPicker } from "@/components/forms/LocationPicker";
 
 type Initial = {
   name: string;
@@ -28,9 +28,13 @@ export function ProfileSettingsForm({ initial }: { initial: Initial }) {
   const [bio, setBio] = useState(initial.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl ?? "");
   const [slug, setSlug] = useState(initial.slug ?? "");
-  const [country, setCountry] = useState(initial.country ?? "");
-  const [city, setCity] = useState(initial.city ?? "");
-  const [region, setRegion] = useState(initial.region ?? "");
+  // Cascading country → state → city. Single state object keeps the
+  // LocationPicker's reset-downstream logic clean.
+  const [location, setLocation] = useState({
+    country: initial.country ?? "",
+    region: initial.region ?? "",
+    city: initial.city ?? "",
+  });
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -44,9 +48,9 @@ export function ProfileSettingsForm({ initial }: { initial: Initial }) {
       if (email !== initial.email) payload.email = email;
       if (slug && slug !== initial.slug) payload.slug = slug;
       if (password) payload.password = password;
-      if (country && country !== initial.country) payload.country = country;
-      if (city !== (initial.city ?? "")) payload.city = city;
-      if (region !== (initial.region ?? "")) payload.region = region;
+      if (location.country && location.country !== initial.country) payload.country = location.country;
+      if (location.city !== (initial.city ?? "")) payload.city = location.city;
+      if (location.region !== (initial.region ?? "")) payload.region = location.region;
 
       const res = await fetch("/api/account/profile", {
         method: "PATCH",
@@ -124,41 +128,8 @@ export function ProfileSettingsForm({ initial }: { initial: Initial }) {
           Drives delivery zones at checkout — buyers see fees specific to your
           city and country.
         </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="label">Country</label>
-            <select
-              className="input"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-            >
-              <option value="">Select…</option>
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">City</label>
-            <input
-              className="input"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              maxLength={80}
-              placeholder="e.g. Lagos"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="label">
-              State / Region <span className="text-xs text-ink-400">(optional)</span>
-            </label>
-            <input
-              className="input"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              maxLength={80}
-            />
-          </div>
+        <div className="mt-3">
+          <LocationPicker value={location} onChange={setLocation} required={false} />
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { COUNTRIES } from "@/lib/location";
+import { LocationPicker } from "@/components/forms/LocationPicker";
 import { CATEGORY_GROUPS } from "@/lib/enums";
 
 const INTEREST_OPTIONS = Object.values(CATEGORY_GROUPS).flat();
@@ -19,9 +19,9 @@ export function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [country, setCountry] = useState("");
-  const [city, setCity] = useState("");
-  const [region, setRegion] = useState("");
+  // Cascading country → state → city — single state object so updates
+  // stay atomic and the picker can reset downstream fields cleanly.
+  const [location, setLocation] = useState({ country: "", region: "", city: "" });
   const [gender, setGender] = useState<Gender | "">("");
   const [interests, setInterests] = useState<string[]>([]);
   const [isSeller, setIsSeller] = useState(false);
@@ -45,9 +45,9 @@ export function RegisterForm() {
           name,
           email,
           password,
-          country,
-          city,
-          region: region || undefined,
+          country: location.country,
+          city: location.city,
+          region: location.region || undefined,
           gender: gender || undefined,
           interests: interests.length > 0 ? interests : undefined,
           isSeller,
@@ -111,54 +111,7 @@ export function RegisterForm() {
           <input id="email" type="email" required className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="country">Country</label>
-            <select
-              id="country"
-              required
-              className="input"
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-            >
-              <option value="">Select…</option>
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="city">City</label>
-            <input
-              id="city"
-              required
-              minLength={2}
-              maxLength={80}
-              className="input"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Lagos"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="label" htmlFor="region">
-              State / Region <span className="text-xs text-gray-400">(optional)</span>
-            </label>
-            <input
-              id="region"
-              maxLength={80}
-              className="input"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              placeholder="e.g. Lagos State"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Helps buyers in big countries narrow down delivery zones.
-            </p>
-          </div>
-        </div>
+        <LocationPicker value={location} onChange={setLocation} />
 
         <div className="rounded-xl border border-ink-100 bg-violet-50/30 p-3">
           <p className="label">Tell us what you love <span className="text-xs text-ink-400">(optional)</span></p>

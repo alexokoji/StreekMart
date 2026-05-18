@@ -3,9 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { COUNTRIES } from "@/lib/location";
+import { useCurrency } from "@/components/CurrencyProvider";
 
 export function CityForm() {
   const router = useRouter();
+  // Admin types fees in their active currency; we convert to USD-cents
+  // before persisting because the platform canonicalises every money
+  // field in USD-cents. The admin sees their own symbol everywhere
+  // (₦, €, etc.) instead of a hardcoded $.
+  const ctx = useCurrency();
   const [country, setCountry] = useState("");
   const [name, setName] = useState("");
   const [region, setRegion] = useState("");
@@ -18,6 +24,11 @@ export function CityForm() {
     setErr(null);
     setBusy(true);
     try {
+      // Convert the admin's local-currency input → USD-cents.
+      const localAmount = Number(fee);
+      const usdAmount = ctx.code === "USD" ? localAmount : localAmount / ctx.rate;
+      const feeCents = Math.round(usdAmount * 100);
+
       const res = await fetch("/api/admin/delivery-cities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -25,7 +36,7 @@ export function CityForm() {
           country,
           name,
           region: region || undefined,
-          feeCents: Math.round(Number(fee) * 100),
+          feeCents,
         }),
       });
       const data = await res.json();
@@ -62,9 +73,13 @@ export function CityForm() {
         <input className="input" value={region} onChange={(e) => setRegion(e.target.value)} placeholder="e.g. Lagos State" />
       </div>
       <div>
-        <label className="label">Fee (USD)</label>
+        <label className="label">
+          Fee <span className="text-xs font-normal text-ink-500">({ctx.flag} {ctx.code})</span>
+        </label>
         <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-500">$</span>
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-500">
+            {ctx.symbol}
+          </span>
           <input
             type="number"
             min={0}

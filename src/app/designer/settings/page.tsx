@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Permission } from "@/lib/enums";
 import { requireUser } from "@/lib/auth";
 import { ProfileSettingsForm } from "@/components/forms/ProfileSettingsForm";
-import { DeliveryFeesForm } from "@/components/dashboard/DeliveryFeesForm";
+import { DeliveryFeesView } from "@/components/dashboard/DeliveryFeesView";
 import { ShareButton } from "@/components/ShareButton";
 
 export default async function DesignerSettingsPage() {
@@ -47,12 +47,12 @@ export default async function DesignerSettingsPage() {
       <div className="card p-6">
         <h2 className="font-display text-lg font-semibold">Delivery rates</h2>
         <p className="text-sm text-ink-600">
-          Set what buyers pay for delivery, by zone. Your shop&apos;s city is used to
-          decide which rate applies — set it under Location above.
+          What buyers pay your own rider when an order falls outside the platform&apos;s
+          delivery zones. Set by StreekMart admins — read-only here.
         </p>
         <div className="mt-4">
-          <DeliveryFeesForm
-            initial={{
+          <DeliveryFeesView
+            rates={{
               withinCityCents: user.deliveryWithinCityCents,
               outsideCityCents: user.deliveryOutsideCityCents,
               outsideCountryCents: user.deliveryOutsideCountryCents,

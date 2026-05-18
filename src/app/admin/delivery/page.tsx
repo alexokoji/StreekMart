@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { Price } from "@/components/Price";
 import { countryName } from "@/lib/location";
+import { AdminDeliveryRateEditor } from "./AdminDeliveryRateEditor";
 
 // /admin/delivery — overview of every seller's delivery rates so admins can
 // spot outliers (e.g. someone charging $300 within-city). Sorted by the most
@@ -60,6 +61,7 @@ export default async function AdminDeliveryRatesPage() {
               <th className="px-4 py-2 text-right">Within city</th>
               <th className="px-4 py-2 text-right">Outside city</th>
               <th className="px-4 py-2 text-right">International</th>
+              <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-100">
@@ -80,6 +82,16 @@ export default async function AdminDeliveryRatesPage() {
                 <RateCell cents={s.deliveryWithinCityCents} />
                 <RateCell cents={s.deliveryOutsideCityCents} />
                 <RateCell cents={s.deliveryOutsideCountryCents} />
+                <td className="px-4 py-2 text-right">
+                  <AdminDeliveryRateEditor
+                    userId={s.id}
+                    initial={{
+                      within: s.deliveryWithinCityCents,
+                      outside: s.deliveryOutsideCityCents,
+                      international: s.deliveryOutsideCountryCents,
+                    }}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
