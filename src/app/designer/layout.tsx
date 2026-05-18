@@ -17,12 +17,12 @@ const NAV = [
 ];
 
 export default async function DesignerLayout({ children }: { children: React.ReactNode }) {
-  await requireUser(Permission.DESIGNER);
+  const user = await requireUser(Permission.DESIGNER);
   // Stack on mobile (sidebar collapses into a drawer + trigger bar);
   // side-by-side on md+ where the sidebar is an inline column.
   return (
     <div className="md:flex md:gap-6">
-      <Sidebar title="Designer" items={NAV} />
+      <Sidebar title="Designer" items={NAV} isAdmin={user.isAdmin} />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { LogoutButton } from "./LogoutButton";
 
 export type SidebarItem = {
   href: string;
@@ -23,7 +24,22 @@ export type SidebarItem = {
 // dashboard area. The drawer auto-closes on navigation (pathname change),
 // is dismissable by tapping the backdrop or the close button, and locks
 // background scroll while open so the drawer feels like a native sheet.
-export function Sidebar({ items, title }: { items: SidebarItem[]; title: string }) {
+//
+// `isAdmin` surfaces an Admin shortcut + Log out at the bottom of the
+// mobile drawer. The top nav's AccountChip + LogoutButton handle both on
+// desktop, but neither is rendered on phones, so the drawer is the only
+// place these can live for mobile users.
+export function Sidebar({
+  items,
+  title,
+  isAdmin = false,
+  showAdminLink = true,
+}: {
+  items: SidebarItem[];
+  title: string;
+  isAdmin?: boolean;
+  showAdminLink?: boolean;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -149,6 +165,25 @@ export function Sidebar({ items, title }: { items: SidebarItem[]; title: string 
               );
             })}
           </nav>
+
+          {/* Mobile-only footer: Admin shortcut + Log out.
+              The top nav surfaces both on desktop (AccountChip dropdown +
+              LogoutButton), but it's hidden on phones — so the drawer is
+              the only path to them on mobile. */}
+          <div className="mt-6 space-y-1 border-t border-ink-100 pt-3 md:hidden">
+            {isAdmin && showAdminLink && (
+              <Link
+                href="/admin"
+                className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-violet-700 hover:bg-violet-50"
+              >
+                <span className="font-medium">Admin · Control room</span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            )}
+            <LogoutButton
+              className="block w-full rounded-md px-3 py-2 text-left text-sm text-ink-700 hover:bg-burgundy-50 hover:text-burgundy-700"
+            />
+          </div>
         </div>
       </aside>
     </>

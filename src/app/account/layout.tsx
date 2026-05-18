@@ -19,10 +19,10 @@ const NAV = [
 ];
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
-  await requireUser();
+  const user = await requireUser();
   return (
     <div className="md:flex md:gap-6">
-      <Sidebar title="Account" items={NAV} />
+      <Sidebar title="Account" items={NAV} isAdmin={user.isAdmin} />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );

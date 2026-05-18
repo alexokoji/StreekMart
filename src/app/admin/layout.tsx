@@ -22,7 +22,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   await requireAdmin();
   return (
     <div className="md:flex md:gap-6">
-      <Sidebar title="Admin" items={NAV} />
+      {/* Already in /admin, so the drawer's Admin shortcut would be redundant —
+          we still want the mobile logout button though. */}
+      <Sidebar title="Admin" items={NAV} isAdmin showAdminLink={false} />
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
