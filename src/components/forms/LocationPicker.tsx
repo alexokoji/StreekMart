@@ -33,7 +33,13 @@ export function LocationPicker({
 }) {
   // Restrict to the supported COUNTRIES list — picked into a Set once so
   // the dropdown can render only supported entries.
-  const supportedCodes = useMemo(() => new Set(COUNTRIES.map((c) => c.code)), []);
+  // Widened to `Set<string>` so .has() accepts the raw `isoCode` strings the
+  // country-state-city dataset returns (its type is `string`, not our literal
+  // union from COUNTRIES — TS would otherwise reject the lookup).
+  const supportedCodes = useMemo(
+    () => new Set<string>(COUNTRIES.map((c) => c.code)),
+    [],
+  );
 
   // States + cities cache derived from the current country / state.
   // Using useMemo keeps these cheap — country-state-city ships JSON, no I/O.
