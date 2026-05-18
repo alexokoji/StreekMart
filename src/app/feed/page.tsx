@@ -7,6 +7,7 @@ import { isAiEnabled } from "@/lib/ai";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { PostCard } from "@/components/feed/PostCard";
 import { ForYouRow } from "@/components/ForYouRow";
+import { LocationFilter } from "@/components/storefront/LocationFilter";
 
 // Designer-content feed (Facebook-style: left nav, main timeline, right rail).
 // Shopping happens on the storefront homepage; this page is for inspiration.
@@ -14,7 +15,7 @@ import { ForYouRow } from "@/components/ForYouRow";
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: { category?: string };
+  searchParams: { category?: string; country?: string; city?: string };
 }) {
   const user = await getCurrentUser();
   const now = new Date();
@@ -22,12 +23,22 @@ export default async function FeedPage({
     ? searchParams.category
     : null;
 
+  // Location filter — scopes posts to authors in the selected country/city.
+  // Matches the homepage UX.
+  const country = searchParams.country?.toUpperCase().slice(0, 2);
+  const city = searchParams.city?.trim();
+  const authorWhere: Record<string, unknown> = {};
+  if (country) authorWhere.country = country;
+  if (city) authorWhere.city = { equals: city };
+  const postWhere = Object.keys(authorWhere).length > 0 ? { author: authorWhere } : undefined;
+
   // category filter is for browsing the storefront; the feed itself ignores it
   // (no per-category designer posts). We still surface it in the chip rail
   // so users can switch back to product browsing easily.
 
   const [posts, topDesigners, savedPostIds, followedDesignerIds] = await Promise.all([
     prisma.post.findMany({
+      where: postWhere,
       include: {
         author: { select: { id: true, name: true, exposureScore: true, designerVerified: true, bio: true } },
         promotions: { where: { active: true, endsAt: { gt: now } } },
@@ -84,36 +95,68 @@ export default async function FeedPage({
     });
   const ranked = [...posts].sort((a, b) => scoreFor(b) - scoreFor(a));
 
+  // Shared rail content — re-rendered inline on lg+ and wrapped in a
+  // <details> collapsible on smaller screens so the timeline isn't pushed
+  // half a screen down on mobile.
+  const railContent = (
+    <div className="space-y-4">
+      <div className="card p-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Browse</p>
+        <nav className="mt-2 flex flex-col gap-1 text-sm">
+          <Link href="/feed" className="rounded-md px-2 py-1.5 hover:bg-ink-50">All posts</Link>
+          <Link href="/" className="rounded-md px-2 py-1.5 hover:bg-ink-50">Storefront</Link>
+          <Link href="/wishlist" className="rounded-md px-2 py-1.5 hover:bg-ink-50">Wishlist</Link>
+          {user?.isDesigner && (
+            <Link href="/designer/posts/new" className="rounded-md px-2 py-1.5 text-gold-700 hover:bg-gold-50">+ New post</Link>
+          )}
+        </nav>
+      </div>
+
+      <div className="card p-4">
+        <LocationFilter />
+      </div>
+
+      <div className="card p-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Categories</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {CATEGORIES.slice(0, 12).map((c) => (
+            <Link
+              key={c}
+              href={`/feed?category=${encodeURIComponent(c)}`}
+              className={category === c ? "chip-active" : "chip"}
+            >
+              {c}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_18rem]">
-      {/* Left rail */}
-      <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-        <div className="card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Browse</p>
-          <nav className="mt-2 flex flex-col gap-1 text-sm">
-            <Link href="/feed" className="rounded-md px-2 py-1.5 hover:bg-ink-50">All posts</Link>
-            <Link href="/" className="rounded-md px-2 py-1.5 hover:bg-ink-50">Storefront</Link>
-            <Link href="/wishlist" className="rounded-md px-2 py-1.5 hover:bg-ink-50">Wishlist</Link>
-            {user?.isDesigner && (
-              <Link href="/designer/posts/new" className="rounded-md px-2 py-1.5 text-gold-700 hover:bg-gold-50">+ New post</Link>
-            )}
-          </nav>
-        </div>
+      {/* Mobile/tablet — collapsible filter drawer above the timeline. */}
+      <details className="group lg:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-ink-100 bg-white px-4 py-3 hover:border-violet-400">
+          <span className="font-display text-base font-semibold">Filters & navigation</span>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4 shrink-0 text-ink-500 transition-transform group-open:rotate-180"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        <div className="mt-3">{railContent}</div>
+      </details>
 
-        <div className="card p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Categories</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {CATEGORIES.slice(0, 12).map((c) => (
-              <Link
-                key={c}
-                href={`/feed?category=${encodeURIComponent(c)}`}
-                className={category === c ? "chip-active" : "chip"}
-              >
-                {c}
-              </Link>
-            ))}
-          </div>
-        </div>
+      {/* Desktop left rail — sticky inline column. */}
+      <aside className="hidden lg:block lg:sticky lg:top-4 lg:self-start">
+        {railContent}
       </aside>
 
       {/* Main timeline */}

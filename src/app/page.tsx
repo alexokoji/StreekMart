@@ -6,17 +6,35 @@ import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
 import { ProductCard, type ProductCardData } from "@/components/storefront/ProductCard";
 import { CategoryRail } from "@/components/storefront/CategoryRail";
+import { LocationFilter } from "@/components/storefront/LocationFilter";
 import { SmartSuggestions } from "@/components/SmartSuggestions";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: { country?: string; city?: string };
+}) {
   const user = await getCurrentUser();
   const now = new Date();
 
+  // Optional URL-based location filter — applied to every product rail.
+  // Country is matched exactly (ISO-2). City is matched case-insensitively
+  // via Prisma's `equals` after trimming.
+  const country = searchParams.country?.toUpperCase().slice(0, 2);
+  const city = searchParams.city?.trim();
+  const sellerWhere: Record<string, unknown> = {};
+  if (country) sellerWhere.country = country;
+  if (city) sellerWhere.city = { equals: city };
+  const productWhere = {
+    status: ProductStatus.ACTIVE,
+    ...(Object.keys(sellerWhere).length > 0 ? { seller: sellerWhere } : {}),
+  };
+
   const [products, designers, savedFavorites, perCategoryGrouped] = await Promise.all([
     prisma.product.findMany({
-      where: { status: ProductStatus.ACTIVE },
+      where: productWhere,
       include: {
         seller: { select: { id: true, name: true, exposureScore: true, sellerVerified: true } },
         promotions: { where: { active: true, endsAt: { gt: now } } },
@@ -37,7 +55,7 @@ export default async function HomePage() {
       : Promise.resolve([]),
     prisma.product.groupBy({
       by: ["category"],
-      where: { status: ProductStatus.ACTIVE },
+      where: productWhere,
       _count: { _all: true },
     }),
   ]);
@@ -107,6 +125,12 @@ export default async function HomePage() {
         Hero is intentionally bounded (~h-[420px] on desktop) so the first
         product rail peeks above the fold instead of being pushed below.
       */}
+      {/* Desktop-only location filter strip — mobile gets it inside the
+          collapsible Shop-by-category section below. */}
+      <div className="hidden lg:block">
+        <LocationFilter />
+      </div>
+
       <section className="grid gap-4 lg:grid-cols-[14rem_1fr]">
         <CategoryRail counts={categoryCounts} />
 
@@ -129,12 +153,15 @@ export default async function HomePage() {
                 Fabrics, ready-to-wear, and accessories from independent sellers and designers.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Link href="/feed" className="btn-gold py-1.5 text-xs sm:text-sm">
+                <Link
+                  href="/feed"
+                  className="btn-gold inline-flex shrink-0 whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm"
+                >
                   Explore designers
                 </Link>
                 <Link
                   href="/search"
-                  className="btn inline-flex items-center gap-2 border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur hover:bg-white/20 sm:text-sm"
+                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur hover:bg-white/20 sm:text-sm"
                 >
                   ✨ Smart search
                 </Link>
@@ -170,11 +197,30 @@ export default async function HomePage() {
 
       {/*
         Mobile/tablet category chips — hidden on lg+ since the sidebar
-        replaces them. Keeps every breakpoint with a discoverable category nav.
+        replaces them. Wrapped in a native <details> so the section starts
+        collapsed on phones (where it'd otherwise burn ~half a screen of
+        vertical room) but stays a single tap away. Open by default on sm+.
       */}
-      <section className="lg:hidden">
-        <h2 className="mb-3 font-display text-lg font-semibold">Shop by category</h2>
-        <div className="space-y-3">
+      <details className="group lg:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-ink-100 bg-white px-4 py-3 transition-colors hover:border-violet-400">
+          <h2 className="font-display text-base font-semibold sm:text-lg">Shop by category & location</h2>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4 shrink-0 text-ink-500 transition-transform group-open:rotate-180"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </summary>
+        <div className="mt-3 space-y-3">
+          {/* Location filter — writes to ?country & ?city so every rail re-queries. */}
+          <div className="rounded-xl border border-ink-100 bg-white p-3">
+            <LocationFilter />
+          </div>
           {(Object.entries(CATEGORY_GROUPS) as ReadonlyArray<readonly [string, readonly string[]]>).map(([group, items]) => (
             <div key={group}>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-500">{group}</p>
@@ -193,7 +239,7 @@ export default async function HomePage() {
             </div>
           ))}
         </div>
-      </section>
+      </details>
 
       {/* Flash sales */}
       {flashSales.length > 0 && (
@@ -231,12 +277,17 @@ export default async function HomePage() {
 
       {/* Top designers */}
       <section>
-        <div className="mb-4 flex items-end justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold">Top designers</h2>
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-semibold sm:text-xl">Top designers</h2>
             <p className="text-xs text-ink-500">Independent designers ranked by exposure on StreekMart.</p>
           </div>
-          <Link href="/feed" className="text-sm text-gold-700 hover:underline">Browse the feed →</Link>
+          <Link
+            href="/feed"
+            className="shrink-0 whitespace-nowrap text-xs text-gold-700 hover:underline sm:text-sm"
+          >
+            Browse →
+          </Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {designers.map((d) => (
@@ -294,12 +345,15 @@ function Section({
   return (
     <section>
       <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="font-display text-xl font-semibold">{title}</h2>
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold sm:text-xl">{title}</h2>
           {subtitle && <p className="text-xs text-ink-500">{subtitle}</p>}
         </div>
         {href && (
-          <Link href={href} className="text-sm text-gold-700 hover:underline">
+          <Link
+            href={href}
+            className="shrink-0 whitespace-nowrap text-xs text-gold-700 hover:underline sm:text-sm"
+          >
             See all →
           </Link>
         )}

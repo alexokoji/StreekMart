@@ -92,17 +92,18 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           <p className="mt-4 text-sm font-medium text-red-600">Out of stock</p>
         )}
 
-        <div className="mt-6 flex gap-2">
+        <div className="mt-6 flex flex-col gap-2">
           {product.stock > 0 && (
             <AddToCartButton
               productId={product.id}
               unit={product.unit}
               stock={product.stock}
+              sizes={parseJsonArray(product.sizesJson)}
               disabled={isOwnListing}
             />
           )}
           {user && !isOwnListing && (
-            <Link href={`/messages?with=${product.seller.id}`} className="btn-secondary">
+            <Link href={`/messages?with=${product.seller.id}`} className="btn-secondary self-start">
               Message seller
             </Link>
           )}

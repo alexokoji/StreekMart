@@ -295,6 +295,11 @@ model Product {
   // cart can render qty + unit and multiply correctly. Whitelist lives in
   // src/lib/units.ts (PRODUCT_UNITS).
   unit        String   @default("piece")
+  // Optional size list for sized products (clothing, shoes, bags). JSON
+  // array of strings. Empty for materials and unsized items. Seller picks
+  // the relevant scale on the listing form (XS-XXL, EU shoe sizes, etc.);
+  // the buyer picks one at add-to-cart time.
+  sizesJson   String   @default("[]")
   // DRAFT | ACTIVE | SOLD_OUT | ARCHIVED
   status      String   @default("ACTIVE")
   // JSON-encoded array of image URLs (SQLite has no native string[]).
@@ -397,6 +402,12 @@ model CartItem {
   // Float so fabrics can be added by the half-yard / fraction. For
   // piece-priced products the API still rejects fractional values.
   quantity  Float    @default(1)
+  // Optional size for sized goods (clothing, shoes, bags). NULL for
+  // materials and unsized items. Two carts of the same product in
+  // different sizes overwrite today (unique constraint is on
+  // cartId+productId, not size) — acceptable for V1, revisit if buyers
+  // start asking for it.
+  size      String?
   createdAt DateTime @default(now())
 
   @@unique([cartId, productId])

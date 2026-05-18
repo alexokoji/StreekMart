@@ -175,18 +175,67 @@ export function ImageUploader({
             <circle cx="9" cy="9" r="1.5" fill="currentColor" />
           </svg>
           <p>
-            <span className="font-semibold">{busy ? "Uploading…" : "Drop images here"}</span>
-            <span className="hidden sm:inline"> or click to choose</span>
+            <span className="font-semibold">
+              {busy
+                ? "Uploading…"
+                : /* Phrasing flips on mobile vs desktop. Mobile users can't drag,
+                     so leading with "tap" makes the affordance unmistakable. */ ""}
+            </span>
+            <span className="font-semibold sm:hidden">
+              {!busy && "Tap to choose from your device"}
+            </span>
+            <span className="hidden font-semibold sm:inline">
+              {!busy && "Click to choose or drop images here"}
+            </span>
           </p>
           <p className="text-[10px] text-ink-400">
             JPEG · PNG · WebP · GIF · AVIF — up to 8&nbsp;MB each
             {multi && limit > 1 && ` · max ${limit} images`}
           </p>
+
+          {/* Dedicated buttons so the affordance is unambiguous on every
+              device. The dropzone background still accepts taps too. */}
+          <div className="mt-1 flex flex-wrap items-center justify-center gap-2 text-[11px]">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (fileRef.current) {
+                  fileRef.current.removeAttribute("capture");
+                  fileRef.current.click();
+                }
+              }}
+              disabled={busy}
+              className="rounded-md border border-violet-200 bg-white px-3 py-1.5 font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+            >
+              Choose from device
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (fileRef.current) {
+                  fileRef.current.setAttribute("capture", "environment");
+                  fileRef.current.click();
+                }
+              }}
+              disabled={busy}
+              className="rounded-md border border-ink-200 bg-white px-3 py-1.5 font-semibold text-ink-700 hover:bg-ink-50 disabled:opacity-50"
+            >
+              Use camera
+            </button>
+          </div>
+
+          {/*
+            Hidden native input. Default `accept="image/*"` only — we toggle
+            `capture` per click above so "Choose from device" opens the file
+            browser while "Use camera" opens the camera. Without that toggle,
+            Android browsers default to camera-first.
+          */}
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             multiple={multi}
             className="hidden"
             onChange={(e) => {

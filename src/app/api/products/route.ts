@@ -55,6 +55,9 @@ const CreateBody = z.object({
   // The unit `price` is quoted in. Seller picks "yard" / "meter" for fabric;
   // "piece" for ready-to-wear (default).
   unit: z.enum(PRODUCT_UNITS as [typeof PRODUCT_UNITS[number], ...typeof PRODUCT_UNITS[number][]]).optional(),
+  // Optional list of available sizes for clothing / shoes / bags. Empty
+  // for materials and other unsized items. Stored as JSON on the row.
+  sizes: z.array(z.string().min(1).max(20)).max(40).optional(),
   // ISO-4217 code for the currency the seller typed `price`/`salePrice` in.
   // Server converts to USD before storing so all downstream display/maths
   // stays in one canonical unit. Defaults to USD when absent (back-compat).
@@ -81,7 +84,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, description, price, salePrice, category, status, stock, images, unit, currency, actAsOwnerId } = parsed.data;
+  const { name, description, price, salePrice, category, status, stock, images, unit, sizes, currency, actAsOwnerId } = parsed.data;
 
   // Owner = the actor unless they're a manager acting on someone else's behalf.
   const ownerId = await resolveActingOwner(guard.session.sub, actAsOwnerId, "edit_products");
@@ -170,6 +173,7 @@ export async function POST(req: Request) {
       status: status ?? ProductStatus.ACTIVE,
       stock: stock ?? 99,
       unit: unit ?? "piece",
+      sizesJson: JSON.stringify(sizes ?? []),
       imagesJson: JSON.stringify(images),
     },
   });

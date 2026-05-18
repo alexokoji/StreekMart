@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
+import { VerificationGate } from "@/components/VerificationGate";
 
 export default async function SellerDashboardPage() {
   const user = await requireUser("SELLER");
@@ -32,6 +33,8 @@ export default async function SellerDashboardPage() {
         <h1 className="text-2xl font-bold">Welcome back, {user.name}</h1>
         <Link href="/seller/products/new" className="btn-primary">+ Add product</Link>
       </div>
+
+      <VerificationGate kind="seller" verified={user.sellerVerified} />
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Products" value={productCount} />

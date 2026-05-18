@@ -38,6 +38,9 @@ const UpdateBody = z.object({
   // quantities are validated for *future* additions; existing cart rows
   // keep whatever quantity they were saved with.
   unit: z.enum(PRODUCT_UNITS as [typeof PRODUCT_UNITS[number], ...typeof PRODUCT_UNITS[number][]]).optional(),
+  // Stocked sizes — empty array clears the list. Omit the field to leave
+  // it untouched.
+  sizes: z.array(z.string().min(1).max(20)).max(40).optional(),
   // ISO-4217 — currency the seller typed `price`/`salePrice` in. When
   // present and not USD, the values are converted to USD before storage.
   currency: z.string().length(3).optional(),
@@ -83,7 +86,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     );
   }
 
-  const { images, currency, price, salePrice, ...rest } = parsed.data;
+  const { images, sizes, currency, price, salePrice, ...rest } = parsed.data;
 
   // Convert price/salePrice from the seller's currency → USD if needed.
   let priceUsd = price;
@@ -111,6 +114,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       ...(salePrice !== undefined ? { salePrice: salePriceForUpdate ?? null } : {}),
       ...(rest.category ? { kind: kindForCategory(rest.category) } : {}),
       ...(images ? { imagesJson: JSON.stringify(images) } : {}),
+      ...(sizes !== undefined ? { sizesJson: JSON.stringify(sizes) } : {}),
     },
   });
   return NextResponse.json({ product: updated });

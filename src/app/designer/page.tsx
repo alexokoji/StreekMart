@@ -3,6 +3,7 @@ import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
+import { VerificationGate } from "@/components/VerificationGate";
 
 export default async function DesignerDashboardPage() {
   const user = await requireUser("DESIGNER");
@@ -31,6 +32,8 @@ export default async function DesignerDashboardPage() {
           <Link href="/designer/posts/new" className="btn-primary">+ New post</Link>
         </div>
       </div>
+
+      <VerificationGate kind="designer" verified={user.designerVerified} />
 
       <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="Posts" value={postCount} />

@@ -23,6 +23,7 @@ export default async function EditProductPage({ params }: { params: { id: string
             salePrice: product.salePrice,
             stock: product.stock,
             unit: product.unit,
+            sizes: parseJsonArray(product.sizesJson),
             category: product.category,
             status: product.status,
             images: parseJsonArray(product.imagesJson),

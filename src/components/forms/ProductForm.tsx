@@ -6,6 +6,13 @@ import { CATEGORY_GROUPS } from "@/lib/enums";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { ImageUploader } from "@/components/forms/ImageUploader";
 import { PRODUCT_UNITS, type ProductUnit, unitConfig } from "@/lib/units";
+import {
+  SIZE_SCALES,
+  type SizeScale,
+  defaultScaleFor,
+  isSizedCategory,
+  scaleByValue,
+} from "@/lib/sizes";
 
 type ProductStatusValue = "DRAFT" | "ACTIVE" | "SOLD_OUT" | "ARCHIVED";
 
@@ -19,6 +26,7 @@ type ProductFormInitial = {
   status?: string;
   stock?: number;
   unit?: string;
+  sizes?: string[];
   images?: string[];
 };
 
@@ -69,7 +77,33 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
   const [unit, setUnit] = useState<ProductUnit>(
     (initial?.unit as ProductUnit) ?? "piece",
   );
+  // Size selector state. Only used for "sized" categories (clothing, shoes,
+  // bags). The scale defaults from the category mapping; the seller can
+  // switch if their goods follow a different scale (e.g. EU vs UK numeric).
+  const [sizeScale, setSizeScale] = useState<SizeScale>(
+    defaultScaleFor(initial?.category ?? "") ?? "alpha",
+  );
+  const [sizes, setSizes] = useState<string[]>(initial?.sizes ?? []);
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
+
+  // When the seller picks a different category, switch to the recommended
+  // scale and clear any sizes that no longer exist on the new scale.
+  function changeCategory(next: string) {
+    setCategory(next);
+    const recommended = defaultScaleFor(next);
+    if (recommended) {
+      setSizeScale(recommended);
+      const allowed = new Set(scaleByValue(recommended).sizes);
+      setSizes((prev) => prev.filter((s) => allowed.has(s)));
+    } else {
+      // Unsized category — wipe the sizes so we don't ship orphans.
+      setSizes([]);
+    }
+  }
+
+  function toggleSize(size: string) {
+    setSizes((cur) => (cur.includes(size) ? cur.filter((s) => s !== size) : [...cur, size]));
+  }
   const [aiNotes, setAiNotes] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -91,6 +125,9 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
         status,
         stock: Number(stock),
         unit,
+        // Only send sizes when the category is sized. Avoids unsized rows
+        // accidentally carrying stale alpha sizes from a previous edit.
+        sizes: isSizedCategory(category) ? sizes : [],
         images,
       };
 
@@ -304,7 +341,7 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
 
       <div>
         <label className="label">Category</label>
-        <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select className="input" value={category} onChange={(e) => changeCategory(e.target.value)}>
           {ALL_CATEGORIES.map(([group, items]) => (
             <optgroup key={group} label={group}>
               {items.map((c) => (
@@ -314,6 +351,61 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
           ))}
         </select>
       </div>
+
+      {/* Size selector — only renders for clothing / shoes / bags etc.
+          Materials and unsized items skip this entirely. The seller can
+          override the auto-picked scale (e.g. EU numeric instead of alpha)
+          via the dropdown. */}
+      {isSizedCategory(category) && (
+        <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <label className="label mb-0">Available sizes</label>
+              <p className="text-xs text-ink-500">
+                Pick every size you stock. Buyers select one at checkout.
+              </p>
+            </div>
+            <select
+              className="input max-w-[180px] text-sm"
+              value={sizeScale}
+              onChange={(e) => {
+                const next = e.target.value as SizeScale;
+                setSizeScale(next);
+                const allowed = new Set(scaleByValue(next).sizes);
+                setSizes((prev) => prev.filter((s) => allowed.has(s)));
+              }}
+            >
+              {SIZE_SCALES.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {scaleByValue(sizeScale).sizes.map((s) => {
+              const on = sizes.includes(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleSize(s)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    on
+                      ? "border-violet-500 bg-violet-600 text-white"
+                      : "border-ink-200 bg-white text-ink-700 hover:border-violet-300"
+                  }`}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+          {sizes.length === 0 && (
+            <p className="mt-2 text-[11px] italic text-ink-500">
+              No sizes selected — buyers won&apos;t be able to add this to cart.
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="label">Images</label>

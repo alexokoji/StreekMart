@@ -24,6 +24,7 @@ export default async function EditDesignerProductPage({ params }: { params: { id
             salePrice: product.salePrice,
             stock: product.stock,
             unit: product.unit,
+            sizes: parseJsonArray(product.sizesJson),
             category: product.category,
             status: product.status,
             images: parseJsonArray(product.imagesJson),

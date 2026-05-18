@@ -66,6 +66,9 @@ const AddBody = z.object({
   // Float so fabric units (yard/meter/etc.) accept fractions. The unit's
   // step rule is enforced below against the product's `unit` field.
   quantity: z.number().positive().max(1000).optional(),
+  // Required when the product has stocked sizes; ignored otherwise. We
+  // validate against the product's actual size list below.
+  size: z.string().min(1).max(20).optional(),
 });
 
 export async function POST(req: Request) {
@@ -92,8 +95,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: stepError }, { status: 400 });
   }
 
+  // Size validation. The product's stocked sizes live in `sizesJson`. If
+  // any sizes are listed, the buyer must pick one; the picked size must be
+  // in the list. Unsized products ignore the field entirely.
+  const stockedSizes = parseJsonArray(product.sizesJson);
+  let size: string | null = null;
+  if (stockedSizes.length > 0) {
+    if (!parsed.data.size) {
+      return NextResponse.json(
+        { error: "Pick a size before adding this to your cart." },
+        { status: 400 },
+      );
+    }
+    if (!stockedSizes.includes(parsed.data.size)) {
+      return NextResponse.json(
+        { error: `Size "${parsed.data.size}" isn't available for this item.` },
+        { status: 400 },
+      );
+    }
+    size = parsed.data.size;
+  }
+
   // Upsert keeps add-twice from creating duplicate rows; existing rows get the
-  // requested quantity added on top.
+  // requested quantity added on top. Changing the size on an existing row
+  // overwrites — the buyer ends up with the most recently picked size.
   const existing = await prisma.cartItem.findUnique({
     where: { cartId_productId: { cartId: cart.id, productId: product.id } },
   });
@@ -102,8 +127,8 @@ export async function POST(req: Request) {
 
   const item = await prisma.cartItem.upsert({
     where: { cartId_productId: { cartId: cart.id, productId: product.id } },
-    create: { cartId: cart.id, productId: product.id, quantity: newQty },
-    update: { quantity: newQty },
+    create: { cartId: cart.id, productId: product.id, quantity: newQty, size },
+    update: { quantity: newQty, size: size ?? existing?.size ?? null },
   });
 
   return NextResponse.json({ item, addedQuantity: newQty - (existing?.quantity ?? 0) });

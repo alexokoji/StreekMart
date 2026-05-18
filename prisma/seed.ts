@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding UpClo demo data…");
+  console.log("Seeding StreekMart demo data…");
 
   const password = await bcrypt.hash("password123", 10);
 
@@ -43,9 +43,9 @@ async function main() {
   // Platform admin — gates /admin and /api/admin/*.
   await prisma.user.create({
     data: {
-      email: "admin@upclo.dev",
-      name: "UpClo Admin",
-      slug: "upclo-admin",
+      email: "admin@streekmart.online",
+      name: "StreekMart Admin",
+      slug: "streekmart-admin",
       passwordHash: password,
       isAdmin: true,
       cart: { create: {} },
@@ -56,7 +56,7 @@ async function main() {
   // a memorable slug so /u/<slug> shows nicely in shared links.
   const buyer = await prisma.user.create({
     data: {
-      email: "buyer@upclo.dev",
+      email: "buyer@streekmart.online",
       name: "Alex Buyer",
       slug: "alex-buyer",
       passwordHash: password,
@@ -66,7 +66,7 @@ async function main() {
 
   const seller = await prisma.user.create({
     data: {
-      email: "seller@upclo.dev",
+      email: "seller@streekmart.online",
       name: "Seoul Threads",
       slug: "seoul-threads",
       passwordHash: password,
@@ -80,7 +80,7 @@ async function main() {
 
   const designer = await prisma.user.create({
     data: {
-      email: "designer@upclo.dev",
+      email: "designer@streekmart.online",
       name: "Mira Okafor",
       slug: "mira-okafor",
       passwordHash: password,
@@ -95,7 +95,7 @@ async function main() {
   // "Pro" account = Buyer + Seller + Designer all at once.
   const pro = await prisma.user.create({
     data: {
-      email: "pro@upclo.dev",
+      email: "pro@streekmart.online",
       name: "Kemi Adelaja",
       slug: "kemi-adelaja",
       passwordHash: password,
@@ -391,11 +391,11 @@ async function main() {
   });
 
   console.log("Done. Demo accounts (password = password123):");
-  console.log("  admin@upclo.dev      — Platform admin (controls /admin)");
-  console.log("  buyer@upclo.dev      — Buyer only");
-  console.log("  seller@upclo.dev     — Buyer + Seller");
-  console.log("  designer@upclo.dev   — Buyer + Designer");
-  console.log("  pro@upclo.dev        — Buyer + Seller + Designer");
+  console.log("  admin@streekmart.online      — Platform admin (controls /admin)");
+  console.log("  buyer@streekmart.online      — Buyer only");
+  console.log("  seller@streekmart.online     — Buyer + Seller");
+  console.log("  designer@streekmart.online   — Buyer + Designer");
+  console.log("  pro@streekmart.online        — Buyer + Seller + Designer");
 }
 
 main()

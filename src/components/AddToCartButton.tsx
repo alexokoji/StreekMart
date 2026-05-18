@@ -18,12 +18,16 @@ export function AddToCartButton({
   productId,
   unit = "piece",
   stock,
+  sizes,
   disabled,
   compact,
 }: {
   productId: string;
   unit?: string;
   stock?: number;
+  /** Optional list of stocked sizes. When present the buyer must pick one
+   *  before adding to cart. Pass `[]` (or omit) for unsized goods. */
+  sizes?: string[];
   disabled?: boolean;
   compact?: boolean;
 }) {
@@ -32,6 +36,13 @@ export function AddToCartButton({
   const [qty, setQty] = useState<number>(cfg.step);
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState(false);
+  // Selected size when the product is sized. Required before the API call.
+  const sizeOptions = sizes ?? [];
+  const showSizes = sizeOptions.length > 0;
+  const [selectedSize, setSelectedSize] = useState<string | null>(
+    sizeOptions.length === 1 ? sizeOptions[0] : null,
+  );
+  const [sizeError, setSizeError] = useState(false);
 
   // Stepper visibility: hide for "piece" (one-click is the right UX). For
   // anything else, show — buyers need to pick how many yards / meters / etc.
@@ -43,12 +54,17 @@ export function AddToCartButton({
   }
 
   async function add() {
+    if (showSizes && !selectedSize) {
+      setSizeError(true);
+      return;
+    }
+    setSizeError(false);
     setBusy(true);
     try {
       const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, quantity: qty }),
+        body: JSON.stringify({ productId, quantity: qty, size: selectedSize ?? undefined }),
       });
       if (res.status === 401) {
         router.push("/login?redirect=" + encodeURIComponent(window.location.pathname));
@@ -77,6 +93,40 @@ export function AddToCartButton({
 
   return (
     <div className={`flex w-full flex-col gap-2 ${compact ? "text-xs" : ""}`}>
+      {showSizes && (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-ink-500">
+            Size
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {sizeOptions.map((s) => {
+              const on = selectedSize === s;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setSelectedSize(s);
+                    setSizeError(false);
+                  }}
+                  className={`min-w-[2.5rem] rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    on
+                      ? "border-violet-500 bg-violet-600 text-white"
+                      : "border-ink-200 bg-white text-ink-700 hover:border-violet-300"
+                  }`}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+          {sizeError && (
+            <p className="mt-1.5 text-xs font-medium text-burgundy-700">
+              Pick a size to continue.
+            </p>
+          )}
+        </div>
+      )}
       {showStepper && (
         <div className="flex items-center gap-2 text-sm">
           <div className="inline-flex items-center rounded-md border border-ink-200">
