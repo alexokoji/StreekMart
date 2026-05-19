@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { isAiEnabled } from "@/lib/ai";
@@ -17,7 +18,8 @@ export default async function PublicProductPage({ params }: { params: { id: stri
     include: {
       seller: {
         select: {
-          id: true, slug: true, name: true, bio: true, avatarUrl: true,
+          id: true, slug: true, name: true, businessName: true,
+          bio: true, avatarUrl: true,
           isSeller: true, isDesigner: true,
           sellerVerified: true, designerVerified: true,
           exposureScore: true,
@@ -68,7 +70,7 @@ export default async function PublicProductPage({ params }: { params: { id: stri
         <p className="mt-1 text-sm text-gray-500">
           Sold by{" "}
           <Link href={`/u/${product.seller.slug ?? product.seller.id}`} className="font-medium text-brand-700 hover:underline">
-            {product.seller.name}
+            {displaySellerName(product.seller)}
           </Link>
           {product.seller.sellerVerified && (
             <span title="Verified by StreekMart" className="ml-1 inline-flex h-4 w-4 -translate-y-0.5 items-center justify-center rounded-full bg-emerald-accent text-[9px] font-bold text-white">✓</span>

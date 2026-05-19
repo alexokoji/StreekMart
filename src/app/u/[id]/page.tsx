@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { FollowButton } from "./FollowButton";
+import { CoverImageUploader } from "./CoverImageUploader";
 import { ShareButton } from "@/components/ShareButton";
 
 // Public profile page — surfaces a user's seller storefront and (if they're
@@ -37,8 +38,10 @@ const PROFILE_SELECT = {
   id: true,
   slug: true,
   name: true,
+  businessName: true,
   bio: true,
   avatarUrl: true,
+  coverImageUrl: true,
   isSeller: true,
   isDesigner: true,
   sellerVerified: true,
@@ -66,21 +69,25 @@ export async function generateMetadata({
         : profile.isDesigner
           ? "designer"
           : "member";
-  const desc = profile.bio ?? `${profile.name} on StreekMart — independent ${role}.`;
+  // Prefer the business name for SEO / share previews — that's how buyers
+  // know the shop. Fall back to the personal name for non-seller profiles.
+  const displayName = profile.businessName?.trim() || profile.name;
+  const desc = profile.bio ?? `${displayName} on StreekMart — independent ${role}.`;
+  const ogImage = profile.coverImageUrl ?? profile.avatarUrl ?? undefined;
   return {
-    title: `${profile.name} · StreekMart`,
+    title: `${displayName} · StreekMart`,
     description: desc,
     openGraph: {
-      title: `${profile.name} on StreekMart`,
+      title: `${displayName} on StreekMart`,
       description: desc,
-      images: profile.avatarUrl ? [profile.avatarUrl] : undefined,
+      images: ogImage ? [ogImage] : undefined,
       type: "profile",
     },
     twitter: {
       card: "summary_large_image",
-      title: `${profile.name} on StreekMart`,
+      title: `${displayName} on StreekMart`,
       description: desc,
-      images: profile.avatarUrl ? [profile.avatarUrl] : undefined,
+      images: ogImage ? [ogImage] : undefined,
     },
   };
 }
@@ -106,6 +113,11 @@ export default async function PublicProfilePage({
   }
 
   const handle = profile.slug ?? profile.id;
+  // Brand identity for the cover heading. Falls back to the personal
+  // `name` for legacy / non-seller profiles that haven't set a business
+  // name yet. Matches the displaySellerName helper used on product cards.
+  const displayName = profile.businessName?.trim() || profile.name;
+  const isOwner = !!viewer && viewer.id === profile.id;
 
   // Default to whichever tab makes sense for the user's role mix.
   const requested = (searchParams.tab as Tab | undefined) ?? null;
@@ -143,9 +155,53 @@ export default async function PublicProfilePage({
 
   return (
     <div className="space-y-6">
-      {/* Profile header */}
+      {/* Profile header — cover-image-first layout.
+          Cover fills the top of the card and carries the business name
+          overlay (white, smaller font, with the white+green-tick verified
+          badge inline). Avatar, bio, and role badges live below the cover
+          on a normal background. */}
       <header className="card overflow-hidden">
-        <div className="h-24 w-full bg-g-aurora sm:h-32" />
+        <div className="relative h-44 w-full sm:h-52 md:h-64">
+          {profile.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.coverImageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full bg-g-aurora" />
+          )}
+          {/* Dark gradient at the bottom so the white name copy stays legible
+              even against light cover photos. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/65 via-black/25 to-transparent" />
+
+          {/* Name + verified badge overlay. Sits in the bottom-left so it
+              doesn't fight the avatar that pokes up from underneath. */}
+          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-5 pb-4 sm:px-6">
+            <div className="min-w-0">
+              <h1 className="flex flex-wrap items-center gap-2 font-display text-base font-semibold leading-tight text-white drop-shadow sm:text-lg">
+                <span className="truncate">{displayName}</span>
+                {verified && (
+                  <span
+                    title="Verified by StreekMart"
+                    className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-accent shadow-sm"
+                  >
+                    <span aria-hidden="true">✓</span>
+                    <span className="not-italic">Verified</span>
+                  </span>
+                )}
+              </h1>
+            </div>
+
+            {isOwner && (
+              <CoverImageUploader
+                initialUrl={profile.coverImageUrl}
+              />
+            )}
+          </div>
+        </div>
+
         <div className="-mt-10 flex flex-wrap items-end justify-between gap-4 px-6 pb-5 sm:-mt-12">
           <div className="flex items-end gap-4">
             <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-soft sm:h-24 sm:w-24">
@@ -154,23 +210,12 @@ export default async function PublicProfilePage({
                 <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-500 text-2xl font-bold text-white">
-                  {profile.name.slice(0, 1).toUpperCase()}
+                  {displayName.slice(0, 1).toUpperCase()}
                 </div>
               )}
             </div>
-            <div>
-              <h1 className="font-display text-2xl font-bold leading-tight">
-                {profile.name}
-                {verified && (
-                  <span
-                    title="Verified by StreekMart"
-                    className="ml-2 inline-flex h-5 w-5 -translate-y-0.5 items-center justify-center rounded-full bg-emerald-accent text-[10px] font-bold text-white"
-                  >
-                    ✓
-                  </span>
-                )}
-              </h1>
-              <p className="mt-0.5 text-sm text-ink-600">{profile.bio ?? "Independent maker on StreekMart."}</p>
+            <div className="min-w-0">
+              <p className="text-sm text-ink-600">{profile.bio ?? "Independent maker on StreekMart."}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-500">
                 {profile.isSeller && <span className="badge bg-violet-50 text-violet-700">Seller</span>}
                 {profile.isDesigner && <span className="badge bg-fuchsia-50 text-fuchsia-700">Designer</span>}
@@ -185,7 +230,7 @@ export default async function PublicProfilePage({
           <div className="flex flex-wrap items-center gap-2">
             <ShareButton
               path={`/u/${handle}`}
-              title={`${profile.name} on StreekMart`}
+              title={`${displayName} on StreekMart`}
               text={profile.bio ?? "Check out this StreekMart profile."}
             />
             {viewer && viewer.id !== profile.id && (
@@ -290,7 +335,7 @@ export default async function PublicProfilePage({
       {((tab === "products" && !profile.isSeller) ||
         (tab === "posts" && !profile.isDesigner)) && (
         <div className="card p-10 text-center text-ink-500">
-          {profile.name} hasn&apos;t enabled that part of their profile.
+          {displayName} hasn&apos;t enabled that part of their profile.
         </div>
       )}
     </div>

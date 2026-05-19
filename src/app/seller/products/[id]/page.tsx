@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { PromotionStatus } from "@/lib/enums";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { PromoteButton } from "@/components/PromoteButton";
@@ -10,12 +11,44 @@ export default async function ViewProductPage({ params }: { params: { id: string
   const user = await requireUser("SELLER");
   const product = await prisma.product.findUnique({
     where: { id: params.id },
-    include: { promotions: { where: { active: true, endsAt: { gt: new Date() } } } },
+    include: {
+      // All non-terminal promotions for this product. We use this to drive
+      // the PromoteButton: APPROVED+live → "Promoted" (disabled),
+      // PENDING_PAYMENT/PENDING_REVIEW → in-flight state, else → can pay.
+      promotions: {
+        where: {
+          status: {
+            in: [
+              PromotionStatus.APPROVED,
+              PromotionStatus.PENDING_PAYMENT,
+              PromotionStatus.PENDING_REVIEW,
+            ],
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      },
+    },
   });
   if (!product || product.sellerId !== user.id) notFound();
 
   const images = parseJsonArray(product.imagesJson);
-  const isPromoted = product.promotions.length > 0;
+  const now = new Date();
+  const livePromotion = product.promotions.find(
+    (p) => p.status === PromotionStatus.APPROVED && p.endsAt > now,
+  );
+  const isPromoted = !!livePromotion;
+  const pendingPromo = product.promotions.find(
+    (p) =>
+      p.status === PromotionStatus.PENDING_PAYMENT ||
+      p.status === PromotionStatus.PENDING_REVIEW,
+  );
+  const pendingState: "payment" | "review" | undefined =
+    pendingPromo?.status === PromotionStatus.PENDING_PAYMENT
+      ? "payment"
+      : pendingPromo?.status === PromotionStatus.PENDING_REVIEW
+        ? "review"
+        : undefined;
 
   return (
     <div className="space-y-6">
@@ -23,7 +56,12 @@ export default async function ViewProductPage({ params }: { params: { id: string
         <h1 className="text-2xl font-bold">{product.name}</h1>
         <div className="flex gap-2">
           <Link href={`/seller/products/${product.id}/edit`} className="btn-secondary">Edit</Link>
-          <PromoteButton kind="product" id={product.id} disabled={isPromoted} />
+          <PromoteButton
+            kind="product"
+            id={product.id}
+            disabled={isPromoted}
+            pendingState={pendingState}
+          />
         </div>
       </div>
 

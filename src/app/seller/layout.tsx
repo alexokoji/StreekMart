@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ProfileCompletionBanner } from "@/components/layout/ProfileCompletionBanner";
 import { requireUser } from "@/lib/auth";
 import { Permission } from "@/lib/enums";
 
@@ -23,7 +24,15 @@ export default async function SellerLayout({ children }: { children: React.React
   return (
     <div className="md:flex md:gap-6">
       <Sidebar title="Seller" items={NAV} isAdmin={user.isAdmin} />
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1">
+        <ProfileCompletionBanner
+          isSeller={user.isSeller}
+          phone={user.phone}
+          businessName={user.businessName}
+          settingsHref="/seller/settings"
+        />
+        {children}
+      </div>
     </div>
   );
 }

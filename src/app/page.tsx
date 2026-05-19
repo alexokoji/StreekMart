@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { CATEGORY_GROUPS, ProductKind, ProductStatus } from "@/lib/enums";
+import {
+  CATEGORY_GROUPS,
+  ProductKind,
+  ProductStatus,
+  PromotionStatus,
+} from "@/lib/enums";
+import { displaySellerName } from "@/lib/businessName";
 import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
 import { ProductCard, type ProductCardData } from "@/components/storefront/ProductCard";
 import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
+import {
+  PromotionSlider,
+  type PromotionSlide,
+} from "@/components/storefront/PromotionSlider";
 import { SmartSuggestions } from "@/components/SmartSuggestions";
 
 export const dynamic = "force-dynamic";
@@ -32,12 +42,32 @@ export default async function HomePage({
     ...(Object.keys(sellerWhere).length > 0 ? { seller: sellerWhere } : {}),
   };
 
-  const [products, designers, savedFavorites, perCategoryGrouped] = await Promise.all([
+  const [products, designers, savedFavorites, perCategoryGrouped, activePromotions] = await Promise.all([
     prisma.product.findMany({
       where: productWhere,
       include: {
-        seller: { select: { id: true, name: true, exposureScore: true, sellerVerified: true } },
-        promotions: { where: { active: true, endsAt: { gt: now } } },
+        seller: {
+          select: {
+            id: true,
+            name: true,
+            // businessName takes precedence on every product surface — see
+            // displaySellerName in @/lib/businessName.
+            businessName: true,
+            exposureScore: true,
+            sellerVerified: true,
+          },
+        },
+        // Only APPROVED, currently-running promotions feed into rank-boost.
+        // PENDING_REVIEW rows shouldn't influence ordering before an admin
+        // signs off, and `active=true` alone isn't enough (legacy rows
+        // could have skipped the new state machine).
+        promotions: {
+          where: {
+            active: true,
+            status: PromotionStatus.APPROVED,
+            endsAt: { gt: now },
+          },
+        },
       },
       take: 200,
     }),
@@ -58,10 +88,46 @@ export default async function HomePage({
       where: productWhere,
       _count: { _all: true },
     }),
+    // Approved, currently-running product promotions. Sorted oldest-first
+    // so promos that have been live longest cycle out as new ones come in,
+    // giving every seller fair time at the top of the page.
+    prisma.promotion.findMany({
+      where: {
+        status: PromotionStatus.APPROVED,
+        active: true,
+        endsAt: { gt: now },
+        productId: { not: null },
+        product: { status: ProductStatus.ACTIVE },
+      },
+      include: {
+        product: {
+          include: {
+            seller: { select: { name: true, businessName: true } },
+          },
+        },
+      },
+      orderBy: { startsAt: "asc" },
+      take: 10,
+    }),
   ]);
 
   const savedSet = new Set(savedFavorites.map((f) => f.productId!));
   const categoryCounts = new Map(perCategoryGrouped.map((c) => [c.category, c._count._all]));
+
+  // Drop any promotion whose product was deleted between query and render,
+  // then shape what the slider actually needs.
+  const promotionSlides: PromotionSlide[] = activePromotions
+    .filter((p): p is typeof p & { product: NonNullable<typeof p.product> } => !!p.product)
+    .map((p) => ({
+      promotionId: p.id,
+      productId: p.product.id,
+      name: p.product.name,
+      image: parseJsonArray(p.product.imagesJson)[0] ?? null,
+      price: p.product.price,
+      salePrice: p.product.salePrice,
+      sellerName: displaySellerName(p.product.seller),
+      category: p.product.category,
+    }));
 
   function shape(p: typeof products[number]): ProductCardData {
     return {
@@ -71,7 +137,7 @@ export default async function HomePage({
       salePrice: p.salePrice,
       category: p.category,
       image: parseJsonArray(p.imagesJson)[0] ?? null,
-      sellerName: p.seller.name,
+      sellerName: displaySellerName(p.seller),
       sellerVerified: p.seller.sellerVerified,
       promoted: p.promotions.length > 0,
       rating: p.ratingAvg,
@@ -120,6 +186,11 @@ export default async function HomePage({
 
   return (
     <div className="space-y-10 pb-12 sm:space-y-12">
+      {/* Paid promotions — sellers pay ₦500 for a 3-day admin-approved
+          slot at the absolute top of the home page, above everything
+          else. Hidden when no live promotion exists. */}
+      {promotionSlides.length > 0 && <PromotionSlider slides={promotionSlides} />}
+
       {/*
         Top row: dense category rail (lg+) | compact hero.
         Hero is intentionally bounded (~h-[420px] on desktop) so the first

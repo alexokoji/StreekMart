@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getSession, setSessionCookie } from "@/lib/auth";
+import {
+  canonicaliseBusinessNameDisplay,
+  isBusinessNameTaken,
+  normaliseBusinessName,
+  normalisePhone,
+} from "@/lib/businessName";
 import { validateSlug } from "@/lib/slug";
 import { isValidCountryCode } from "@/lib/location";
 
@@ -19,9 +25,21 @@ const Body = z.object({
   name: z.string().min(2).max(80).optional(),
   bio: z.string().max(500).optional(),
   avatarUrl: z.string().url().or(z.literal("")).optional(),
+  // Profile-page cover banner. Owner-only — see /u/[slug]'s upload control.
+  coverImageUrl: z.string().url().or(z.literal("")).optional(),
   email: z.string().email().optional(),
   password: z.string().min(8).max(200).optional(),
   slug: z.string().min(3).max(30).optional(),
+  // Phone is always editable — it's the contact channel, not a brand identity.
+  phone: z
+    .string()
+    .regex(/^[+]?[\d\s().-]{7,20}$/, "Enter a valid phone number")
+    .optional(),
+  // Business name is editable ONLY when the user doesn't already have one
+  // set. Subsequent changes have to go through /api/account/business-name-change
+  // for admin approval. The handler enforces this — the client can't bypass
+  // by sending the field anyway.
+  businessName: z.string().min(2).max(80).optional(),
   // Location updates — useful both for buyers (delivery matching) and
   // sellers (defines the "within city" zone for their delivery rates).
   country: z.string().length(2).optional(),
@@ -59,8 +77,46 @@ export async function PATCH(req: Request) {
   if (parsed.data.name) data.name = parsed.data.name;
   if (parsed.data.bio !== undefined) data.bio = parsed.data.bio;
   if (parsed.data.avatarUrl !== undefined) data.avatarUrl = parsed.data.avatarUrl || null;
+  if (parsed.data.coverImageUrl !== undefined) {
+    data.coverImageUrl = parsed.data.coverImageUrl || null;
+  }
   if (parsed.data.email) data.email = parsed.data.email;
   if (parsed.data.slug) data.slug = parsed.data.slug;
+  if (parsed.data.phone !== undefined) {
+    data.phone = normalisePhone(parsed.data.phone);
+  }
+  if (parsed.data.businessName !== undefined) {
+    // Only honoured for the *first* time a user sets their business name.
+    // Once `businessNameLower` is non-null the field is locked and the
+    // user must go through BusinessNameChangeRequest. Silently dropping
+    // the field would hide the intent, so 403 instead.
+    const me = await prisma.user.findUnique({
+      where: { id: session.sub },
+      select: { businessNameLower: true },
+    });
+    if (me?.businessNameLower) {
+      return NextResponse.json(
+        {
+          error:
+            "Your business name is locked. Submit a change request from settings to update it.",
+        },
+        { status: 403 },
+      );
+    }
+    const display = canonicaliseBusinessNameDisplay(parsed.data.businessName);
+    if (!display) {
+      return NextResponse.json({ error: "Enter a valid business name." }, { status: 400 });
+    }
+    const lower = normaliseBusinessName(display);
+    if (await isBusinessNameTaken(lower, session.sub)) {
+      return NextResponse.json(
+        { error: "That business name is already taken." },
+        { status: 409 },
+      );
+    }
+    data.businessName = display;
+    data.businessNameLower = lower;
+  }
   if (parsed.data.country) {
     const code = parsed.data.country.toUpperCase();
     if (!isValidCountryCode(code)) {

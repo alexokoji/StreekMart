@@ -34,6 +34,22 @@ model User {
   // Which provider minted the account: "password" or "google".
   authProvider String   @default("password")
   name         String
+  // Business / brand name shown to buyers on product cards, the public
+  // profile, and order receipts. Required for sellers (enforced in the
+  // UI + API; legacy rows allowed to be null until the user fills it in).
+  // Stored case-as-typed. `businessNameLower` is a normalised mirror that
+  // carries the @unique constraint — SQLite has no case-insensitive
+  // collation, so we compare on lowercase ourselves.
+  // Once set, the user can't edit it directly — they submit a
+  // BusinessNameChangeRequest for admin approval.
+  businessName       String?
+  businessNameLower  String?  @unique
+  // Required for everyone — used for delivery contact and order updates.
+  // Nullable for legacy rows; the dashboard nags users to fill it in.
+  phone              String?
+  // Optional banner shown on the public profile page (/u/<slug>). Only the
+  // profile owner can upload one. Falls back to the gradient hero when null.
+  coverImageUrl      String?
   // URL-friendly handle for the public profile (/u/<slug>). Auto-generated
   // from `name` at signup; users can change it from Account settings.
   // Nullable for legacy rows; backfilled by the seed and the slug helper.
@@ -98,6 +114,32 @@ model User {
   managingFor     Manager[]        @relation("ManagerUser")
   verificationRequests VerificationRequest[]
   payoutRequests PayoutRequest[]
+  businessNameChangeRequests BusinessNameChangeRequest[]
+}
+
+// Business-name change queue. A user submits one of these to ask the admin
+// to swap their current `businessName` for a new one. The admin approves
+// (applies the change atomically, updates `businessName` + `businessNameLower`
+// on the user) or rejects (no-op, optional decision note). Status values
+// mirror VerificationRequest: PENDING | APPROVED | REJECTED.
+model BusinessNameChangeRequest {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Snapshot of the user's current businessName at submission time. Lets
+  // the admin see the swap context even if the user later modifies the
+  // row through some other flow.
+  currentName     String?
+  requestedName   String
+  requestedLower  String
+  status          String   @default("PENDING")
+  reviewerId      String?
+  reviewedAt      DateTime?
+  decisionNote    String?
+  createdAt       DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([userId])
 }
 
 // -------------------- Wallet & payouts --------------------
@@ -552,21 +594,54 @@ model Like {
 
 // -------------------- Promotions --------------------
 
+// Product promotions (paid) and post promotions (free, legacy).
+//
+// Product flow (paid, fixed ₦500 / 3-day, admin-approved):
+//   PENDING_PAYMENT  → seller created the request, awaiting Monnify
+//                      callback. `active=false`. `endsAt` is a placeholder.
+//   PENDING_REVIEW   → payment succeeded; waits for admin approval.
+//                      `paidAt` is set, `paymentTxnRef` carries the Monnify ref.
+//   APPROVED         → admin approved. `startsAt`=approval time,
+//                      `endsAt`=startsAt+3d, `active=true`. Shows on the
+//                      homepage slider above featured pieces.
+//   REJECTED         → admin declined. Fee auto-refunded to the seller's
+//                      wallet (see /api/admin/promotions/[id]).
+//   CANCELLED        → Monnify reported FAILED_TRANSACTION — buyer abandoned.
+//
+// Post flow (legacy, free): created directly as APPROVED + active.
 model Promotion {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  productId String?
-  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
-  postId    String?
-  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
-  boost     Float    @default(1.5)
-  startsAt  DateTime @default(now())
-  endsAt    DateTime
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  postId        String?
+  post          Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  boost         Float    @default(1.5)
+  // Status lives in lib/enums.ts as PromotionStatus. SQLite stores it as a
+  // string. Existing free post promotions migrate to "APPROVED".
+  status        String   @default("APPROVED")
+  // Stored as Monnify-compatible kobo (50000 = ₦500). Zero for free post
+  // promotions so the wallet refund step on rejection is a no-op.
+  priceCents    Int      @default(0)
+  // Monnify reference written at creation time; used as the webhook
+  // paymentReference and also as the idempotency key when the webhook
+  // marks the promo paid.
+  paymentReference String? @unique
+  paymentTxnRef String?
+  paidAt        DateTime?
+  reviewerId    String?
+  reviewedAt    DateTime?
+  decisionNote  String?
+  startsAt      DateTime @default(now())
+  endsAt        DateTime
+  // Mirrors `status === "APPROVED" && endsAt > now`. Kept as a column so
+  // existing queries that just check `active=true` keep working.
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
 
   @@index([active, endsAt])
+  @@index([status, endsAt])
 }
 
 // -------------------- Search learning log --------------------

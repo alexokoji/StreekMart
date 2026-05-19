@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/Sidebar";
+import { ProfileCompletionBanner } from "@/components/layout/ProfileCompletionBanner";
 import { requireUser } from "@/lib/auth";
 
 // Buyer dashboard layout. Mirrors the seller/designer layouts: a sidebar on
@@ -23,7 +24,15 @@ export default async function AccountLayout({ children }: { children: React.Reac
   return (
     <div className="md:flex md:gap-6">
       <Sidebar title="Account" items={NAV} isAdmin={user.isAdmin} />
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1">
+        <ProfileCompletionBanner
+          isSeller={user.isSeller}
+          phone={user.phone}
+          businessName={user.businessName}
+          settingsHref="/account/settings"
+        />
+        {children}
+      </div>
     </div>
   );
 }

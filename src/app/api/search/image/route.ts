@@ -53,7 +53,7 @@ export async function POST(req: Request) {
         : {}),
     },
     include: {
-      seller: { select: { id: true, name: true, exposureScore: true, sellerVerified: true } },
+      seller: { select: { id: true, name: true, businessName: true, exposureScore: true, sellerVerified: true } },
       promotions: { where: { active: true, endsAt: { gt: new Date() } } },
     },
     take: 200,
@@ -121,7 +121,11 @@ export async function POST(req: Request) {
         price: r.product.price,
         salePrice: r.product.salePrice,
         image: parseJsonArray(c.imagesJson)[0] ?? null,
-        seller: { id: c.seller.id, name: c.seller.name, verified: c.seller.sellerVerified },
+        seller: {
+          id: c.seller.id,
+          name: c.seller.businessName?.trim() || c.seller.name,
+          verified: c.seller.sellerVerified,
+        },
         score: Math.round(r.score * 100) / 100,
         reasons: r.reasons,
       };

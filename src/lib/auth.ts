@@ -47,6 +47,12 @@ export async function getCurrentUser() {
       email: true,
       name: true,
       slug: true,
+      // Contact + brand identity. Surfaced on every dashboard so the
+      // ProfileCompletionBanner can decide whether to nag the user.
+      phone: true,
+      businessName: true,
+      businessNameLower: true,
+      coverImageUrl: true,
       isSeller: true,
       isDesigner: true,
       sellerVerified: true,

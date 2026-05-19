@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
+import {
+  canonicaliseBusinessNameDisplay,
+  isBusinessNameTaken,
+  normaliseBusinessName,
+  normalisePhone,
+} from "@/lib/businessName";
 import { uniqueSlugFrom } from "@/lib/slug";
 import { isValidCountryCode } from "@/lib/location";
 import { sendEmail, welcomeEmail } from "@/lib/email";
@@ -17,6 +23,14 @@ const Body = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
   name: z.string().min(2),
+  // Required for everyone — phone is the platform's contact channel for
+  // delivery + order updates.
+  phone: z
+    .string()
+    .regex(/^[+]?[\d\s().-]{7,20}$/, "Enter a valid phone number"),
+  // Required when isSeller is true (further-validated below). Sellers can't
+  // list a product without one — buyers identify shops by their business name.
+  businessName: z.string().min(2).max(80).optional(),
   country: z.string().length(2, "Pick a country"),
   city: z.string().min(2, "Enter your city").max(80),
   region: z.string().max(80).optional(),
@@ -38,10 +52,36 @@ export async function POST(req: Request) {
     );
   }
 
-  const { email, password, name, country, city, region, isSeller, isDesigner, gender, interests } = parsed.data;
+  const { email, password, name, phone, businessName, country, city, region, isSeller, isDesigner, gender, interests } = parsed.data;
   if (!isValidCountryCode(country.toUpperCase())) {
     return NextResponse.json({ error: "Pick a supported country" }, { status: 400 });
   }
+
+  // Sellers must register with a business name. We allow non-sellers to
+  // skip it — they may still set one later if they enable seller permission.
+  if (isSeller && !businessName) {
+    return NextResponse.json(
+      { error: "Sellers must enter a business name." },
+      { status: 400 },
+    );
+  }
+
+  let businessNameDisplay: string | null = null;
+  let businessNameLower: string | null = null;
+  if (businessName) {
+    businessNameDisplay = canonicaliseBusinessNameDisplay(businessName);
+    if (!businessNameDisplay) {
+      return NextResponse.json({ error: "Enter a valid business name." }, { status: 400 });
+    }
+    businessNameLower = normaliseBusinessName(businessNameDisplay);
+    if (await isBusinessNameTaken(businessNameLower)) {
+      return NextResponse.json(
+        { error: "That business name is already taken." },
+        { status: 409 },
+      );
+    }
+  }
+
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     return NextResponse.json({ error: "Email already registered" }, { status: 409 });
@@ -56,6 +96,9 @@ export async function POST(req: Request) {
       email,
       name,
       slug,
+      phone: normalisePhone(phone),
+      businessName: businessNameDisplay,
+      businessNameLower,
       passwordHash: await hashPassword(password),
       country: country.toUpperCase(),
       city: city.trim(),

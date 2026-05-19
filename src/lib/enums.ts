@@ -28,6 +28,27 @@ export const OrderStatus = {
 } as const;
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 
+// Paid product-promotion lifecycle. See prisma/schema.prisma's Promotion
+// model for the state-machine description.
+export const PromotionStatus = {
+  PENDING_PAYMENT: "PENDING_PAYMENT",
+  PENDING_REVIEW: "PENDING_REVIEW",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+  CANCELLED: "CANCELLED",
+} as const;
+export type PromotionStatus = (typeof PromotionStatus)[keyof typeof PromotionStatus];
+
+// Paid promotion price + duration. Stored as Monnify-compatible kobo
+// (50000 = ₦500). The duration is hardcoded at 3 days from the moment an
+// admin approves the request.
+export const PROMOTION_FEE_KOBO = 50_000;
+export const PROMOTION_FEE_NGN = 500;
+export const PROMOTION_DURATION_DAYS = 3;
+// Approved paid promotions also rank above unpaid ones in the featured
+// grid — set higher than the legacy free-promo default of 1.5.
+export const PROMOTION_PAID_BOOST = 2.5;
+
 // Product kind — separates raw materials from finished products on the storefront.
 export const ProductKind = {
   MATERIAL: "MATERIAL",

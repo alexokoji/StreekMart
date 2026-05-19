@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { PromotionStatus } from "@/lib/enums";
 import { verifyWebhookHash } from "@/lib/monnify";
 import { cancelPendingOrders, finalizePaidOrders } from "@/lib/orders";
 
@@ -49,6 +50,19 @@ export async function POST(req: Request) {
     case "SUCCESSFUL_TRANSACTION": {
       const ref = data.paymentReference;
       if (!ref) return NextResponse.json({ ok: true, ignored: "missing paymentReference" });
+      // Promotion fees use the `PROMO_<random>` reference prefix — route
+      // them to the promotion-review queue instead of the order finaliser.
+      if (ref.startsWith("PROMO_")) {
+        const updated = await prisma.promotion.updateMany({
+          where: { paymentReference: ref, status: PromotionStatus.PENDING_PAYMENT },
+          data: {
+            status: PromotionStatus.PENDING_REVIEW,
+            paymentTxnRef: data.transactionReference ?? null,
+            paidAt: new Date(),
+          },
+        });
+        return NextResponse.json({ ok: true, promotion: updated.count });
+      }
       const result = await finalizePaidOrders({
         paymentReference: ref,
         paymentTxnRef: data.transactionReference,
@@ -58,6 +72,13 @@ export async function POST(req: Request) {
     case "FAILED_TRANSACTION": {
       const ref = data.paymentReference;
       if (!ref) return NextResponse.json({ ok: true, ignored: "missing paymentReference" });
+      if (ref.startsWith("PROMO_")) {
+        const updated = await prisma.promotion.updateMany({
+          where: { paymentReference: ref, status: PromotionStatus.PENDING_PAYMENT },
+          data: { status: PromotionStatus.CANCELLED, active: false },
+        });
+        return NextResponse.json({ ok: true, promotion: updated.count });
+      }
       const cancelled = await cancelPendingOrders(ref);
       return NextResponse.json({ ok: true, cancelled });
     }

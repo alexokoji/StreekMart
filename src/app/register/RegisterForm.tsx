@@ -18,6 +18,8 @@ export function RegisterForm() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [password, setPassword] = useState("");
   // Cascading country → state → city — single state object so updates
   // stay atomic and the picker can reset downstream fields cleanly.
@@ -44,6 +46,11 @@ export function RegisterForm() {
         body: JSON.stringify({
           name,
           email,
+          phone,
+          // Send business name only if the seller permission is on. The
+          // server enforces the same constraint, but pruning it here keeps
+          // unused state out of the request payload.
+          businessName: isSeller && businessName ? businessName : undefined,
           password,
           country: location.country,
           city: location.city,
@@ -110,6 +117,46 @@ export function RegisterForm() {
           <label className="label" htmlFor="email">Email</label>
           <input id="email" type="email" required className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
+        <div>
+          <label className="label" htmlFor="phone">Phone number</label>
+          <input
+            id="phone"
+            type="tel"
+            required
+            className="input"
+            inputMode="tel"
+            placeholder="+234 803 123 4567"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <p className="mt-1 text-[11px] text-ink-500">
+            We use this for delivery contact and order updates. Buyers and sellers can both be reached here.
+          </p>
+        </div>
+
+        {isSeller && (
+          <div>
+            <label className="label" htmlFor="businessName">
+              Business name <span className="text-burgundy-700">*</span>
+            </label>
+            <input
+              id="businessName"
+              required
+              minLength={2}
+              maxLength={80}
+              className="input"
+              placeholder="e.g. Adaeze Tailoring"
+              value={businessName}
+              onChange={(e) => setBusinessName(e.target.value)}
+            />
+            <p className="mt-1 text-[11px] text-ink-500">
+              This is the unique shop name buyers see on every product card. Spaces are fine; capitalisation doesn&apos;t affect uniqueness.{" "}
+              <span className="font-semibold text-ink-700">
+                Once set, changes need admin approval.
+              </span>
+            </p>
+          </div>
+        )}
 
         <LocationPicker value={location} onChange={setLocation} />
 

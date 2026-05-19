@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { PromotionStatus } from "@/lib/enums";
 import { isLiveMode } from "@/lib/monnify";
 import { finalizePaidOrders, cancelPendingOrders } from "@/lib/orders";
 
@@ -26,13 +28,35 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  const ref = parsed.data.paymentReference;
+
   if (parsed.data.outcome === "failed") {
-    const cancelled = await cancelPendingOrders(parsed.data.paymentReference);
+    if (ref.startsWith("PROMO_")) {
+      const updated = await prisma.promotion.updateMany({
+        where: { paymentReference: ref, status: PromotionStatus.PENDING_PAYMENT },
+        data: { status: PromotionStatus.CANCELLED, active: false },
+      });
+      return NextResponse.json({ ok: true, promotion: updated.count });
+    }
+    const cancelled = await cancelPendingOrders(ref);
     return NextResponse.json({ ok: true, cancelled });
   }
+
+  if (ref.startsWith("PROMO_")) {
+    const updated = await prisma.promotion.updateMany({
+      where: { paymentReference: ref, status: PromotionStatus.PENDING_PAYMENT },
+      data: {
+        status: PromotionStatus.PENDING_REVIEW,
+        paymentTxnRef: `STUB_${ref}`,
+        paidAt: new Date(),
+      },
+    });
+    return NextResponse.json({ ok: true, promotion: updated.count });
+  }
+
   const result = await finalizePaidOrders({
-    paymentReference: parsed.data.paymentReference,
-    paymentTxnRef: `STUB_${parsed.data.paymentReference}`,
+    paymentReference: ref,
+    paymentTxnRef: `STUB_${ref}`,
   });
   return NextResponse.json({ ok: true, ...result });
 }
