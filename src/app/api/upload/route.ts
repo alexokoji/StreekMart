@@ -18,7 +18,12 @@ export const runtime = "nodejs";
 // to run the app. The component contract (POST → { url }) is identical
 // across both backends.
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB — enough for a phone photo, not enough to DoS the disk
+// 4 MB cap. Lower than what a raw phone photo would be, but Vercel's
+// Hobby tier rejects multipart bodies over ~4.5 MB at the proxy before our
+// route runs. The client downscales aggressively (see ImageUploader's
+// downscaleImage) so almost everything fits well under this — the cap is
+// a safety net for whatever slips through.
+const MAX_BYTES = 4 * 1024 * 1024;
 
 const ALLOWED_MIME = new Set([
   "image/jpeg",

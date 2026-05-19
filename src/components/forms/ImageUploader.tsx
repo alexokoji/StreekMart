@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { downscaleImage } from "./downscaleImage";
 
 // Reusable image input.
 //
@@ -78,8 +79,13 @@ export function ImageUploader({
   }
 
   async function uploadOne(file: File): Promise<string | null> {
+    // Shrink phone photos before they hit the wire — Vercel's serverless
+    // proxy rejects requests over ~4.5 MB before our route runs, so the
+    // server-side MAX_BYTES (4 MB) is only useful when the client cooperates.
+    // See downscaleImage for the iteration heuristics.
+    const prepared = await downscaleImage(file);
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", prepared);
     const res = await fetch("/api/upload", { method: "POST", body: fd });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -189,7 +195,7 @@ export function ImageUploader({
             </span>
           </p>
           <p className="text-[10px] text-ink-400">
-            JPEG · PNG · WebP · GIF · AVIF — up to 8&nbsp;MB each
+            JPEG · PNG · WebP · GIF · AVIF — up to 4&nbsp;MB each (we auto-shrink larger photos)
             {multi && limit > 1 && ` · max ${limit} images`}
           </p>
 
