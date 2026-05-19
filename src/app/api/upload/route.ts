@@ -28,6 +28,19 @@ const ALLOWED_MIME = new Set([
   "image/avif",
 ]);
 
+// Some Android pickers and a few in-app browsers (Instagram, Messenger) hand
+// images through with an empty or "application/octet-stream" `file.type`.
+// Sniff the extension instead so a legitimate JPEG from those flows isn't
+// rejected as "Unsupported image type".
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+};
+
 const EXT_FROM_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -36,21 +49,48 @@ const EXT_FROM_MIME: Record<string, string> = {
   "image/avif": "avif",
 };
 
+function resolveMime(file: File): string | null {
+  if (file.type && ALLOWED_MIME.has(file.type)) return file.type;
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return EXT_TO_MIME[ext] ?? null;
+}
+
 export async function POST(req: Request) {
   // Auth — only logged-in users can upload. Prevents the URL becoming an
   // anonymous file dump.
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const form = await req.formData().catch(() => null);
-  const file = form?.get("file");
+  let form: FormData | null = null;
+  try {
+    form = await req.formData();
+  } catch (err) {
+    // Body too big at the proxy, malformed multipart, or stream aborted —
+    // all show up as a formData() throw. Surface the real reason so the
+    // client doesn't get the misleading "Missing 'file' field" instead.
+    console.error("[upload] formData() failed:", err);
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error && err.message
+            ? `Couldn't read the upload (${err.message}).`
+            : "Couldn't read the upload. The file may be too large for your network or the host.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const file = form.get("file");
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "Missing 'file' field" }, { status: 400 });
   }
 
-  if (!ALLOWED_MIME.has(file.type)) {
+  const mime = resolveMime(file);
+  if (!mime) {
     return NextResponse.json(
-      { error: `Unsupported image type "${file.type}". Use JPEG, PNG, WebP, GIF, or AVIF.` },
+      {
+        error: `Unsupported image type${file.type ? ` "${file.type}"` : ""}. Use JPEG, PNG, WebP, GIF, or AVIF.`,
+      },
       { status: 415 },
     );
   }
@@ -74,22 +114,48 @@ export async function POST(req: Request) {
       return NextResponse.json({
         url: result.url,
         size: result.bytes,
-        mime: file.type,
+        mime,
         width: result.width,
         height: result.height,
       });
     } catch (err) {
+      // Surface the Cloudinary message verbatim — "Invalid API key", "Invalid
+      // signature", credential typos, network blocks etc. are all helpful to
+      // see in the dashboard rather than masked as a generic failure.
+      console.error("[upload] Cloudinary upload failed:", err);
+      const detail =
+        err instanceof Error && err.message
+          ? err.message
+          : typeof err === "object" && err && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "Image upload failed.";
       return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Image upload failed." },
+        { error: `Image upload failed: ${detail}` },
         { status: 502 },
       );
     }
   }
 
-  // Dev fallback — write to public/uploads/. Requires a writable filesystem,
-  // so this path will not work on Vercel/Fly serverless. Only safe for `npm
-  // run dev` or a deploy with a persistent disk.
-  const ext = EXT_FROM_MIME[file.type] ?? "bin";
+  // Production without Cloudinary configured would silently write to a
+  // read-only / ephemeral filesystem and hand back a /uploads/<file> URL
+  // that Next.js never serves in standalone mode — the image appears to
+  // upload but renders broken. Fail loudly so the operator notices the
+  // missing env vars instead of debugging mystery 404s.
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[upload] CLOUDINARY_* env vars are not set; refusing to use the dev filesystem fallback in production.",
+    );
+    return NextResponse.json(
+      {
+        error:
+          "Image hosting isn't configured on the server. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET, then redeploy.",
+      },
+      { status: 503 },
+    );
+  }
+
+  // Dev fallback — write to public/uploads/. Only runs locally.
+  const ext = EXT_FROM_MIME[mime] ?? "bin";
   const filename = `${session.sub.slice(0, 6)}_${randomBytes(8).toString("hex")}.${ext}`;
   const uploadDir = path.join(process.cwd(), "public", "uploads");
   await mkdir(uploadDir, { recursive: true });
@@ -98,6 +164,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     url: `/uploads/${filename}`,
     size: bytes.byteLength,
-    mime: file.type,
+    mime,
   });
 }

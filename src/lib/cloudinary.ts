@@ -44,10 +44,11 @@ export async function uploadBufferToCloudinary(args: {
         folder: args.folder,
         public_id: args.publicId,
         resource_type: "image",
-        // Cloudinary picks the best-supported format per request via the URL
-        // (f_auto / q_auto). Storing the raw bytes is fine.
-        overwrite: false,
-        unique_filename: true,
+        // Cloudinary auto-generates a unique public_id when none is supplied,
+        // so we don't need `unique_filename`/`overwrite` flags here — they
+        // were no-ops without `use_filename: true`. Leaving them out keeps
+        // the request payload minimal so a stricter Cloudinary plan or a
+        // signature mismatch can't trip on unexpected fields.
       },
       (err, res) => {
         if (err || !res) reject(err ?? new Error("Cloudinary upload failed"));
