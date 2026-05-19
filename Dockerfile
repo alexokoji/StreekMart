@@ -95,11 +95,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@libsql ./node_modules/@libsql
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/libsql ./node_modules/libsql
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/adapter-libsql ./node_modules/@prisma/adapter-libsql
-# @libsql/core/lib-esm/util.js imports js-base64 via ESM (`base64.mjs`).
-# Next.js's tracer follows the CJS entrypoint and misses the .mjs sibling,
-# so the schema-push step crashed at boot with ERR_MODULE_NOT_FOUND. Ship
-# the whole package alongside @libsql so the dynamic ESM resolve succeeds.
+# Pure-ESM siblings of CJS modules that @libsql/* imports dynamically.
+# Next.js's tracer follows each package's CJS entrypoint and misses the
+# .mjs siblings (js-base64/base64.mjs, ws/wrapper.mjs), so the schema-push
+# step crashed at boot with ERR_MODULE_NOT_FOUND. Ship the whole packages
+# alongside @libsql so the dynamic ESM resolve succeeds.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/js-base64 ./node_modules/js-base64
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/ws ./node_modules/ws
 # Pre-generated Turso schema SQL + the push script so the entrypoint can
 # self-heal a fresh DB on boot (idempotent — uses CREATE TABLE IF NOT EXISTS).
 COPY --from=builder --chown=nextjs:nodejs /app/.turso ./.turso
