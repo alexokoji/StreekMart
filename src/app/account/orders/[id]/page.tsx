@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { deliveryZoneLabel, type DeliveryZone } from "@/lib/location";
@@ -21,7 +22,7 @@ export default async function BuyerOrderDetailPage({
     where: { id: params.id },
     include: {
       product: { select: { id: true, name: true, imagesJson: true } },
-      seller: { select: { id: true, slug: true, name: true, city: true, country: true } },
+      seller: { select: { id: true, slug: true, name: true, businessName: true, city: true, country: true } },
       updates: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -44,7 +45,7 @@ export default async function BuyerOrderDetailPage({
         <p className="text-sm text-ink-600">
           Sold by{" "}
           <Link href={`/u/${handle}`} className="text-violet-700 hover:underline">
-            {order.seller.name}
+            {displaySellerName(order.seller)}
           </Link>
           {" · "}
           {timeAgo(order.createdAt)}

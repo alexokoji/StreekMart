@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { ChatPanel } from "./ChatPanel";
 
 export default async function ChatPage({ params }: { params: { chatId: string } }) {
@@ -10,7 +11,21 @@ export default async function ChatPage({ params }: { params: { chatId: string } 
   const chat = await prisma.chat.findUnique({
     where: { id: params.chatId },
     include: {
-      participants: { include: { user: { select: { id: true, name: true, isSeller: true, isDesigner: true } } } },
+      participants: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              // Shown in the chat header — sellers see their shop name from buyers,
+              // and the displaySellerName helper falls back to personal name otherwise.
+              businessName: true,
+              isSeller: true,
+              isDesigner: true,
+            },
+          },
+        },
+      },
     },
   });
   if (!chat || !chat.participants.some((p) => p.userId === user.id)) notFound();
@@ -30,7 +45,7 @@ export default async function ChatPage({ params }: { params: { chatId: string } 
         <Link href="/messages" className="text-sm text-brand-700 hover:underline">← All conversations</Link>
         {other && (
           <p className="font-medium">
-            {other.name}{" "}
+            {displaySellerName(other)}{" "}
             <span className="text-xs text-gray-500">
               ({[other.isSeller && "seller", other.isDesigner && "designer", "buyer"].filter(Boolean).join(" · ")})
             </span>

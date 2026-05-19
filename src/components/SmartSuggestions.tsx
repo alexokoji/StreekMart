@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
 
@@ -33,7 +34,7 @@ export async function SmartSuggestions() {
       ...(interests.length > 0 ? { category: { in: interests } } : {}),
     },
     include: {
-      seller: { select: { id: true, name: true, slug: true, sellerVerified: true } },
+      seller: { select: { id: true, name: true, businessName: true, slug: true, sellerVerified: true } },
     },
     orderBy: [{ likeCount: "desc" }, { salesCount: "desc" }, { createdAt: "desc" }],
     take: 12,
@@ -49,7 +50,7 @@ export async function SmartSuggestions() {
         seller: { OR: [{ sellerVerified: true }, { designerVerified: true }] },
       },
       include: {
-        seller: { select: { id: true, name: true, slug: true, sellerVerified: true } },
+        seller: { select: { id: true, name: true, businessName: true, slug: true, sellerVerified: true } },
       },
       orderBy: [{ likeCount: "desc" }, { salesCount: "desc" }, { createdAt: "desc" }],
       take: 12,
@@ -107,7 +108,7 @@ export async function SmartSuggestions() {
                   <p className="line-clamp-1 text-sm font-medium">{p.name}</p>
                   <p className="text-[11px] text-ink-500">
                     <Link href={`/u/${handle}`} className="hover:underline">
-                      {p.seller.name}
+                      {displaySellerName(p.seller)}
                     </Link>
                     {p.seller.sellerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
                   </p>

@@ -156,10 +156,10 @@ export default async function PublicProfilePage({
   return (
     <div className="space-y-6">
       {/* Profile header — cover-image-first layout.
-          Cover fills the top of the card and carries the business name
-          overlay (white, smaller font, with the white+green-tick verified
-          badge inline). Avatar, bio, and role badges live below the cover
-          on a normal background. */}
+          Avatar + business name live inside the cover at the bottom-left
+          (previously the avatar sat below and was clipped by the name
+          overlay). Bio + role badges + actions live in a clean row
+          underneath the cover so nothing fights for the same space. */}
       <header className="card overflow-hidden">
         <div className="relative h-44 w-full sm:h-52 md:h-64">
           {profile.coverImageUrl ? (
@@ -172,14 +172,31 @@ export default async function PublicProfilePage({
           ) : (
             <div className="h-full w-full bg-g-aurora" />
           )}
-          {/* Dark gradient at the bottom so the white name copy stays legible
-              even against light cover photos. */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/65 via-black/25 to-transparent" />
+          {/* Dark gradient at the bottom keeps the white name + avatar ring
+              legible against light cover photos. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
 
-          {/* Name + verified badge overlay. Sits in the bottom-left so it
-              doesn't fight the avatar that pokes up from underneath. */}
-          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 px-5 pb-4 sm:px-6">
-            <div className="min-w-0">
+          {/* Owner-only cover edit chip, top-right. */}
+          {isOwner && (
+            <div className="absolute right-3 top-3">
+              <CoverImageUploader initialUrl={profile.coverImageUrl} />
+            </div>
+          )}
+
+          {/* Bottom-left: avatar + business name + verified badge. Single
+              flex row so they share the same baseline and can't overlap. */}
+          <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 px-4 pb-4 sm:px-5 sm:pb-5">
+            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-soft sm:h-20 sm:w-20">
+              {profile.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-500 text-xl font-bold text-white">
+                  {displayName.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 pb-1">
               <h1 className="flex flex-wrap items-center gap-2 font-display text-base font-semibold leading-tight text-white drop-shadow sm:text-lg">
                 <span className="truncate">{displayName}</span>
                 {verified && (
@@ -193,37 +210,19 @@ export default async function PublicProfilePage({
                 )}
               </h1>
             </div>
-
-            {isOwner && (
-              <CoverImageUploader
-                initialUrl={profile.coverImageUrl}
-              />
-            )}
           </div>
         </div>
 
-        <div className="-mt-10 flex flex-wrap items-end justify-between gap-4 px-6 pb-5 sm:-mt-12">
-          <div className="flex items-end gap-4">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-white shadow-soft sm:h-24 sm:w-24">
-              {profile.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-600 to-fuchsia-500 text-2xl font-bold text-white">
-                  {displayName.slice(0, 1).toUpperCase()}
-                </div>
+        {/* Bio + role chips + viewer actions — sits cleanly below the cover. */}
+        <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-ink-600">{profile.bio ?? "Independent maker on StreekMart."}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-500">
+              {profile.isSeller && <span className="badge bg-violet-50 text-violet-700">Seller</span>}
+              {profile.isDesigner && <span className="badge bg-fuchsia-50 text-fuchsia-700">Designer</span>}
+              {profile._count.followedBy > 0 && (
+                <span>{profile._count.followedBy} follower{profile._count.followedBy === 1 ? "" : "s"}</span>
               )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm text-ink-600">{profile.bio ?? "Independent maker on StreekMart."}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-500">
-                {profile.isSeller && <span className="badge bg-violet-50 text-violet-700">Seller</span>}
-                {profile.isDesigner && <span className="badge bg-fuchsia-50 text-fuchsia-700">Designer</span>}
-                <span>· joined {timeAgo(profile.createdAt)}</span>
-                {profile._count.followedBy > 0 && (
-                  <span>· {profile._count.followedBy} follower{profile._count.followedBy === 1 ? "" : "s"}</span>
-                )}
-              </div>
             </div>
           </div>
 

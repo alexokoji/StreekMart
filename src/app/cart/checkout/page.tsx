@@ -15,7 +15,7 @@ export default async function CheckoutPage() {
     include: {
       items: {
         include: {
-          product: { include: { seller: { select: { id: true, name: true } } } },
+          product: { include: { seller: { select: { id: true, name: true, businessName: true } } } },
         },
       },
     },

@@ -119,7 +119,7 @@ export async function GET() {
         },
         ...(stated.interests.length > 0 ? { category: { in: stated.interests } } : {}),
       },
-      include: { seller: { select: { id: true, name: true } } },
+      include: { seller: { select: { id: true, name: true, businessName: true } } },
       orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
       take: 30,
     }),
@@ -247,14 +247,16 @@ function shapeProduct(p: {
   price: number;
   category: string;
   imagesJson: string;
-  seller: { id: string; name: string };
+  seller: { id: string; name: string; businessName: string | null };
 }) {
   return {
     name: p.name,
     price: p.price,
     category: p.category,
     image: parseJsonArray(p.imagesJson)[0] ?? null,
-    seller: p.seller.name,
+    // Surface the seller's shop name to buyers; falls back to the personal
+    // name for sellers who haven't set a business name yet.
+    seller: p.seller.businessName?.trim() || p.seller.name,
     href: `/products/${p.id}`,
   };
 }

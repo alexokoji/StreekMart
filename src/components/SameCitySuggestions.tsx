@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
 
@@ -43,7 +44,7 @@ export async function SameCitySuggestions({
       },
     },
     include: {
-      seller: { select: { id: true, name: true, slug: true, sellerVerified: true } },
+      seller: { select: { id: true, name: true, businessName: true, slug: true, sellerVerified: true } },
     },
     orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
     take: 6,
@@ -101,7 +102,7 @@ export async function SameCitySuggestions({
                   <p className="line-clamp-1 text-sm font-medium">{p.name}</p>
                   <p className="text-xs text-ink-500">
                     <Link href={`/u/${handle}`} className="hover:underline">
-                      {p.seller.name}
+                      {displaySellerName(p.seller)}
                     </Link>
                     {p.seller.sellerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
                   </p>

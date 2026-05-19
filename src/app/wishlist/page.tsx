@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { AddToCartButton } from "@/components/AddToCartButton";
@@ -10,7 +11,7 @@ export default async function WishlistPage() {
   const favorites = await prisma.favorite.findMany({
     where: { userId: user.id, productId: { not: null } },
     include: {
-      product: { include: { seller: { select: { id: true, name: true } } } },
+      product: { include: { seller: { select: { id: true, name: true, businessName: true } } } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -57,7 +58,7 @@ export default async function WishlistPage() {
                       <span className="ml-2 text-xs text-gray-400 line-through"><Price amount={f.product.price} /></span>
                     )}
                   </p>
-                  <p className="text-xs text-gray-500">Saved {timeAgo(f.createdAt)} · By {f.product.seller.name}</p>
+                  <p className="text-xs text-gray-500">Saved {timeAgo(f.createdAt)} · By {displaySellerName(f.product.seller)}</p>
                   <div className="mt-3">
                     <AddToCartButton productId={f.product.id} disabled={f.product.sellerId === user.id} compact />
                   </div>

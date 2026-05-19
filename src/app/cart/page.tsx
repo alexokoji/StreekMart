@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { deliveryFeeCentsFor, deliveryZoneFor, deliveryZoneLabel } from "@/lib/location";
@@ -23,6 +24,7 @@ export default async function CartPage() {
                 select: {
                   id: true,
                   name: true,
+                  businessName: true,
                   country: true,
                   city: true,
                   region: true,
@@ -86,7 +88,7 @@ export default async function CartPage() {
       const zone = deliveryZoneFor(buyer, it.product.seller);
       const cents = deliveryFeeCentsFor(it.product.seller, zone);
       deliveryBreakdown.push({
-        sellerName: it.product.seller.name,
+        sellerName: displaySellerName(it.product.seller),
         zoneLabel: deliveryZoneLabel(zone),
         cents,
       });

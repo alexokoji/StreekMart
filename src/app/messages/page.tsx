@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { timeAgo } from "@/lib/utils";
 import { StartChatRedirect } from "./StartChatRedirect";
 
@@ -19,7 +20,19 @@ export default async function MessagesPage({
   const chats = await prisma.chat.findMany({
     where: { participants: { some: { userId: user.id } } },
     include: {
-      participants: { include: { user: { select: { id: true, name: true, isSeller: true, isDesigner: true } } } },
+      participants: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              businessName: true,
+              isSeller: true,
+              isDesigner: true,
+            },
+          },
+        },
+      },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
     },
     orderBy: { updatedAt: "desc" },
@@ -41,7 +54,7 @@ export default async function MessagesPage({
               <li key={c.id}>
                 <Link href={`/messages/${c.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50">
                   <div>
-                    <p className="font-medium">{other?.name ?? "Unknown"}</p>
+                    <p className="font-medium">{other ? displaySellerName(other) : "Unknown"}</p>
                     <p className="line-clamp-1 text-sm text-gray-600">
                       {last?.body ?? <span className="italic text-gray-400">No messages yet</span>}
                     </p>

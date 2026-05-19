@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { OrderActions } from "./OrderActions";
@@ -11,7 +12,7 @@ export default async function BuyerOrdersPage() {
     where: { buyerId: user.id },
     include: {
       product: { select: { id: true, name: true, imagesJson: true } },
-      seller: { select: { id: true, slug: true, name: true } },
+      seller: { select: { id: true, slug: true, name: true, businessName: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -77,7 +78,7 @@ export default async function BuyerOrdersPage() {
                   <p className="mt-0.5 text-xs text-ink-500">
                     Sold by{" "}
                     <Link href={`/u/${handle}`} className="text-violet-700 hover:underline">
-                      {o.seller.name}
+                      {displaySellerName(o.seller)}
                     </Link>
                     {" · "}
                     {timeAgo(o.createdAt)}
