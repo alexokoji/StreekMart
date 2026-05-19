@@ -47,6 +47,7 @@ async function main() {
       name: "StreekMart Admin",
       slug: "streekmart-admin",
       passwordHash: password,
+      phone: "+234 800 000 0001",
       isAdmin: true,
       cart: { create: {} },
     },
@@ -54,12 +55,19 @@ async function main() {
 
   // Four demo accounts exercising every permission combination. Each gets
   // a memorable slug so /u/<slug> shows nicely in shared links.
+  //
+  // `phone` is required for everyone since the registration flow change —
+  // pre-seeding it keeps the ProfileCompletionBanner quiet for the demo
+  // accounts. `businessName` only goes on sellers (designers and buyers
+  // don't carry a brand identity); the matching `businessNameLower`
+  // mirror is kept in lockstep so the @unique constraint works.
   const buyer = await prisma.user.create({
     data: {
       email: "buyer@streekmart.online",
       name: "Alex Buyer",
       slug: "alex-buyer",
       passwordHash: password,
+      phone: "+234 803 000 0002",
       cart: { create: {} },
     },
   });
@@ -70,6 +78,9 @@ async function main() {
       name: "Seoul Threads",
       slug: "seoul-threads",
       passwordHash: password,
+      phone: "+234 803 000 0003",
+      businessName: "Seoul Threads",
+      businessNameLower: "seoul threads",
       isSeller: true,
       sellerVerified: true,
       bio: "Small-batch streetwear from Seoul.",
@@ -84,6 +95,7 @@ async function main() {
       name: "Mira Okafor",
       slug: "mira-okafor",
       passwordHash: password,
+      phone: "+234 803 000 0004",
       isDesigner: true,
       designerVerified: true,
       bio: "Independent designer · color & silhouette",
@@ -99,6 +111,9 @@ async function main() {
       name: "Kemi Adelaja",
       slug: "kemi-adelaja",
       passwordHash: password,
+      phone: "+234 803 000 0005",
+      businessName: "Kemi Adelaja Atelier",
+      businessNameLower: "kemi adelaja atelier",
       isSeller: true,
       isDesigner: true,
       sellerVerified: true,

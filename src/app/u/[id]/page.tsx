@@ -213,17 +213,21 @@ export default async function PublicProfilePage({
           </div>
         </div>
 
-        {/* Bio + role chips + viewer actions — sits cleanly below the cover. */}
-        <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-ink-600">{profile.bio ?? "Independent maker on StreekMart."}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-500">
-              {profile.isSeller && <span className="badge bg-violet-50 text-violet-700">Seller</span>}
-              {profile.isDesigner && <span className="badge bg-fuchsia-50 text-fuchsia-700">Designer</span>}
-              {profile._count.followedBy > 0 && (
-                <span>{profile._count.followedBy} follower{profile._count.followedBy === 1 ? "" : "s"}</span>
-              )}
-            </div>
+        {/* Bio / role chips / viewer actions, vertically stacked.
+            Previously the role chips and the share/message/follow buttons
+            shared a row via `justify-between`, which let the buttons clip
+            the chips on narrow viewports. Stacking keeps both legible at
+            every width and matches the requested ordering: role chips on
+            top, actions on the next line, both left-aligned. */}
+        <div className="space-y-3 px-6 py-5">
+          <p className="text-sm text-ink-600">{profile.bio ?? "Independent maker on StreekMart."}</p>
+
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-500">
+            {profile.isSeller && <span className="badge bg-violet-50 text-violet-700">Seller</span>}
+            {profile.isDesigner && <span className="badge bg-fuchsia-50 text-fuchsia-700">Designer</span>}
+            {profile._count.followedBy > 0 && (
+              <span>{profile._count.followedBy} follower{profile._count.followedBy === 1 ? "" : "s"}</span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
