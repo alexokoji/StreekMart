@@ -36,8 +36,14 @@ export async function resolveDeliveryQuote(args: {
   buyer: LocatedUser;
   seller: LocatedUser & SellerDeliveryRates;
   sellerHasRider: boolean;
+  // Buyer-driven override from the cart's "Delivering to" picker. Lets a
+  // shopper whose saved address is in the seller's city explicitly say
+  // they're delivering elsewhere (or vice versa). International is still
+  // determined by country and can't be overridden — keeps the cross-border
+  // block intact.
+  zoneOverride?: "WITHIN_CITY" | "OUTSIDE_CITY";
 }): Promise<DeliveryQuote> {
-  const { buyer, seller, sellerHasRider } = args;
+  const { buyer, seller, sellerHasRider, zoneOverride } = args;
 
   if (!buyer.country || !seller.country) {
     return {
@@ -60,8 +66,16 @@ export async function resolveDeliveryQuote(args: {
     };
   }
 
+  // The buyer's picker overrides auto-detection. "OUTSIDE_CITY" means the
+  // buyer is telling us this seller delivers cross-city for them; "WITHIN_CITY"
+  // says the opposite. Either way we still defer to the supported-cities
+  // list + rider rules below.
   const sameCity =
-    !!buyer.city && !!seller.city && normalisedCity(buyer.city) === normalisedCity(seller.city);
+    zoneOverride === "WITHIN_CITY"
+      ? true
+      : zoneOverride === "OUTSIDE_CITY"
+        ? false
+        : !!buyer.city && !!seller.city && normalisedCity(buyer.city) === normalisedCity(seller.city);
 
   // 2) Same city → check supported list.
   if (sameCity) {

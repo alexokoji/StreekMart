@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Price } from "@/components/Price";
@@ -25,7 +25,16 @@ type Item = {
 
 export function CartClient({ items: initial }: { items: Item[] }) {
   const router = useRouter();
+  // Local state for optimistic updates — but kept in sync with whatever the
+  // server hands us on every refresh. Without this effect, a `router.refresh()`
+  // re-renders the parent server component with fresh data but CartClient's
+  // `useState(initial)` still holds the previous snapshot — so the row stays
+  // visible after a successful remove, and the qty fields lag behind the
+  // server's clamped value.
   const [items, setItems] = useState(initial);
+  useEffect(() => {
+    setItems(initial);
+  }, [initial]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   async function setQty(itemId: string, qty: number) {
@@ -39,6 +48,9 @@ export function CartClient({ items: initial }: { items: Item[] }) {
       });
       if (res.ok) {
         setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, quantity: qty } : it)));
+        // Re-render the parent so the Order Summary aside (subtotal,
+        // per-seller delivery, grand total) reflects the new quantity.
+        router.refresh();
       }
     } finally {
       setBusyId(null);

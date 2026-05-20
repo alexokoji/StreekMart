@@ -34,6 +34,11 @@ const Body = z.object({
   // The server caps it at the smaller of (available wallet, order total).
   // If the wallet covers the whole order, no gateway call is made.
   useWalletCredit: z.boolean().optional().default(false),
+  // Mirror of the cart page's "Delivering to" picker. The server applies
+  // the same override when quoting so the buyer is charged exactly the
+  // fee they saw on the cart summary. International is always determined
+  // by country code and ignores this override.
+  zoneOverride: z.enum(["WITHIN_CITY", "OUTSIDE_CITY"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -141,6 +146,7 @@ export async function POST(req: Request) {
       buyer,
       seller,
       sellerHasRider: hasRiderByOwner.get(sellerId) ?? false,
+      zoneOverride: parsed.data.zoneOverride,
     });
     if (quote.fulfiller === "BLOCKED") {
       return NextResponse.json(

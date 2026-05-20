@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Price } from "@/components/Price";
 
 type PaymentMethod = "DIRECT" | "ON_DELIVERY";
 
 export function CheckoutForm() {
   const router = useRouter();
+  // The cart page passes the buyer's zone override through the URL (?zone=
+  // within|outside). We forward it on the POST body so the server quote
+  // matches what the buyer saw on the cart summary.
+  const searchParams = useSearchParams();
+  const zoneOverride =
+    searchParams?.get("zone") === "within"
+      ? "WITHIN_CITY"
+      : searchParams?.get("zone") === "outside"
+        ? "OUTSIDE_CITY"
+        : undefined;
   const [shippingAddress, setShippingAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("DIRECT");
@@ -46,6 +56,7 @@ export function CheckoutForm() {
           notes: notes || undefined,
           paymentMethod,
           useWalletCredit,
+          zoneOverride,
         }),
       });
       const data = await res.json();

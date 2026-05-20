@@ -4,11 +4,33 @@ import { requireUser } from "@/lib/auth";
 import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
-import { deliveryFeeCentsFor, deliveryZoneFor, deliveryZoneLabel } from "@/lib/location";
+import {
+  deliveryFeeCentsFor,
+  deliveryZoneFor,
+  deliveryZoneLabel,
+  type DeliveryZone,
+} from "@/lib/location";
 import { CartClient } from "./CartClient";
+import { DeliveryZonePicker } from "./DeliveryZonePicker";
 
-export default async function CartPage() {
+// Page is dynamic — reads cookies (for auth) and searchParams. Mark
+// explicit so Next never tries to cache an old quote on us.
+export const dynamic = "force-dynamic";
+
+export default async function CartPage({
+  searchParams,
+}: {
+  // `?zone=within` or `?zone=outside` forces a manual override for the
+  // delivery-zone calculation. Absent → auto-detect from saved address.
+  searchParams: { zone?: string };
+}) {
   const user = await requireUser();
+  const zoneOverride: "WITHIN_CITY" | "OUTSIDE_CITY" | undefined =
+    searchParams.zone === "within"
+      ? "WITHIN_CITY"
+      : searchParams.zone === "outside"
+        ? "OUTSIDE_CITY"
+        : undefined;
 
   // Lazy provision the cart on first visit.
   const cart = await prisma.cart.upsert({
@@ -74,7 +96,8 @@ export default async function CartPage() {
   const subtotal = items.reduce((s, it) => s + it.product.effectivePrice * it.quantity, 0);
 
   // Delivery preview — same per-seller bundling rule the checkout endpoint
-  // applies. Only computed when the buyer has filled in their address.
+  // applies. Only computed when the buyer has filled in their address (or
+  // an explicit zone override is set).
   const buyer = { country: user.country, city: user.city, region: user.region };
   const buyerHasAddress = !!buyer.country && !!buyer.city;
   const deliverySellerSeen = new Set<string>();
@@ -85,7 +108,13 @@ export default async function CartPage() {
       const sellerId = it.product.seller.id;
       if (deliverySellerSeen.has(sellerId)) continue;
       deliverySellerSeen.add(sellerId);
-      const zone = deliveryZoneFor(buyer, it.product.seller);
+      // If the buyer picked an override, honour it. International is always
+      // determined by country and ignores the override.
+      const autoZone = deliveryZoneFor(buyer, it.product.seller);
+      const zone: DeliveryZone =
+        autoZone === "OUTSIDE_COUNTRY"
+          ? "OUTSIDE_COUNTRY"
+          : zoneOverride ?? autoZone;
       const cents = deliveryFeeCentsFor(it.product.seller, zone);
       deliveryBreakdown.push({
         sellerName: displaySellerName(it.product.seller),
@@ -113,6 +142,20 @@ export default async function CartPage() {
 
       <aside className="card sticky top-4 h-fit min-w-0 p-6">
         <h2 className="text-lg font-semibold">Order summary</h2>
+
+        {/* Buyer-driven zone override — re-renders the breakdown below. */}
+        <div className="mt-4">
+          <DeliveryZonePicker
+            current={
+              zoneOverride === "WITHIN_CITY"
+                ? "WITHIN_CITY"
+                : zoneOverride === "OUTSIDE_CITY"
+                  ? "OUTSIDE_CITY"
+                  : "AUTO"
+            }
+          />
+        </div>
+
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
             <dt>Subtotal</dt>
@@ -154,7 +197,16 @@ export default async function CartPage() {
             <dd className="font-bold"><Price amount={grandTotal} /></dd>
           </div>
         </dl>
-        <Link href="/cart/checkout" className="btn-primary mt-6 w-full text-center">
+        {/* Carry the zone override through to checkout so the quote the
+            checkout endpoint computes matches what the buyer saw here. */}
+        <Link
+          href={
+            zoneOverride
+              ? `/cart/checkout?zone=${zoneOverride === "WITHIN_CITY" ? "within" : "outside"}`
+              : "/cart/checkout"
+          }
+          className="btn-primary mt-6 w-full text-center"
+        >
           Checkout
         </Link>
         <Link href="/" className="mt-2 block text-center text-xs text-gray-500 hover:text-brand-700">
