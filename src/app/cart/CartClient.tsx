@@ -64,7 +64,11 @@ export function CartClient({ items: initial }: { items: Item[] }) {
       if (res.ok) {
         setItems((prev) => prev.filter((it) => it.id !== itemId));
         router.refresh();
+      } else {
+        console.error("Failed to remove item:", res.status, await res.text());
       }
+    } catch (err) {
+      console.error("Error removing item:", err);
     } finally {
       setBusyId(null);
     }
@@ -145,7 +149,7 @@ export function CartClient({ items: initial }: { items: Item[] }) {
                 </span>
                 <button
                   type="button"
-                  className="ml-auto text-xs text-gray-500 hover:text-red-600"
+                  className="ml-auto -mr-2 px-2 py-1 text-xs text-gray-500 hover:text-red-600 active:text-red-600"
                   onClick={() => remove(it.id)}
                   disabled={busyId === it.id}
                 >
