@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Price } from "@/components/Price";
+import { displaySellerName } from "@/lib/businessName";
 import { formatQuantity, perUnitLabel, unitConfig } from "@/lib/units";
 
 type Item = {
@@ -16,7 +17,7 @@ type Item = {
     salePrice: number | null;
     effectivePrice: number;
     image: string | null;
-    seller: { id: string; name: string };
+    seller: { id: string; name: string; businessName: string | null };
     stock: number;
     unit: string;
   };
@@ -71,10 +72,18 @@ export function CartClient({ items: initial }: { items: Item[] }) {
               )}
             </Link>
             <div className="flex-1 min-w-0">
-              <Link href={`/products/${it.product.id}`} className="font-medium hover:underline">
+              {/* `break-words` on the title + the parent's `min-w-0` keep a
+                  long unbreakable product name from widening the row past
+                  the viewport. */}
+              <Link
+                href={`/products/${it.product.id}`}
+                className="block break-words font-medium hover:underline"
+              >
                 {it.product.name}
               </Link>
-              <p className="text-xs text-gray-500">Sold by {it.product.seller.name}</p>
+              <p className="break-words text-xs text-gray-500">
+                Sold by {displaySellerName(it.product.seller)}
+              </p>
               <p className="mt-1 text-sm">
                 <span className="font-semibold"><Price amount={it.product.effectivePrice} /></span>
                 {isMeasured && (

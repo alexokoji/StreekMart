@@ -98,8 +98,12 @@ export default async function CartPage() {
   const grandTotal = subtotal + deliveryTotalCents / 100;
 
   return (
+    // `min-w-0` on both grid children defeats the default `min-width: auto`
+    // so a long product name or business name can't push the cell past the
+    // viewport. Without these, the CartClient's product titles or the
+    // delivery breakdown's seller names cause horizontal page scroll.
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-      <div className="space-y-3">
+      <div className="min-w-0 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Your cart</h1>
           <p className="text-sm text-gray-500">{items.length} item{items.length === 1 ? "" : "s"}</p>
@@ -107,10 +111,10 @@ export default async function CartPage() {
         <CartClient items={items} />
       </div>
 
-      <aside className="card sticky top-4 h-fit p-6">
+      <aside className="card sticky top-4 h-fit min-w-0 p-6">
         <h2 className="text-lg font-semibold">Order summary</h2>
         <dl className="mt-4 space-y-2 text-sm">
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <dt>Subtotal</dt>
             <dd className="font-medium"><Price amount={subtotal} /></dd>
           </div>
@@ -122,12 +126,14 @@ export default async function CartPage() {
                   Delivery
                 </p>
                 {deliveryBreakdown.map((d) => (
-                  <div key={d.sellerName} className="flex justify-between">
-                    <dt className="text-gray-600">
+                  <div key={d.sellerName} className="flex justify-between gap-3">
+                    {/* `min-w-0 break-words` lets long business names wrap
+                        instead of widening the sticky aside past 22rem. */}
+                    <dt className="min-w-0 break-words text-gray-600">
                       {d.sellerName}
                       <span className="ml-1 text-[10px] text-gray-400">· {d.zoneLabel}</span>
                     </dt>
-                    <dd>{d.cents > 0 ? <Price amount={d.cents / 100} /> : "Free"}</dd>
+                    <dd className="shrink-0">{d.cents > 0 ? <Price amount={d.cents / 100} /> : "Free"}</dd>
                   </div>
                 ))}
               </div>
