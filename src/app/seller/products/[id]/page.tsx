@@ -65,12 +65,15 @@ export default async function ViewProductPage({ params }: { params: { id: string
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="card overflow-hidden">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {/* Fixed gallery envelope — matches the buyer-facing product page so
+            tall/wide product photos can't push the rest of the layout
+            around. See products/[id]/page.tsx for the rationale. */}
+        <div className="card mx-auto w-full max-w-[480px] overflow-hidden lg:mx-0">
           <div className="aspect-square bg-gray-100">
             {images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={images[0]} alt={product.name} className="h-full w-full object-cover" />
+              <img src={images[0]} alt={product.name} className="h-full w-full object-contain" />
             ) : (
               <div className="flex h-full items-center justify-center text-gray-400">No image uploaded</div>
             )}
@@ -79,7 +82,7 @@ export default async function ViewProductPage({ params }: { params: { id: string
             <div className="grid grid-cols-4 gap-2 p-2">
               {images.slice(1).map((src, i) => (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img key={i} src={src} alt="" className="aspect-square w-full rounded object-cover" />
+                <img key={i} src={src} alt="" className="aspect-square w-full rounded bg-gray-100 object-contain" />
               ))}
             </div>
           )}

@@ -39,12 +39,24 @@ export default async function PublicProductPage({ params }: { params: { id: stri
   const isOwnListing = !!user && user.id === product.seller.id;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <div className="card overflow-hidden">
+    // `lg:items-start` stops the right column from stretching to match the
+    // image column's height — on wide screens the image card would otherwise
+    // be free to grow unbounded.
+    <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      {/* Fixed visual envelope for the gallery so a tall portrait or extra-
+          wide landscape can't push the rest of the page around. Hard-capped
+          at 480px on every breakpoint and centred on small screens. The
+          inner square + object-contain combo shows the whole image inside
+          that envelope without cropping or distortion. */}
+      <div className="card mx-auto w-full max-w-[480px] overflow-hidden lg:mx-0">
         <div className="relative aspect-square bg-gray-100">
           {images[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={images[0]} alt={product.name} className="h-full w-full object-cover" />
+            <img
+              src={images[0]}
+              alt={product.name}
+              className="h-full w-full object-contain"
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-gray-400">No image</div>
           )}
@@ -58,7 +70,12 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           <div className="grid grid-cols-4 gap-2 p-2">
             {images.slice(1).map((src, i) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={src} alt="" className="aspect-square w-full rounded object-cover" />
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="aspect-square w-full rounded bg-gray-100 object-contain"
+              />
             ))}
           </div>
         )}
