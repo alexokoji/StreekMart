@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
-import { isBusinessNameTaken } from "@/lib/businessName";
+import { isBusinessNameTaken } from "@/lib/businessNameServer";
 
 // PATCH /api/admin/business-name-changes/[id] { decision, note? }
 //

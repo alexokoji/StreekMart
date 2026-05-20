@@ -1,12 +1,13 @@
-// Helpers for the case-insensitive, space-allowed business-name field.
+// Pure (client-safe) helpers for the case-insensitive, space-allowed
+// business-name field. NO `prisma` import here — this file is dragged
+// into the client bundle by displaySellerName usage in client components
+// (CartClient, etc.), so pulling in @/lib/db would also pull the whole
+// libsql adapter and its non-JS files (README.md, LICENSE) which webpack
+// can't parse.
 //
-// SQLite has no case-insensitive UNIQUE collation, so the schema carries
-// two columns: `businessName` (case-as-typed, shown to users) and
-// `businessNameLower` (normalised mirror, the actual @unique). Every code
-// path that reads/writes the field should go through these helpers so the
-// two columns can never diverge.
-
-import { prisma } from "./db";
+// The DB-touching helper (`isBusinessNameTaken`) lives in
+// `lib/businessNameServer.ts` next door. Server code that needs both
+// pure helpers and the uniqueness check imports from both files.
 
 // Loose phone validation — accepts the formats sellers in NG / GH / KE / etc.
 // realistically type. Strict E.164 is too brittle for buyers entering numbers
@@ -39,20 +40,6 @@ export function isValidBusinessName(raw: unknown): raw is string {
   if (typeof raw !== "string") return false;
   const t = raw.trim();
   return t.length >= 2 && t.length <= 80;
-}
-
-// Returns true if someone other than `selfId` already owns this name.
-// Self-collision (the same user re-saving the same value) returns false.
-export async function isBusinessNameTaken(
-  lower: string,
-  selfId?: string,
-): Promise<boolean> {
-  const owner = await prisma.user.findUnique({
-    where: { businessNameLower: lower },
-    select: { id: true },
-  });
-  if (!owner) return false;
-  return owner.id !== selfId;
 }
 
 // Pick the display name for a seller — businessName when set, else the

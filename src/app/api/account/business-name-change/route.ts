@@ -4,9 +4,9 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import {
   canonicaliseBusinessNameDisplay,
-  isBusinessNameTaken,
   normaliseBusinessName,
 } from "@/lib/businessName";
+import { isBusinessNameTaken } from "@/lib/businessNameServer";
 
 // POST /api/account/business-name-change { requestedName, note? }
 //

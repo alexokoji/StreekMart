@@ -4,10 +4,10 @@ import { prisma } from "@/lib/db";
 import { hashPassword, setSessionCookie } from "@/lib/auth";
 import {
   canonicaliseBusinessNameDisplay,
-  isBusinessNameTaken,
   normaliseBusinessName,
   normalisePhone,
 } from "@/lib/businessName";
+import { isBusinessNameTaken } from "@/lib/businessNameServer";
 import { uniqueSlugFrom } from "@/lib/slug";
 import { isValidCountryCode } from "@/lib/location";
 import { sendEmail, welcomeEmail } from "@/lib/email";
