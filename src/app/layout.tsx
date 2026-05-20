@@ -51,7 +51,12 @@ export default async function RootLayout({
   ]);
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body className="font-sans">
+      {/* `overflow-x-clip` is a global safety net against rogue horizontal
+          scroll — a single oversized child (long unbreakable string, a
+          wide table, an iframe) would otherwise let the whole page scroll
+          sideways on mobile. `clip` (vs `hidden`) doesn't establish a new
+          scroll container, so position:sticky inside still works. */}
+      <body className="overflow-x-clip font-sans">
         {/*
           CurrencyProvider seeds the client with the same context the server
           used to render initial prices, so SSR and hydration always agree.

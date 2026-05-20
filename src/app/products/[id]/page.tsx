@@ -42,13 +42,18 @@ export default async function PublicProductPage({ params }: { params: { id: stri
     // `lg:items-start` stops the right column from stretching to match the
     // image column's height — on wide screens the image card would otherwise
     // be free to grow unbounded.
+    //
+    // `min-w-0` on the grid children defeats CSS Grid's default
+    // `min-width: auto`, which would otherwise let an unbreakable word
+    // (e.g. a long URL in the description) push the cell past the viewport
+    // and cause horizontal page scroll.
     <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
       {/* Fixed visual envelope for the gallery so a tall portrait or extra-
           wide landscape can't push the rest of the page around. Hard-capped
           at 480px on every breakpoint and centred on small screens. The
           inner square + object-contain combo shows the whole image inside
           that envelope without cropping or distortion. */}
-      <div className="card mx-auto w-full max-w-[480px] overflow-hidden lg:mx-0">
+      <div className="card mx-auto w-full min-w-0 max-w-[480px] overflow-hidden lg:mx-0">
         <div className="relative aspect-square bg-gray-100">
           {images[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -81,12 +86,15 @@ export default async function PublicProductPage({ params }: { params: { id: stri
         )}
       </div>
 
-      <div className="card p-6">
+      <div className="card min-w-0 p-6">
         <p className="text-xs uppercase tracking-wider text-gray-500">{product.category}</p>
-        <h1 className="mt-1 text-3xl font-bold">{product.name}</h1>
+        {/* `break-words` covers product names with unbreakable strings — the
+            Unicode word-break algorithm normally won't split a single token
+            like `Tencel/Lyocell-Long-Brand-Name`. */}
+        <h1 className="mt-1 break-words text-3xl font-bold">{product.name}</h1>
         <p className="mt-1 text-sm text-gray-500">
           Sold by{" "}
-          <Link href={`/u/${product.seller.slug ?? product.seller.id}`} className="font-medium text-brand-700 hover:underline">
+          <Link href={`/u/${product.seller.slug ?? product.seller.id}`} className="break-words font-medium text-brand-700 hover:underline">
             {displaySellerName(product.seller)}
           </Link>
           {product.seller.sellerVerified && (
@@ -95,7 +103,7 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           {" · "}{timeAgo(product.createdAt)}
         </p>
 
-        <div className="mt-4 flex items-end gap-3">
+        <div className="mt-4 flex flex-wrap items-end gap-3">
           <p className="text-3xl font-bold"><Price amount={effective} /></p>
           {onSale && (
             <p className="text-lg text-gray-400 line-through"><Price amount={product.price} /></p>
@@ -105,7 +113,12 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           )}
         </div>
 
-        <p className="mt-4 whitespace-pre-wrap text-gray-700">{product.description}</p>
+        {/* `break-words` + the parent's `min-w-0` together stop a single
+            long token (URL, hashtag) in the description from ballooning the
+            card and creating horizontal scroll on the page. */}
+        <p className="mt-4 whitespace-pre-wrap break-words text-gray-700">
+          {product.description}
+        </p>
 
         {product.stock === 0 && (
           <p className="mt-4 text-sm font-medium text-red-600">Out of stock</p>
@@ -138,7 +151,7 @@ export default async function PublicProductPage({ params }: { params: { id: stri
       {/* Same-city alternatives — only renders when the viewer is in a
           different city / country from the seller. Helps buyers find a
           local match instead of getting blocked at checkout. */}
-      <div className="lg:col-span-2">
+      <div className="min-w-0 lg:col-span-2">
         <SameCitySuggestions
           buyer={user ? { country: user.country, city: user.city } : null}
           product={product}
