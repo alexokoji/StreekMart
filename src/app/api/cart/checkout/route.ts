@@ -4,7 +4,7 @@ import { z } from "zod";
 import { OrderStatus, ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { initTransaction, isLiveMode } from "@/lib/monnify";
+import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
 import { availableBalanceCents, chargeWalletForPurchase } from "@/lib/wallet";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
@@ -233,9 +233,13 @@ export async function POST(req: Request) {
     });
   }
 
-  if (isLiveMode()) {
+  const gateway = getGatewaySelector();
+  const isStubMode = gateway.isStubMode();
+
+  if (!isStubMode) {
     try {
-      const txn = await initTransaction({
+      const gateway = getGatewaySelector();
+      const txn = await gateway.initCheckout({
         amountCents: remainingCents,
         customerEmail: guard.session.email,
         customerName: guard.session.name,

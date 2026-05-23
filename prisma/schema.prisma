@@ -485,9 +485,11 @@ model Order {
   // Monnify webhook events (which arrive per paymentReference, not per order)
   // back to the rows that need to be finalised.
   paymentReference String?
-  // External transaction reference returned by Monnify after a successful
+  // External transaction reference returned by Monnify or Korapay after a successful
   // payment. Stored for support / reconciliation.
   paymentTxnRef   String?
+  // Payment gateway used: "KORAPAY" | "MONNIFY"
+  paymentGateway  String   @default("MONNIFY")
   // Delivery fee snapshotted at order time so a later seller-side rate
   // change doesn't retroactively alter what the buyer was charged.
   deliveryFeeCents Int     @default(0)
@@ -506,11 +508,91 @@ model Order {
   // false when the buyer pressed "Confirm delivery" themselves. Useful for
   // analytics + dispute resolution.
   completedByRider Boolean @default(false)
+  // Tracking code from logistics provider (denormalized for quick access on order detail).
+  trackingCode    String?
+  // Logistics provider used: "SENDBOX" | "JUMIA" | etc. Set after shipment creation.
+  logisticsProvider String?
   updates         OrderUpdate[]
+  shipment        Shipment?
+  shippingRates   ShippingRate[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([paymentReference])
+}
+
+// -------------------- Shipments (Logistics) --------------------
+
+// One shipment per order. Tracks logistics provider integration, tracking code,
+// label URL, and shipment status.
+model Shipment {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Logistics provider name: "SENDBOX" | "JUMIA" | "DELLYMAN" | etc.
+  provider    String
+  // External shipment ID from the logistics provider
+  externalId  String
+  // Tracking code the buyer sees to track delivery
+  trackingCode String
+  // Courier/shipping method selected: e.g., "Economy", "Standard", "Express"
+  courierName String?
+  // URL to download shipping label PDF from provider
+  labelUrl    String?
+  // URL to receipt/invoice/waybill from provider (if available)
+  receiptUrl  String?
+  // Shipment status: PENDING | PICKED | IN_TRANSIT | OUT_FOR_DELIVERY | DELIVERED | FAILED
+  status      String   @default("PENDING")
+  // Seller's reference for the shipment
+  sellerReference String?
+  // Estimated delivery date from provider
+  estimatedDeliveryAt DateTime?
+  // Last sync time with logistics provider
+  lastSyncedAt DateTime?
+  // Shipping fees charged in cents
+  shippingFeeCents Int @default(0)
+  // Sender details snapshot at shipment time
+  senderName    String?
+  senderPhone   String?
+  senderAddress String?
+  // Recipient details
+  recipientName    String?
+  recipientPhone   String?
+  recipientAddress String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([provider])
+  @@index([status])
+  @@unique([orderId, provider])
+}
+
+// -------------------- Shipping Rates (Logistics Quotes) --------------------
+
+// Snapshots of shipping rate quotes shown to buyers during checkout.
+// Allows tracking which rates were presented and which was selected.
+model ShippingRate {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Provider name: "SENDBOX" | "JUMIA" | etc.
+  provider    String
+  // Courier/method name: "Economy", "Standard", "Express"
+  courierName String
+  // Quote amount in cents (USD)
+  amountCents Int
+  // Estimated delivery days from quote
+  estimatedDays Int?
+  // Estimated delivery date
+  estimatedDeliveryAt DateTime?
+  // Whether this rate was selected for the order
+  selected    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([provider])
+  @@index([selected])
 }
 
 // -------------------- Reviews --------------------

@@ -195,3 +195,20 @@ export async function cancelPendingOrders(paymentReference: string): Promise<str
   });
   return orders.map((o) => o.id);
 }
+
+// Get shipment details for an order with full tracking info.
+export async function getOrderShipment(orderId: string) {
+  const shipment = await prisma.shipment.findUnique({
+    where: { orderId },
+  });
+  return shipment;
+}
+
+// Check if an order has a shipment created.
+export async function orderHasShipment(orderId: string): Promise<boolean> {
+  const shipment = await prisma.shipment.findUnique({
+    where: { orderId },
+  });
+  return !!shipment;
+}
+

@@ -1,0 +1,78 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { requireApiUser } from "@/lib/auth";
+import { getLogisticsService } from "@/lib/services/logistics";
+
+const Body = z.object({
+  provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
+  pickupCity: z.string(),
+  pickupState: z.string().optional(),
+  pickupPostalCode: z.string().optional(),
+  pickupCountry: z.string(),
+  deliveryCity: z.string(),
+  deliveryState: z.string().optional(),
+  deliveryPostalCode: z.string().optional(),
+  deliveryCountry: z.string(),
+  weight: z.number().positive().optional(),
+  description: z.string().optional(),
+});
+
+/**
+ * POST /api/logistics/rates
+ * Get shipping rate quotes from a logistics provider.
+ * Used during checkout to show buyers shipping options.
+ */
+export async function POST(req: Request) {
+  const guard = await requireApiUser();
+  if ("error" in guard) return guard.error;
+
+  const json = await req.json().catch(() => null);
+  const parsed = Body.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  try {
+    const me = await prisma.user.findUnique({
+      where: { id: guard.session.sub },
+      select: { country: true, city: true, region: true },
+    });
+
+    if (!me?.country || !me.city) {
+      return NextResponse.json(
+        { error: "Your location is not set. Update it in Account settings." },
+        { status: 400 },
+      );
+    }
+
+    const logistics = getLogisticsService();
+    const rates = await logistics.getShippingRates({
+      provider: parsed.data.provider as any,
+      pickupAddress: "Seller Location", // Placeholder — seller address comes from seller.location
+      pickupCity: parsed.data.pickupCity,
+      pickupState: parsed.data.pickupState,
+      pickupPostalCode: parsed.data.pickupPostalCode,
+      pickupCountry: parsed.data.pickupCountry,
+      deliveryAddress: me.city, // Placeholder
+      deliveryCity: parsed.data.deliveryCity,
+      deliveryState: parsed.data.deliveryState,
+      deliveryPostalCode: parsed.data.deliveryPostalCode,
+      deliveryCountry: parsed.data.deliveryCountry,
+      weight: parsed.data.weight,
+      description: parsed.data.description,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      provider: parsed.data.provider,
+      rates: rates.couriers || [],
+    });
+  } catch (err) {
+    console.error("Shipping rates error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to fetch shipping rates" },
+      { status: 500 },
+    );
+  }
+}
