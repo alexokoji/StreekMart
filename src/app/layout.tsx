@@ -3,6 +3,7 @@ import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/layout/TopNav";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { Footer } from "@/components/layout/Footer";
 import { SmartSearch } from "@/components/SmartSearch";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { getCurrentUser } from "@/lib/auth";
@@ -74,6 +75,7 @@ export default async function RootLayout({
           <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:pb-10">
             {children}
           </main>
+          <Footer />
           <BottomNav user={user} />
           {/* SmartSearch renders its own desktop launcher (bottom-right) and
               listens for the "upclo:open-search" event from the BottomNav FAB
