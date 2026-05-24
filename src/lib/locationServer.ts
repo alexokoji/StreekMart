@@ -99,20 +99,11 @@ export async function resolveDeliveryQuote(args: {
       };
     }
     // Same city but NOT supported by platform — seller delivers with their
-    // own rider using their own fee, or we block.
-    if (!sellerHasRider) {
-      return {
-        zone: "WITHIN_CITY",
-        fulfiller: "BLOCKED",
-        feeCents: 0,
-        blockedReason:
-          "This seller's city isn't a platform delivery zone yet, and they don't have an in-house rider.",
-      };
-    }
+    // own rider using their own fee, or use platform delivery as fallback
     return {
       zone: "WITHIN_CITY",
-      fulfiller: "SELLER",
-      feeCents: seller.deliveryWithinCityCents,
+      fulfiller: sellerHasRider ? "SELLER" : "PLATFORM",
+      feeCents: sellerHasRider ? seller.deliveryWithinCityCents : 0,
     };
   }
 
