@@ -89,7 +89,6 @@ export function TrackingWidget({ orderId }: TrackingWidgetProps) {
 
       {error && (
         <div className="mb-4 text-sm text-gray-600">
-          {tracking.cached && "Showing cached data. "}
           Tracking information unavailable right now.
         </div>
       )}

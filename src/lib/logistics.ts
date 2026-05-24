@@ -30,7 +30,7 @@ export type GetTrackingInput = {
 };
 
 export type TrackingUpdate = {
-  status: "pending" | "picked" | "in_transit" | "delivered" | "failed";
+  status: "pending" | "picked" | "in_transit" | "out_for_delivery" | "delivered" | "failed";
   lastUpdate: Date;
   currentLocation?: string;
   estimatedDelivery?: Date;
