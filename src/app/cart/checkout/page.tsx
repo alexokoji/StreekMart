@@ -4,12 +4,13 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
-import { isLiveMode } from "@/lib/monnify";
+import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { CheckoutForm } from "./CheckoutForm";
 
 export default async function CheckoutPage() {
   const user = await requireUser();
-  const live = isLiveMode();
+  const gateway = getGatewaySelector();
+  const isStubMode = gateway.isStubMode();
   const cart = await prisma.cart.findUnique({
     where: { userId: user.id },
     include: {
@@ -38,9 +39,9 @@ export default async function CheckoutPage() {
         <Link href="/cart" className="text-sm text-brand-700 hover:underline">← Back to cart</Link>
         <h1 className="text-2xl font-bold">Checkout</h1>
         <p className="text-sm text-gray-600">
-          {live
-            ? "You'll be redirected to Monnify to complete payment securely."
-            : "Monnify is in stub mode — orders will auto-confirm without a real charge. Set MONNIFY_LIVE=1 in .env for the real flow."}
+          {!isStubMode
+            ? "You'll be redirected to Korapay to complete payment securely."
+            : "Korapay is in stub mode — orders will auto-confirm without a real charge. Set KORAPAY_LIVE=1 in .env for the real flow."}
         </p>
         <div className="card p-6">
           <CheckoutForm />
