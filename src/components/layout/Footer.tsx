@@ -11,7 +11,7 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           {/* Brand */}
           <div>
-            <h3 className="text-lg font-bold text-gray-900">UpClo</h3>
+            <h3 className="text-lg font-bold text-gray-900">StreekMart</h3>
             <p className="mt-2 text-sm text-gray-600">
               Fashion marketplace for materials, ready-to-wear, and designer content.
             </p>
@@ -83,7 +83,7 @@ export function Footer() {
         {/* Bottom Bar */}
         <div className="mt-12 border-t border-gray-200 pt-8">
           <p className="text-center text-sm text-gray-600">
-            © {currentYear} UpClo. All rights reserved.
+            © {currentYear} StreekMart. All rights reserved.
           </p>
         </div>
       </div>
