@@ -22,7 +22,7 @@ export class KorapayGateway implements PaymentGateway {
         name: input.customerName,
         email: input.customerEmail,
       },
-      channels: ["card", "bank_transfer", "ussd"],
+      channels: ["card", "bank_transfer", "mobile_money"],
       notification_url: `${this.getNotificationUrl()}/api/korapay/webhook`,
       redirect_url: input.redirectUrl,
       metadata: {
