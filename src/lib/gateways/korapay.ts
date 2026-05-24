@@ -12,7 +12,7 @@ export class KorapayGateway implements PaymentGateway {
 
     const secretKey = this.requireEnv("KORAPAY_SECRET_KEY");
     const encryptionKey = process.env.KORAPAY_ENCRYPTION_KEY; // Optional, for request encryption
-    const url = `${this.baseUrl()}/transactions/initialize`;
+    const url = `${this.baseUrl()}/charges/initialize`;
 
     const payload = {
       amount: input.amountCents / 100,
@@ -62,7 +62,7 @@ export class KorapayGateway implements PaymentGateway {
 
     const secretKey = this.requireEnv("KORAPAY_SECRET_KEY");
     const encryptionKey = process.env.KORAPAY_ENCRYPTION_KEY;
-    const url = `${this.baseUrl()}/transactions/verify/${input.transactionReference}`;
+    const url = `${this.baseUrl()}/transactions/${input.transactionReference}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -116,7 +116,7 @@ export class KorapayGateway implements PaymentGateway {
   // ---- Internal helpers ----
 
   private baseUrl(): string {
-    return process.env.KORAPAY_BASE_URL ?? "https://api.korapay.com";
+    return process.env.KORAPAY_BASE_URL ?? "https://api.korapay.com/merchant/api/v1";
   }
 
   private getNotificationUrl(): string {
