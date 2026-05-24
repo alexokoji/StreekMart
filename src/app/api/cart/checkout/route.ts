@@ -221,10 +221,7 @@ export async function POST(req: Request) {
         amountCents: remainingCents,
         customerEmail: guard.session.email,
         customerName: guard.session.name,
-        description:
-          walletAppliedCents > 0
-            ? `StreekMart order × ${orders.length} (wallet applied)`
-            : `StreekMart order × ${orders.length}`,
+        description: `StreekMart order × ${orders.length}`,
         paymentReference,
         redirectUrl: buildRedirectUrl(req, paymentReference),
       });
