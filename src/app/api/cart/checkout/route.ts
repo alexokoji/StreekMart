@@ -172,6 +172,8 @@ export async function POST(req: Request) {
       const isFirstFromSeller = !sellerSeen.has(sellerKey);
       if (isFirstFromSeller) sellerSeen.add(sellerKey);
       const deliveryFeeCents = isFirstFromSeller ? quote.feeCents : 0;
+      const itemTotal = unitPrice * it.quantity + deliveryFeeCents / 100;
+      console.log("[checkout] item:", { productId: it.product.id, unitPrice, qty: it.quantity, delivery: deliveryFeeCents, itemTotal });
 
       return prisma.order.create({
         data: {
@@ -179,9 +181,7 @@ export async function POST(req: Request) {
           buyerId: guard.session.sub,
           sellerId: it.product.sellerId,
           quantity: it.quantity,
-          // totalPrice includes delivery so the seller's wallet credit and
-          // the gateway charge stay in sync with what the buyer was shown.
-          totalPrice: unitPrice * it.quantity + deliveryFeeCents / 100,
+          totalPrice: itemTotal,
           deliveryFeeCents,
           deliveryZone: quote.zone,
           deliveryFulfiller: quote.fulfiller,
