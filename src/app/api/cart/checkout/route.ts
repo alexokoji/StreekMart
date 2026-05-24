@@ -196,6 +196,7 @@ export async function POST(req: Request) {
   );
 
   const totalCents = Math.round(orders.reduce((s, o) => s + o.totalPrice, 0) * 100);
+  console.log("[checkout] totalCents:", totalCents, "totalPrice:", totalCents / 100);
 
   // Apply wallet credit first if the buyer asked for it. The wallet is
   // debited *now* (with idempotency keyed on paymentReference) so a partial
@@ -212,6 +213,7 @@ export async function POST(req: Request) {
     }
   }
   const remainingCents = Math.max(0, totalCents - walletAppliedCents);
+  console.log("[checkout] wallet:", walletAppliedCents, "remaining:", remainingCents, "remainingNGN:", remainingCents / 100);
 
   // If the wallet fully covers the order, finalise immediately. No gateway
   // hop, no live-mode check — the buyer already paid (with refund credit)
