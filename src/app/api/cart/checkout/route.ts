@@ -12,12 +12,11 @@ import { resolveDeliveryQuote } from "@/lib/locationServer";
 // POST /api/cart/checkout — converts cart items into Orders (one per
 // seller×product) under a single payment group.
 //
-// Live Monnify (MONNIFY_LIVE=1):
+// Live payment gateway (KORAPAY_LIVE=1):
 //   1. Create orders as PENDING with a shared `paymentReference`.
-//   2. Call Monnify init-transaction to mint a checkout URL.
+//   2. Call the gateway to initialize a checkout session and mint a checkout URL.
 //   3. Return { redirectUrl } so the client can hand off to the gateway.
-//   4. The webhook (POST /api/monnify/webhook) finalises everything when
-//      Monnify confirms the payment.
+//   4. The webhook finalises everything when the gateway confirms the payment.
 //
 // Stub mode (default for dev):
 //   1. Create orders as PENDING.
@@ -27,8 +26,6 @@ import { resolveDeliveryQuote } from "@/lib/locationServer";
 const Body = z.object({
   shippingAddress: z.string().min(5).max(500),
   notes: z.string().max(500).optional(),
-  // "DIRECT" — pay upfront via Monnify (default).
-  // "ON_DELIVERY" — pay cash on arrival; only allowed for trusted buyers.
   paymentMethod: z.enum(["DIRECT", "ON_DELIVERY"]).default("DIRECT"),
   // Apply the buyer's wallet credit (refunds, etc.) toward this order.
   // The server caps it at the smaller of (available wallet, order total).

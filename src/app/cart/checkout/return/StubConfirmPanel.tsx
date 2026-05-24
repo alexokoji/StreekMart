@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Stub-mode confirmation control. Lets the developer simulate Monnify's
-// asynchronous webhook by calling /api/monnify/stub-confirm directly.
+// Stub-mode confirmation control. When the payment gateway is in stub mode,
+// this lets developers simulate the asynchronous webhook by calling
+// /api/monnify/stub-confirm directly.
 export function StubConfirmPanel({ paymentReference }: { paymentReference: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"paid" | "failed" | null>(null);
@@ -34,7 +35,7 @@ export function StubConfirmPanel({ paymentReference }: { paymentReference: strin
     <>
       <h1 className="font-display text-xl font-semibold">Stub checkout</h1>
       <p className="mt-2 text-sm text-ink-600">
-        Monnify is in stub mode (set <code>MONNIFY_LIVE=1</code> in <code>.env</code> for real
+        Payment gateway is in stub mode (set <code>KORAPAY_LIVE=1</code> in <code>.env</code> for real
         payments). Pick an outcome to simulate the webhook.
       </p>
       <div className="mt-4 flex justify-center gap-2">

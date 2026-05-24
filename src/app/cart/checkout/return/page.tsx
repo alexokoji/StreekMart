@@ -3,13 +3,13 @@ import { redirect } from "next/navigation";
 import { OrderStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { isLiveMode } from "@/lib/monnify";
+import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { StubConfirmPanel } from "./StubConfirmPanel";
 
 // /cart/checkout/return?ref=…
 //
-// Buyers land here after Monnify redirects them back from the hosted
-// checkout. We resolve the order group by paymentReference and show one of
+// Buyers land here after the payment gateway redirects them back from
+// hosted checkout. We resolve the order group by paymentReference and show one of
 // three states based on what the webhook has written so far:
 //
 //   PAID      — webhook has fired and orders are finalised. Show success.
@@ -17,7 +17,7 @@ import { StubConfirmPanel } from "./StubConfirmPanel";
 //               to refresh; the webhook will catch up.
 //   CANCELLED — payment failed or was abandoned. Offer to retry.
 //
-// In stub mode (no real Monnify) we render a confirmation panel so the
+// In stub mode (no real payment gateway) we render a confirmation panel so the
 // developer can choose paid / failed and exercise the rest of the pipeline.
 export default async function CheckoutReturnPage({
   searchParams,
@@ -45,7 +45,8 @@ export default async function CheckoutReturnPage({
 
   const allPaid = orders.every((o) => o.status === OrderStatus.PAID || o.status === OrderStatus.SHIPPED || o.status === OrderStatus.COMPLETED);
   const allCancelled = orders.every((o) => o.status === OrderStatus.CANCELLED);
-  const stubPending = !isLiveMode() && orders.every((o) => o.status === OrderStatus.PENDING);
+  const gateway = getGatewaySelector();
+  const stubPending = gateway.isStubMode() && orders.every((o) => o.status === OrderStatus.PENDING);
 
   return (
     <div className="card mx-auto max-w-md p-8 text-center">

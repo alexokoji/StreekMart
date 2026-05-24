@@ -12,16 +12,16 @@ import {
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
-import { initTransaction, isLiveMode } from "@/lib/monnify";
+import { getGatewaySelector } from "@/lib/gatewaySelector";
 
 // POST /api/promotions { kind, id }
 //
 // Product promotions are paid (₦500 / 3 days, admin-approved). The flow:
 //   1. Create a Promotion row with status=PENDING_PAYMENT and a fresh
 //      paymentReference (`PROMO_<random>`).
-//   2. Init a Monnify transaction for ₦500 using that reference.
-//   3. Respond with the Monnify checkoutUrl so the client can redirect.
-//   4. /api/monnify/webhook flips the row to PENDING_REVIEW on success
+//   2. Init a payment gateway transaction for ₦500 using that reference.
+//   3. Respond with the checkout URL so the client can redirect.
+//   4. /api/*/webhook flips the row to PENDING_REVIEW on success
 //      and CANCELLED on failure.
 //   5. /api/admin/promotions/[id] flips PENDING_REVIEW → APPROVED, sets
 //      startsAt=now / endsAt=now+3d, and writes active=true. Rejection
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
       },
     });
 
-    // Init Monnify. The user is the seller, paying the platform for
+    // Init payment gateway. The user is the seller, paying the platform for
     // visibility — we send their email/name so the receipt matches.
     const me = await prisma.user.findUnique({
       where: { id: guard.session.sub },
@@ -118,7 +118,8 @@ export async function POST(req: Request) {
     }
 
     try {
-      const init = await initTransaction({
+      const gateway = getGatewaySelector();
+      const init = await gateway.initCheckout({
         amountCents: PROMOTION_FEE_KOBO,
         customerEmail: me.email,
         customerName: me.name,
@@ -129,9 +130,9 @@ export async function POST(req: Request) {
 
       // Stub mode has no real payment surface — auto-mark the row as
       // PENDING_REVIEW so the admin queue can see it. Send the seller
-      // straight back to the product page instead of through Monnify's
+      // straight back to the product page instead of through the gateway's
       // synthetic checkout URL (which assumes an active cart).
-      if (!isLiveMode()) {
+      if (gateway.isStubMode()) {
         await prisma.promotion.update({
           where: { id: promotion.id },
           data: {

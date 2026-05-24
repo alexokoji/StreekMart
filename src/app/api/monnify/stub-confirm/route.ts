@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { PromotionStatus } from "@/lib/enums";
-import { isLiveMode } from "@/lib/monnify";
+import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders, cancelPendingOrders } from "@/lib/orders";
 
 // POST /api/monnify/stub-confirm { paymentReference, outcome }
 //
-// Dev-only helper for the stub Monnify mode. The stub `initTransaction` mints
-// a checkoutUrl that lands buyers on /cart/checkout/return, which (in stub
-// mode) auto-finalises by calling this endpoint. Lets us exercise the full
-// init → redirect → webhook → finalise pipeline without real Monnify keys.
+// Dev-only helper for stub mode. When the payment gateway is in stub mode,
+// the checkout flow lands buyers on /cart/checkout/return, which can call
+// this endpoint to simulate payment confirmation. Lets us exercise the full
+// init → redirect → webhook → finalise pipeline without real gateway keys.
 //
 // In live mode this endpoint is a no-op so a stray client cannot bypass the
 // real gateway by hand-crafting a request.
@@ -21,7 +21,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  if (isLiveMode()) {
+  const gateway = getGatewaySelector();
+  if (!gateway.isStubMode()) {
     return NextResponse.json({ error: "Disabled in live mode." }, { status: 403 });
   }
   const json = await req.json().catch(() => null);
