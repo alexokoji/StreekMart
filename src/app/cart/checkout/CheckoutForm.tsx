@@ -21,27 +21,9 @@ export function CheckoutForm() {
   const [shippingAddress, setShippingAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("DIRECT");
-  const [useWalletCredit, setUseWalletCredit] = useState(false);
-  const [walletAvailableCents, setWalletAvailableCents] = useState<number | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Fetch the buyer's available wallet credit on mount so the UI can show
-  // "you have $X.XX" and gate the checkbox visibility cleanly.
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/wallet")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!alive || !data) return;
-        const cents = typeof data.availableCents === "number" ? data.availableCents : 0;
-        setWalletAvailableCents(cents);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +37,6 @@ export function CheckoutForm() {
           shippingAddress,
           notes: notes || undefined,
           paymentMethod,
-          useWalletCredit,
           zoneOverride,
         }),
       });
@@ -149,27 +130,6 @@ export function CheckoutForm() {
           </div>
         </label>
       </fieldset>
-
-      {walletAvailableCents !== null && walletAvailableCents > 0 && (
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
-          <input
-            type="checkbox"
-            className="mt-0.5 h-4 w-4"
-            checked={useWalletCredit}
-            onChange={(e) => setUseWalletCredit(e.target.checked)}
-          />
-          <div className="min-w-0">
-            <p className="text-sm font-medium">
-              Apply refund wallet (
-              <Price amount={walletAvailableCents / 100} /> available)
-            </p>
-            <p className="text-xs text-ink-500">
-              Wallet credit is applied first; only the remaining balance — if any —
-              is charged to your card.
-            </p>
-          </div>
-        </label>
-      )}
 
       {err && <p className="text-sm text-red-600">{err}</p>}
       <button type="submit" className="btn-primary w-full" disabled={busy}>

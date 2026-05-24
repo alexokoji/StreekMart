@@ -6,7 +6,6 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
-import { availableBalanceCents, chargeWalletForPurchase } from "@/lib/wallet";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
 
 // POST /api/cart/checkout — converts cart items into Orders (one per
@@ -27,10 +26,6 @@ const Body = z.object({
   shippingAddress: z.string().min(5).max(500),
   notes: z.string().max(500).optional(),
   paymentMethod: z.enum(["DIRECT", "ON_DELIVERY"]).default("DIRECT"),
-  // Apply the buyer's wallet credit (refunds, etc.) toward this order.
-  // The server caps it at the smaller of (available wallet, order total).
-  // If the wallet covers the whole order, no gateway call is made.
-  useWalletCredit: z.boolean().optional().default(false),
   // Mirror of the cart page's "Delivering to" picker. The server applies
   // the same override when quoting so the buyer is charged exactly the
   // fee they saw on the cart summary. International is always determined
@@ -196,24 +191,9 @@ export async function POST(req: Request) {
   );
 
   const totalCents = Math.round(orders.reduce((s, o) => s + o.totalPrice, 0) * 100);
-  console.log("[checkout] totalCents:", totalCents, "totalPrice:", totalCents / 100);
 
-  // Apply wallet credit first if the buyer asked for it. The wallet is
-  // debited *now* (with idempotency keyed on paymentReference) so a partial
-  // gateway charge can't leave both ledgers half-applied later.
-  let walletAppliedCents = 0;
-  if (parsed.data.useWalletCredit) {
-    const available = await availableBalanceCents(guard.session.sub);
-    if (available > 0) {
-      walletAppliedCents = await chargeWalletForPurchase({
-        userId: guard.session.sub,
-        maxApplyCents: totalCents,
-        paymentReference,
-      });
-    }
-  }
-  const remainingCents = Math.max(0, totalCents - walletAppliedCents);
-  console.log("[checkout] wallet:", walletAppliedCents, "remaining:", remainingCents, "remainingNGN:", remainingCents / 100);
+  // Buyer pays the full amount directly. Wallet is only for seller payouts and refunds.
+  const remainingCents = totalCents;
 
   // If the wallet fully covers the order, finalise immediately. No gateway
   // hop, no live-mode check — the buyer already paid (with refund credit)
@@ -226,7 +206,6 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       paymentReference,
-      walletAppliedCents,
       paidByWallet: true,
       orders: orders.map((o) => ({ id: o.id })),
     });
@@ -252,43 +231,16 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         paymentReference,
-        walletAppliedCents,
         redirectUrl: txn.checkoutUrl,
         orders: orders.map((o) => ({ id: o.id })),
       });
     } catch (err) {
       // If the gateway hand-off fails we cancel the freshly created orders
-      // so the buyer can retry without ghost PENDING rows piling up. The
-      // wallet debit is reversed by an explicit credit so the buyer doesn't
-      // lose their credit on a failed attempt.
+      // so the buyer can retry without ghost PENDING rows piling up.
       await prisma.order.updateMany({
         where: { paymentReference },
         data: { status: OrderStatus.CANCELLED },
       });
-      if (walletAppliedCents > 0) {
-        // Reverse the wallet debit so the buyer doesn't lose credit on a
-        // failed gateway hand-off. Single transaction so the ledger entry
-        // and the balance bump always agree.
-        await prisma.$transaction(async (tx) => {
-          const wallet = await tx.wallet.findUniqueOrThrow({
-            where: { userId: guard.session.sub },
-          });
-          await tx.walletTransaction.create({
-            data: {
-              walletId: wallet.id,
-              amountCents: walletAppliedCents,
-              type: "REFUND",
-              description: `Reversed — checkout ${paymentReference} failed at gateway`,
-              refType: "checkout",
-              refId: paymentReference,
-            },
-          });
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: { balanceCents: { increment: walletAppliedCents } },
-          });
-        });
-      }
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "Could not start payment." },
         { status: 502 },
@@ -302,7 +254,6 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     paymentReference,
-    walletAppliedCents,
     orders: orders.map((o) => ({ id: o.id })),
   });
 }
