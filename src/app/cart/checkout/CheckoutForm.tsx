@@ -64,7 +64,7 @@ export function CheckoutForm() {
         setErr(data.error || "Checkout failed");
         return;
       }
-      // Live Monnify returns a hosted-checkout URL; stub mode returns just
+      // Live payment gateway returns a hosted-checkout URL; stub mode returns just
       // the paymentReference. Either way the buyer ends up on the return
       // page where the order group resolves.
       if (typeof data.redirectUrl === "string" && data.redirectUrl) {
