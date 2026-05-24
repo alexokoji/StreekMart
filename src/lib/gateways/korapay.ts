@@ -15,7 +15,7 @@ export class KorapayGateway implements PaymentGateway {
     const url = `${this.baseUrl()}/charges/initialize`;
 
     const payload = {
-      amount: input.amountCents,
+      amount: input.amountCents / 100,
       currency: "NGN",
       reference: input.paymentReference,
       customer: {
