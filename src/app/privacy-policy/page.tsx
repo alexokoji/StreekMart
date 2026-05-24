@@ -126,9 +126,9 @@ export default function PrivacyPolicyPage() {
               If you have questions about this Privacy Policy or our privacy practices, please contact us at:
             </p>
             <div className="bg-gray-50 p-6 rounded-lg mt-4">
-              <p className="text-gray-700 font-semibold mb-2">UpClo</p>
-              <p className="text-gray-700">Email: privacy@upclo.com</p>
-              <p className="text-gray-700">Website: www.upclo.com</p>
+              <p className="text-gray-700 font-semibold mb-2">StreekMart</p>
+              <p className="text-gray-700">Email: privacy@streekmart.online</p>
+              <p className="text-gray-700">Website: www.streekmart.online</p>
             </div>
           </section>
         </div>
