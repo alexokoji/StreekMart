@@ -7,6 +7,7 @@ import { requireApiUser } from "@/lib/auth";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
+import { getServerCurrencyContext } from "@/lib/currencyServer";
 
 // POST /api/cart/checkout — converts cart items into Orders (one per
 // seller×product) under a single payment group.
@@ -115,6 +116,9 @@ export async function POST(req: Request) {
   // sibling order and finalise them together.
   const paymentReference = `UPCLO_${randomBytes(8).toString("hex").toUpperCase()}`;
 
+  // Get current currency context to lock in today's exchange rate
+  const currencyCtx = await getServerCurrencyContext();
+
   // Resolve a delivery quote for every distinct seller in the cart. We do
   // this BEFORE creating any Order rows so an international / unsupported-
   // city blocker rejects the whole checkout with a clean error instead of
@@ -161,14 +165,15 @@ export async function POST(req: Request) {
 
   const orders = await prisma.$transaction(
     live.map((it) => {
-      const unitPrice = it.product.salePrice ?? it.product.price;
+      const unitPriceUsd = it.product.salePrice ?? it.product.price;
+      const unitPrice = unitPriceUsd * currencyCtx.rate;
       const quote = quoteBySellerId.get(it.product.seller.id)!;
       const sellerKey = it.product.seller.id;
       const isFirstFromSeller = !sellerSeen.has(sellerKey);
       if (isFirstFromSeller) sellerSeen.add(sellerKey);
       const deliveryFeeCents = isFirstFromSeller ? quote.feeCents : 0;
       const itemTotal = unitPrice * it.quantity + deliveryFeeCents / 100;
-      console.log("[checkout] item:", { productId: it.product.id, unitPrice, qty: it.quantity, delivery: deliveryFeeCents, itemTotal });
+      console.log("[checkout] item:", { productId: it.product.id, unitPriceUsd, unitPrice, currency: currencyCtx.code, qty: it.quantity, delivery: deliveryFeeCents, itemTotal });
 
       return prisma.order.create({
         data: {
