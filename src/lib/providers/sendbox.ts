@@ -114,6 +114,12 @@ export class SendboxProvider implements LogisticsProvider {
       console.log("Sendbox quote response body:", responseText);
 
       if (!response.ok) {
+        console.error("Sendbox API error details:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: responseText,
+          payload: payload,
+        });
         throw new Error(
           `Sendbox API error (${response.status}): ${responseText || response.statusText}`
         );

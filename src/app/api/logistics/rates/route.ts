@@ -34,6 +34,16 @@ export async function POST(req: Request) {
   }
 
   try {
+    console.log("Rates request received:", {
+      provider: parsed.data.provider,
+      pickupCity: parsed.data.pickupCity,
+      pickupState: parsed.data.pickupState,
+      pickupCountry: parsed.data.pickupCountry,
+      deliveryCity: parsed.data.deliveryCity,
+      deliveryState: parsed.data.deliveryState,
+      deliveryCountry: parsed.data.deliveryCountry,
+    });
+
     const me = await prisma.user.findUnique({
       where: { id: guard.session.sub },
       select: { country: true, city: true, region: true },
@@ -46,6 +56,12 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("User location from DB:", {
+      country: me.country,
+      city: me.city,
+      region: me.region,
+    });
+
     // Ensure delivery (buyer) location has all required fields
     const deliveryCity = parsed.data.deliveryCity || me.city;
     const deliveryState = parsed.data.deliveryState || me.region || "";
@@ -53,6 +69,15 @@ export async function POST(req: Request) {
     const pickupCity = parsed.data.pickupCity;
     const pickupState = parsed.data.pickupState || "";
     const pickupCountry = parsed.data.pickupCountry || "NG";
+
+    console.log("Processed location values:", {
+      pickupCity,
+      pickupState,
+      pickupCountry,
+      deliveryCity,
+      deliveryState,
+      deliveryCountry,
+    });
 
     // Validate that required fields are not empty (Sendbox requires these)
     if (!deliveryCity || !deliveryState || !deliveryCountry) {
