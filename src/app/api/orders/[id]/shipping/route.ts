@@ -127,7 +127,6 @@ export async function POST(req: Request, context: { params: { id: string } }) {
         trackingCode: shipmentResult.trackingCode,
         labelUrl: shipmentResult.labelUrl,
         receiptUrl: shipmentResult.receiptUrl,
-        courierName: shipmentResult.courierName ?? null,
         status: "PENDING",
       },
     });
