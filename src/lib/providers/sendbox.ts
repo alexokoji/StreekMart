@@ -31,7 +31,7 @@ export class SendboxProvider implements LogisticsProvider {
   /**
    * Get shipping rate quotes from Sendbox.
    * Returns available courier options with pricing.
-   * Endpoint: POST /api/v1/shipping/quote
+   * Endpoint: POST /shipping/quote
    */
   async getShippingRates(input: {
     pickupAddress: string;
@@ -61,7 +61,7 @@ export class SendboxProvider implements LogisticsProvider {
     console.log("Sendbox getShippingRates debug:", {
       tokenLength: this.accessToken?.length,
       baseUrl: this.baseUrl,
-      endpoint: `${this.baseUrl}/api/v1/shipping/quote`,
+      endpoint: `${this.baseUrl}/shipping/quote`,
       isLive: this.isLive,
     });
 
@@ -87,7 +87,7 @@ export class SendboxProvider implements LogisticsProvider {
 
       console.log("Sendbox quote request payload:", payload);
 
-      const response = await fetch(`${this.baseUrl}/api/v1/shipping/quote`, {
+      const response = await fetch(`${this.baseUrl}/shipping/quote`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -120,7 +120,7 @@ export class SendboxProvider implements LogisticsProvider {
 
   /**
    * Create a shipment with Sendbox.
-   * Endpoint: POST /api/v1/shipping/create
+   * Endpoint: POST /shipping/shipments
    */
   async createShipment(input: CreateShipmentInput): Promise<CreateShipmentResult> {
     if (!this.isLive) {
@@ -151,7 +151,7 @@ export class SendboxProvider implements LogisticsProvider {
 
       console.log("Sendbox create shipment payload:", payload);
 
-      const response = await fetch(`${this.baseUrl}/api/v1/shipping/create`, {
+      const response = await fetch(`${this.baseUrl}/shipping/shipments`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
@@ -191,7 +191,7 @@ export class SendboxProvider implements LogisticsProvider {
     try {
       const trackingId = input.trackingCode || input.externalId;
       const response = await fetch(
-        `${this.baseUrl}/api/v1/shipping/track/${trackingId}`,
+        `${this.baseUrl}/shipping/shipments/${trackingId}`,
         {
           headers: {
             Authorization: `Bearer ${this.accessToken}`,
