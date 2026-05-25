@@ -10,7 +10,7 @@ export default async function ActiveOrdersPage() {
       sellerId: user.id,
       status: { in: [OrderStatus.PENDING, OrderStatus.PAID, OrderStatus.SHIPPED] },
     },
-    include: { product: true, buyer: { select: { id: true, name: true } } },
+    include: { product: true, buyer: { select: { id: true, name: true } }, shipment: true },
     orderBy: { createdAt: "desc" },
   });
 

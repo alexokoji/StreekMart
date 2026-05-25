@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { createJumiaProvider } from "@/lib/logisticsProviders/jumia";
+import { getSendboxProvider } from "@/lib/providers/sendbox";
 
 const CreateShipmentBody = z.object({
   weight: z.number().positive().optional(),
@@ -34,6 +35,7 @@ export async function POST(req: Request, context: { params: { id: string } }) {
     include: {
       buyer: { select: { name: true, phone: true } },
       product: true,
+      seller: { select: { sellerVerified: true, businessName: true } },
     },
   });
 
@@ -67,8 +69,8 @@ export async function POST(req: Request, context: { params: { id: string } }) {
   }
 
   try {
-    // Create shipment via Jumia
-    const provider = createJumiaProvider();
+    const useTrustedCourier = order.seller?.sellerVerified === true;
+    const provider = useTrustedCourier ? createJumiaProvider() : getSendboxProvider();
     const shipmentResult = await provider.createShipment({
       orderId,
       recipientName: order.buyer.name,
@@ -84,7 +86,7 @@ export async function POST(req: Request, context: { params: { id: string } }) {
     const shipment = await prisma.shipment.create({
       data: {
         orderId,
-        provider: "JUMIA",
+        provider: provider.getName(),
         externalId: shipmentResult.externalId,
         trackingCode: shipmentResult.trackingCode,
         labelUrl: shipmentResult.labelUrl,
@@ -98,6 +100,7 @@ export async function POST(req: Request, context: { params: { id: string } }) {
       where: { id: orderId },
       data: {
         trackingCode: shipmentResult.trackingCode,
+        logisticsProvider: provider.getName(),
         status: "SHIPPED",
         updatedAt: new Date(),
       },

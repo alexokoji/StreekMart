@@ -9,6 +9,7 @@ type OrderRow = {
   createdAt: Date;
   product: { id: string; name: string };
   buyer: { id: string; name: string };
+  shipment?: { status: string } | null;
 };
 
 export function OrderList({ orders, empty }: { orders: OrderRow[]; empty: string }) {
@@ -29,7 +30,12 @@ export function OrderList({ orders, empty }: { orders: OrderRow[]; empty: string
           </div>
           <div className="text-right">
             <p className="text-sm font-medium"><Price amount={o.totalPrice} /></p>
-            <span className="badge bg-gray-100 text-gray-700">{o.status}</span>
+            <div className="space-y-1 text-right">
+            <p className="text-sm font-medium"><Price amount={o.totalPrice} /></p>
+            <span className={`badge ${!o.shipment && o.status === "PAID" ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-700"}`}>
+              {!o.shipment && o.status === "PAID" ? "Shipment pending" : o.status}
+            </span>
+          </div>
           </div>
         </div>
       ))}

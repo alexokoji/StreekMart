@@ -23,7 +23,7 @@ import { getServerCurrencyContext } from "@/lib/currencyServer";
 //   2. Immediately call finalizePaidOrders so the dev/UX flow still ends in
 //      PAID without going through a real gateway.
 
-const Body = z.object({
+export const Body = z.object({
   shippingAddress: z.string().min(5).max(500),
   notes: z.string().max(500).optional(),
   paymentMethod: z.enum(["DIRECT", "ON_DELIVERY"]).default("DIRECT"),
@@ -32,6 +32,20 @@ const Body = z.object({
   // fee they saw on the cart summary. International is always determined
   // by country code and ignores this override.
   zoneOverride: z.enum(["WITHIN_CITY", "OUTSIDE_CITY"]).optional(),
+  // Optional shipping choices forwarded from the checkout form for
+  // single- or multi-seller carts. Buyers may select a courier per seller.
+  shippingChoices: z
+    .array(
+      z.object({
+        sellerId: z.string(),
+        provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
+        courierId: z.string().optional(),
+        courierName: z.string().optional(),
+        priceCents: z.number().int().nonnegative().optional(),
+        estimatedDays: z.number().int().optional(),
+      }),
+    )
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -64,7 +78,7 @@ export async function POST(req: Request) {
 
   const buyer = await prisma.user.findUnique({
     where: { id: guard.session.sub },
-    select: { country: true, city: true, region: true },
+    select: { country: true, city: true, region: true, phone: true, name: true },
   });
   if (!buyer?.country || !buyer.city) {
     return NextResponse.json(
@@ -157,6 +171,18 @@ export async function POST(req: Request) {
     });
   }
 
+  // If the buyer provided shipping choices (single or multi-seller), apply
+  // the selected price to the per-seller quote so the buyer is charged what
+  // they explicitly chose at checkout.
+  if (parsed.data.shippingChoices && parsed.data.shippingChoices.length > 0) {
+    for (const choice of parsed.data.shippingChoices) {
+      const sid = choice.sellerId;
+      if (!sid) continue;
+      const q = quoteBySellerId.get(sid);
+      if (q && choice.priceCents != null) q.feeCents = choice.priceCents;
+    }
+  }
+
   // Charge delivery once per seller in this checkout group — buying two
   // items from the same shop should be one shipment, not two. The first
   // order from each seller carries the full fee + fulfiller; the rest get
@@ -218,6 +244,33 @@ export async function POST(req: Request) {
 
   const gateway = getGatewaySelector();
   const isStubMode = gateway.isStubMode();
+
+  // Persist shipping choices as ShippingRate snapshots linked to the
+  // created orders so sellers see which option the buyer picked. Sellers
+  // will create shipments themselves from the order page using these
+  // selected rates. This does not create shipments during checkout.
+  if (parsed.data.shippingChoices && parsed.data.shippingChoices.length > 0) {
+    const choicesBySeller = new Map(parsed.data.shippingChoices.map((c: any) => [c.sellerId, c]));
+    for (const ord of orders) {
+      const choice = choicesBySeller.get(ord.sellerId);
+      if (!choice) continue;
+      try {
+        await prisma.shippingRate.create({
+          data: {
+            orderId: ord.id,
+            provider: choice.provider,
+            courierName: choice.courierName || choice.courierId || "",
+            amountCents: choice.priceCents ?? 0,
+            estimatedDays: choice.estimatedDays ?? null,
+            estimatedDeliveryAt: null,
+            selected: true,
+          },
+        });
+      } catch (err) {
+        console.error("Failed to persist shipping rate for order", ord.id, err);
+      }
+    }
+  }
 
   if (!isStubMode) {
     try {

@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { OrderStatusActions } from "./OrderStatusActions";
 import { TrackingUpdater } from "./TrackingUpdater";
+import SellerShipmentPanel from "./SellerShipmentPanel";
 
 export default async function ViewOrderPage({ params }: { params: { id: string } }) {
   const user = await requireUser("SELLER");
@@ -13,9 +14,12 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
     where: { id: params.id },
     include: {
       product: true,
+      seller: { select: { sellerVerified: true } },
       // Phone is shown to the seller once payment is confirmed — sellers
       // call buyers about delivery windows, missed doors, etc.
       buyer: { select: { id: true, name: true, email: true, phone: true } },
+      shippingRates: true,
+      shipment: true,
     },
   });
   if (!order || order.sellerId !== user.id) notFound();
@@ -26,7 +30,14 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="card p-6 lg:col-span-2">
-          <h1 className="text-2xl font-bold">Order #{order.id.slice(0, 8)}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold">Order #{order.id.slice(0, 8)}</h1>
+            {order.status === "PAID" && !order.shipment && (
+              <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold uppercase text-yellow-800">
+                Shipment pending
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500">Placed {formatDate(order.createdAt)}</p>
 
           <div className="mt-6">
@@ -104,6 +115,15 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
               </p>
             </div>
           )}
+
+          {/* Seller shipment panel: shows buyer-selected shipping choice and
+              provides a CTA for the seller to create the shipment. */}
+          <SellerShipmentPanel
+            orderId={order.id}
+            shippingRates={order.shippingRates}
+            shipment={order.shipment}
+            sellerVerified={order.seller?.sellerVerified ?? false}
+          />
         </aside>
       </div>
 
