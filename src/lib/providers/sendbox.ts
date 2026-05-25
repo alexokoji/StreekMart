@@ -14,13 +14,13 @@ export interface SendboxRateQuote {
 }
 
 export class SendboxProvider implements LogisticsProvider {
-  private apiKey: string;
+  private accessToken: string;
   private baseUrl: string;
   private isLive: boolean;
 
   constructor() {
-    this.apiKey = process.env.SENDBOX_API_KEY || "";
-    this.baseUrl = process.env.SENDBOX_BASE_URL || "https://sandbox.staging.sendbox.co";
+    this.accessToken = process.env.SENDBOX_ACCESS_TOKEN || "";
+    this.baseUrl = process.env.SENDBOX_BASE_URL || "https://live.sendbox.co";
     this.isLive = process.env.SENDBOX_LIVE === "1";
   }
 
@@ -31,6 +31,7 @@ export class SendboxProvider implements LogisticsProvider {
   /**
    * Get shipping rate quotes from Sendbox.
    * Returns available courier options with pricing.
+   * Endpoint: POST /api/v1/shipping/quote
    */
   async getShippingRates(input: {
     pickupAddress: string;
@@ -53,60 +54,59 @@ export class SendboxProvider implements LogisticsProvider {
       return this.stubGetRates();
     }
 
-    if (!this.apiKey) {
-      throw new Error("SENDBOX_API_KEY environment variable is not set");
+    if (!this.accessToken) {
+      throw new Error("SENDBOX_ACCESS_TOKEN environment variable is not set");
     }
 
     console.log("Sendbox getShippingRates debug:", {
-      apiKeyLength: this.apiKey?.length,
+      tokenLength: this.accessToken?.length,
       baseUrl: this.baseUrl,
-      endpoint: `${this.baseUrl}/shipping/shipments/quote`,
+      endpoint: `${this.baseUrl}/api/v1/shipping/quote`,
       isLive: this.isLive,
     });
 
     try {
-      const response = await fetch(`${this.baseUrl}/shipping/shipments/quote`, {
+      const payload = {
+        origin: {
+          address: input.pickupAddress,
+          city: input.pickupCity,
+          state: input.pickupState || "",
+          postal_code: input.pickupPostalCode || "",
+        },
+        destination: {
+          address: input.deliveryAddress,
+          city: input.deliveryCity,
+          state: input.deliveryState || "",
+          postal_code: input.deliveryPostalCode || "",
+        },
+        package: {
+          weight: input.weight || 1,
+          value: 0,
+        },
+      };
+
+      console.log("Sendbox quote request payload:", payload);
+
+      const response = await fetch(`${this.baseUrl}/api/v1/shipping/quote`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          pickup_location: {
-            address: input.pickupAddress,
-            city: input.pickupCity,
-            state: input.pickupState,
-            postal_code: input.pickupPostalCode,
-            country: input.pickupCountry,
-          },
-          delivery_location: {
-            address: input.deliveryAddress,
-            city: input.deliveryCity,
-            state: input.deliveryState,
-            postal_code: input.deliveryPostalCode,
-            country: input.deliveryCountry,
-          },
-          shipment_weight: input.weight ? Math.ceil(input.weight * 1000) : 1000, // grams
-          shipment_dimensions:
-            input.length && input.width && input.height
-              ? {
-                  length: input.length,
-                  width: input.width,
-                  height: input.height,
-                }
-              : undefined,
-          shipment_description: input.description || "Fashion items",
-        }),
+        body: JSON.stringify(payload),
       });
 
+      const responseText = await response.text();
+      console.log("Sendbox quote response status:", response.status);
+      console.log("Sendbox quote response body:", responseText);
+
       if (!response.ok) {
-        const errorText = await response.text();
         throw new Error(
-          `Sendbox API error (${response.status}): ${errorText || response.statusText}`
+          `Sendbox API error (${response.status}): ${responseText || response.statusText}`
         );
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       return this.mapSendboxRatesToCouriers(data);
     } catch (err) {
       console.error("Sendbox getShippingRates error:", err);
@@ -120,45 +120,55 @@ export class SendboxProvider implements LogisticsProvider {
 
   /**
    * Create a shipment with Sendbox.
+   * Endpoint: POST /api/v1/shipping/create
    */
   async createShipment(input: CreateShipmentInput): Promise<CreateShipmentResult> {
     if (!this.isLive) {
       return this.stubCreateShipment();
     }
 
+    if (!this.accessToken) {
+      throw new Error("SENDBOX_ACCESS_TOKEN environment variable is not set");
+    }
+
     try {
-      const response = await fetch(`${this.baseUrl}/shipping/shipments`, {
+      const payload = {
+        origin: {
+          name: input.senderName || "StreekMart Seller",
+          phone: input.senderPhone || "0800000000",
+          address: input.pickupAddress || "StreekMart Warehouse",
+        },
+        destination: {
+          name: input.recipientName,
+          phone: input.recipientPhone,
+          address: input.recipientAddress,
+        },
+        package: {
+          weight: input.weight || 1,
+          value: input.value || 0,
+        },
+      };
+
+      console.log("Sendbox create shipment payload:", payload);
+
+      const response = await fetch(`${this.baseUrl}/api/v1/shipping/create`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          external_reference: input.orderId,
-          receiver: {
-            name: input.recipientName,
-            phone: input.recipientPhone,
-            address: input.recipientAddress,
-          },
-          shipment_weight: input.weight ? Math.ceil(input.weight * 1000) : 1000,
-          shipment_description: input.description || "Fashion items",
-          special_handling: input.specialHandling,
-          dimensions:
-            input.dimensions && input.dimensions.length
-              ? {
-                  length: input.dimensions.length,
-                  width: input.dimensions.width,
-                  height: input.dimensions.height,
-                }
-              : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
+      const responseText = await response.text();
+      console.log("Sendbox create response status:", response.status);
+      console.log("Sendbox create response body:", responseText);
+
       if (!response.ok) {
-        throw new Error(`Sendbox API error: ${response.statusText}`);
+        throw new Error(`Sendbox API error: ${response.status} - ${responseText}`);
       }
 
-      const data = await response.json();
+      const data = JSON.parse(responseText);
       return this.mapSendboxShipmentToResult(data);
     } catch (err) {
       console.error("Sendbox create shipment error:", err);
@@ -174,16 +184,20 @@ export class SendboxProvider implements LogisticsProvider {
       return this.stubGetTracking();
     }
 
-    try {
-      const url = input.trackingCode
-        ? `${this.baseUrl}/shipping/shipments/track/${input.trackingCode}`
-        : `${this.baseUrl}/shipping/shipments/${input.externalId}`;
+    if (!this.accessToken) {
+      throw new Error("SENDBOX_ACCESS_TOKEN environment variable is not set");
+    }
 
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-      });
+    try {
+      const trackingId = input.trackingCode || input.externalId;
+      const response = await fetch(
+        `${this.baseUrl}/api/v1/shipping/track/${trackingId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Sendbox API error: ${response.statusText}`);
@@ -294,10 +308,10 @@ export class SendboxProvider implements LogisticsProvider {
 
   private mapSendboxShipmentToResult(data: any): CreateShipmentResult {
     return {
-      externalId: data.id,
-      trackingCode: data.tracking_code,
-      labelUrl: data.label_url,
-      receiptUrl: data.receipt_url,
+      externalId: data.tracking_id || data.id,
+      trackingCode: data.tracking_id,
+      labelUrl: data.label_url || "",
+      receiptUrl: data.receipt_url || "",
       estimatedDelivery: data.estimated_delivery
         ? new Date(data.estimated_delivery)
         : undefined,

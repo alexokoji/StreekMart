@@ -14,6 +14,10 @@ export type CreateShipmentInput = {
   };
   description?: string; // item description
   specialHandling?: string;
+  senderName?: string;
+  senderPhone?: string;
+  pickupAddress?: string;
+  value?: number; // shipment value in cents
 };
 
 export type CreateShipmentResult = {
