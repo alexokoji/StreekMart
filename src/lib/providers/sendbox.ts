@@ -72,17 +72,23 @@ export class SendboxProvider implements LogisticsProvider {
           city: input.pickupCity,
           state: input.pickupState || "",
           postal_code: input.pickupPostalCode || "",
+          country: "NG",
+          phone: "+234000000000",
         },
         destination: {
           address: input.deliveryAddress,
           city: input.deliveryCity,
           state: input.deliveryState || "",
           postal_code: input.deliveryPostalCode || "",
+          country: "NG",
+          phone: "+234000000000",
         },
         package: {
           weight: input.weight || 1,
           value: 0,
         },
+        currency: "NGN",
+        region: "NG",
       };
 
       console.log("Sendbox quote request payload:", payload);
@@ -90,7 +96,7 @@ export class SendboxProvider implements LogisticsProvider {
       const response = await fetch(`${this.baseUrl}/shipping/shipments/delivery_quote`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.accessToken}`,
+          Authorization: this.accessToken,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -137,16 +143,20 @@ export class SendboxProvider implements LogisticsProvider {
           name: input.senderName || "StreekMart Seller",
           phone: input.senderPhone || "0800000000",
           address: input.pickupAddress || "StreekMart Warehouse",
+          country: "NG",
         },
         destination: {
           name: input.recipientName,
           phone: input.recipientPhone,
           address: input.recipientAddress,
+          country: "NG",
         },
         package: {
           weight: input.weight || 1,
           value: input.value || 0,
         },
+        currency: "NGN",
+        region: "NG",
       };
 
       console.log("Sendbox create shipment payload:", payload);
@@ -154,7 +164,7 @@ export class SendboxProvider implements LogisticsProvider {
       const response = await fetch(`${this.baseUrl}/shipping/shipments`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${this.accessToken}`,
+          Authorization: this.accessToken,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -194,7 +204,7 @@ export class SendboxProvider implements LogisticsProvider {
         `${this.baseUrl}/shipping/shipments/${trackingId}`,
         {
           headers: {
-            Authorization: `Bearer ${this.accessToken}`,
+            Authorization: this.accessToken,
           },
         }
       );
