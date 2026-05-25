@@ -66,11 +66,18 @@ export class SendboxProvider implements LogisticsProvider {
     });
 
     try {
+      // Validate required fields - Sendbox requires city, state, country to be non-empty
+      if (!input.pickupCity || !input.pickupState || !input.deliveryCity || !input.deliveryState) {
+        throw new Error(
+          "Missing required location fields: city and state must be provided for both pickup and delivery"
+        );
+      }
+
       const payload = {
         origin: {
           address: input.pickupAddress,
           city: input.pickupCity,
-          state: input.pickupState || "",
+          state: input.pickupState,
           postal_code: input.pickupPostalCode || "",
           country: "NG",
           phone: "+234000000000",
@@ -78,7 +85,7 @@ export class SendboxProvider implements LogisticsProvider {
         destination: {
           address: input.deliveryAddress,
           city: input.deliveryCity,
-          state: input.deliveryState || "",
+          state: input.deliveryState,
           postal_code: input.deliveryPostalCode || "",
           country: "NG",
           phone: "+234000000000",

@@ -46,19 +46,42 @@ export async function POST(req: Request) {
       );
     }
 
+    // Ensure delivery (buyer) location has all required fields
+    const deliveryCity = parsed.data.deliveryCity || me.city;
+    const deliveryState = parsed.data.deliveryState || me.region || "";
+    const deliveryCountry = parsed.data.deliveryCountry || me.country || "NG";
+    const pickupCity = parsed.data.pickupCity;
+    const pickupState = parsed.data.pickupState || "";
+    const pickupCountry = parsed.data.pickupCountry || "NG";
+
+    // Validate that required fields are not empty (Sendbox requires these)
+    if (!deliveryCity || !deliveryState || !deliveryCountry) {
+      return NextResponse.json(
+        { error: "Delivery location is incomplete. City, state, and country are required." },
+        { status: 400 },
+      );
+    }
+
+    if (!pickupCity || !pickupState || !pickupCountry) {
+      return NextResponse.json(
+        { error: "Pickup location is incomplete. City, state, and country are required." },
+        { status: 400 },
+      );
+    }
+
     const logistics = getLogisticsService();
     const rates = await logistics.getShippingRates({
       provider: parsed.data.provider as any,
       pickupAddress: "Seller Location", // Placeholder — seller address comes from seller.location
-      pickupCity: parsed.data.pickupCity,
-      pickupState: parsed.data.pickupState,
+      pickupCity,
+      pickupState,
       pickupPostalCode: parsed.data.pickupPostalCode,
-      pickupCountry: parsed.data.pickupCountry,
-      deliveryAddress: me.city, // Placeholder
-      deliveryCity: parsed.data.deliveryCity,
-      deliveryState: parsed.data.deliveryState,
+      pickupCountry,
+      deliveryAddress: deliveryCity, // Placeholder
+      deliveryCity,
+      deliveryState,
       deliveryPostalCode: parsed.data.deliveryPostalCode,
-      deliveryCountry: parsed.data.deliveryCountry,
+      deliveryCountry,
       weight: parsed.data.weight,
       description: parsed.data.description,
     });

@@ -10,7 +10,7 @@ export function CheckoutForm({
   sellers,
   subtotal,
 }: {
-  sellers?: { id: string; city?: string | null; country?: string | null; name?: string | null; sellerVerified?: boolean }[];
+  sellers?: { id: string; city?: string | null; country?: string | null; region?: string | null; name?: string | null; sellerVerified?: boolean }[];
   subtotal?: number;
 }) {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function CheckoutForm({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("DIRECT");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [me, setMe] = useState<{city?: string; country?: string} | null>(null);
+  const [me, setMe] = useState<{city?: string; country?: string; region?: string} | null>(null);
   // Per-seller rates + selections
   const [ratesBySeller, setRatesBySeller] = useState<Record<string, any[] | null>>({});
   const [selectedBySeller, setSelectedBySeller] = useState<Record<string, string | null>>({});
@@ -150,8 +150,10 @@ export function CheckoutForm({
             body: JSON.stringify({
               provider: "SENDBOX",
               pickupCity: sellerCity,
+              pickupState: s.region || "",
               pickupCountry: s.country || "",
               deliveryCity: me.city || "",
+              deliveryState: me.region || "",
               deliveryCountry: me.country || "",
               description: "Order from UpClo",
             }),
