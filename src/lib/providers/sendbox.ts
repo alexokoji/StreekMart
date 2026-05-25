@@ -58,7 +58,7 @@ export class SendboxProvider implements LogisticsProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/shipments/rates`, {
+      const response = await fetch(`${this.baseUrl}/shipping/shipments/quote`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
@@ -120,7 +120,7 @@ export class SendboxProvider implements LogisticsProvider {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/shipments`, {
+      const response = await fetch(`${this.baseUrl}/shipping/shipments`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
@@ -169,8 +169,8 @@ export class SendboxProvider implements LogisticsProvider {
 
     try {
       const url = input.trackingCode
-        ? `${this.baseUrl}/api/shipments/track/${input.trackingCode}`
-        : `${this.baseUrl}/api/shipments/${input.externalId}`;
+        ? `${this.baseUrl}/shipping/shipments/track/${input.trackingCode}`
+        : `${this.baseUrl}/shipping/shipments/${input.externalId}`;
 
       const response = await fetch(url, {
         headers: {
