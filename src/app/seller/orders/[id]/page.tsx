@@ -121,7 +121,6 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
             orderId={order.id}
             shippingRates={order.shippingRates}
             shipment={order.shipment}
-            sellerVerified={order.seller?.sellerVerified ?? false}
           />
         </aside>
       </div>
