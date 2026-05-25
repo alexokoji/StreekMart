@@ -31,7 +31,7 @@ export class SendboxProvider implements LogisticsProvider {
   /**
    * Get shipping rate quotes from Sendbox.
    * Returns available courier options with pricing.
-   * Endpoint: POST /shipping/quote
+   * Endpoint: POST /shipping/shipments/delivery_quote
    */
   async getShippingRates(input: {
     pickupAddress: string;
@@ -61,7 +61,7 @@ export class SendboxProvider implements LogisticsProvider {
     console.log("Sendbox getShippingRates debug:", {
       tokenLength: this.accessToken?.length,
       baseUrl: this.baseUrl,
-      endpoint: `${this.baseUrl}/shipping/quote`,
+      endpoint: `${this.baseUrl}/shipping/shipments/delivery_quote`,
       isLive: this.isLive,
     });
 
@@ -87,7 +87,7 @@ export class SendboxProvider implements LogisticsProvider {
 
       console.log("Sendbox quote request payload:", payload);
 
-      const response = await fetch(`${this.baseUrl}/shipping/quote`, {
+      const response = await fetch(`${this.baseUrl}/shipping/shipments/delivery_quote`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
