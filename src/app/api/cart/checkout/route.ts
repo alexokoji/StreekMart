@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { z } from "zod";
 import { OrderStatus, ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
@@ -8,6 +7,7 @@ import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
 import { getServerCurrencyContext } from "@/lib/currencyServer";
+import { CheckoutBodySchema } from "@/lib/schemas/checkout";
 
 // POST /api/cart/checkout — converts cart items into Orders (one per
 // seller×product) under a single payment group.
@@ -23,37 +23,12 @@ import { getServerCurrencyContext } from "@/lib/currencyServer";
 //   2. Immediately call finalizePaidOrders so the dev/UX flow still ends in
 //      PAID without going through a real gateway.
 
-export const CheckoutBodySchema = z.object({
-  shippingAddress: z.string().min(5).max(500),
-  notes: z.string().max(500).optional(),
-  paymentMethod: z.enum(["DIRECT", "ON_DELIVERY"]).default("DIRECT"),
-  // Mirror of the cart page's "Delivering to" picker. The server applies
-  // the same override when quoting so the buyer is charged exactly the
-  // fee they saw on the cart summary. International is always determined
-  // by country code and ignores this override.
-  zoneOverride: z.enum(["WITHIN_CITY", "OUTSIDE_CITY"]).optional(),
-  // Optional shipping choices forwarded from the checkout form for
-  // single- or multi-seller carts. Buyers may select a courier per seller.
-  shippingChoices: z
-    .array(
-      z.object({
-        sellerId: z.string(),
-        provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
-        courierId: z.string().optional(),
-        courierName: z.string().optional(),
-        priceCents: z.number().int().nonnegative().optional(),
-        estimatedDays: z.number().int().optional(),
-      }),
-    )
-    .optional(),
-});
-
 export async function POST(req: Request) {
   const guard = await requireApiUser();
   if ("error" in guard) return guard.error;
 
   const json = await req.json().catch(() => null);
-  const parsed = Body.safeParse(json);
+  const parsed = CheckoutBodySchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
   // Pay-on-delivery is only available to admin-approved trusted buyers
