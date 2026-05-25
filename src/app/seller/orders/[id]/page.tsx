@@ -12,9 +12,8 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
   const user = await requireUser("SELLER");
   const order = await prisma.order.findUnique({
     where: { id: params.id },
-    include: {
+      include: {
       product: true,
-      seller: { select: { sellerVerified: true } },
       // Phone is shown to the seller once payment is confirmed — sellers
       // call buyers about delivery windows, missed doors, etc.
       buyer: { select: { id: true, name: true, email: true, phone: true } },

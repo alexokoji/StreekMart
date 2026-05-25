@@ -69,8 +69,44 @@ export async function POST(req: Request, context: { params: { id: string } }) {
   }
 
   try {
-    const useTrustedCourier = order.seller?.sellerVerified === true;
-    const provider = useTrustedCourier ? createJumiaProvider() : getSendboxProvider();
+    // If delivery is within seller's city the seller delivers themselves —
+    // create a local shipment record without calling external provider.
+    if (order.deliveryZone === "WITHIN_CITY") {
+      const shipment = await prisma.shipment.create({
+        data: {
+          orderId,
+          provider: "LOCAL_SELLER",
+          externalId: `LOCAL-${Date.now()}`,
+          trackingCode: "",
+          courierName: null,
+          labelUrl: null,
+          receiptUrl: null,
+          status: "PENDING",
+        },
+      });
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          logisticsProvider: "LOCAL_SELLER",
+          status: "SHIPPED",
+          updatedAt: new Date(),
+        },
+      });
+
+      await prisma.orderUpdate.create({
+        data: {
+          orderId,
+          kind: "DISPATCHED",
+          message: `Seller will deliver within city`,
+          createdById: guard.session.sub,
+        },
+      });
+
+      return NextResponse.json({ ok: true, shipment: { id: shipment.id } });
+    }
+
+    const provider = getSendboxProvider();
     const shipmentResult = await provider.createShipment({
       orderId,
       recipientName: order.buyer.name,
@@ -91,6 +127,7 @@ export async function POST(req: Request, context: { params: { id: string } }) {
         trackingCode: shipmentResult.trackingCode,
         labelUrl: shipmentResult.labelUrl,
         receiptUrl: shipmentResult.receiptUrl,
+        courierName: shipmentResult.courierName ?? null,
         status: "PENDING",
       },
     });

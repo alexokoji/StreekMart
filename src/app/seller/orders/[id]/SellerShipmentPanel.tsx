@@ -8,12 +8,10 @@ export default function SellerShipmentPanel({
   orderId,
   shippingRates,
   shipment,
-  sellerVerified,
 }: {
   orderId: string;
   shippingRates?: any[] | null;
   shipment?: any | null;
-  sellerVerified: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -49,12 +47,7 @@ export default function SellerShipmentPanel({
 
   return (
     <div className="card p-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="mb-2 text-sm font-semibold uppercase text-gray-500">Shipping</h2>
-        <span className={`rounded-full px-2 py-1 text-[11px] font-semibold uppercase ${sellerVerified ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-800"}`}>
-          {sellerVerified ? "Trusted courier allowed" : "Using Sendbox"}
-        </span>
-      </div>
+      <h2 className="mb-2 text-sm font-semibold uppercase text-gray-500">Shipping</h2>
       {shipment ? (
         <div className="space-y-2">
           <p className="text-sm">Shipment created</p>

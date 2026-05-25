@@ -10,7 +10,7 @@ export function CheckoutForm({
   sellers,
   subtotal,
 }: {
-  sellers?: { id: string; city?: string | null; country?: string | null; name?: string | null }[];
+  sellers?: { id: string; city?: string | null; country?: string | null; name?: string | null; sellerVerified?: boolean }[];
   subtotal?: number;
 }) {
   const router = useRouter();
@@ -116,6 +116,9 @@ export function CheckoutForm({
   }, []);
 
   // Fetch per-seller Sendbox rates when we have buyer location and sellers.
+  // Always use Sendbox for deliveries outside the seller's city. If the
+  // delivery is within the seller's city, the seller handles delivery
+  // themselves (no external rates shown).
   useEffect(() => {
     if (!sellers || sellers.length === 0 || !me) return;
     let mounted = true;
@@ -123,6 +126,7 @@ export function CheckoutForm({
       for (const s of sellers) {
         const sellerId = s.id;
         const sellerCity = s.city;
+
         if (!sellerCity) {
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
@@ -131,8 +135,9 @@ export function CheckoutForm({
         const isOutside =
           zoneOverride === "OUTSIDE_CITY" ||
           (me.city && normalisedCity(me.city) !== normalisedCity(sellerCity));
+
         if (!isOutside) {
-          // For within-city, platform handles delivery; no external rates.
+          // Within-city deliveries: seller handles delivery; no external rates.
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
         }
@@ -254,7 +259,13 @@ export function CheckoutForm({
                   <p className="text-sm font-medium">Seller: {s.name ?? s.id}</p>
                   {rs === undefined && <p className="text-xs text-gray-500">Not checked</p>}
                   {rs === null && <p className="text-xs text-gray-500">Loading shipping options…</p>}
-                  {Array.isArray(rs) && rs.length === 0 && <p className="text-sm text-gray-500">No external shipping options (seller/platform handles delivery)</p>}
+                  {Array.isArray(rs) && rs.length === 0 && (
+                    <p className="text-sm text-gray-500">
+                      {s.sellerVerified
+                        ? "Seller offers their own courier — delivery handled by seller."
+                        : "No external shipping options (seller/platform handles delivery)"}
+                    </p>
+                  )}
                   {Array.isArray(rs) && rs.length > 0 && (
                     <div className="mt-2 space-y-2">
                       {rs.map((r: any) => (
