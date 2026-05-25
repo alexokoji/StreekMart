@@ -57,6 +57,13 @@ export class SendboxProvider implements LogisticsProvider {
       throw new Error("SENDBOX_API_KEY environment variable is not set");
     }
 
+    console.log("Sendbox getShippingRates debug:", {
+      apiKeyLength: this.apiKey?.length,
+      baseUrl: this.baseUrl,
+      endpoint: `${this.baseUrl}/shipping/shipments/quote`,
+      isLive: this.isLive,
+    });
+
     try {
       const response = await fetch(`${this.baseUrl}/shipping/shipments/quote`, {
         method: "POST",
