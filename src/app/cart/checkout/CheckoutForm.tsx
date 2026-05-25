@@ -261,9 +261,7 @@ export function CheckoutForm({
                   {rs === null && <p className="text-xs text-gray-500">Loading shipping options…</p>}
                   {Array.isArray(rs) && rs.length === 0 && (
                     <p className="text-sm text-gray-500">
-                      {s.sellerVerified
-                        ? "Seller offers their own courier — delivery handled by seller."
-                        : "No external shipping options (seller/platform handles delivery)"}
+                      No external shipping options — seller will handle delivery.
                     </p>
                   )}
                   {Array.isArray(rs) && rs.length > 0 && (
