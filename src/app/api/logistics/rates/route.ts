@@ -75,9 +75,25 @@ export async function POST(req: Request) {
       rates: (rates && (rates as any).couriers) || [],
     });
   } catch (err) {
-    console.error("Shipping rates error:", err);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorStack = err instanceof Error ? err.stack : "";
+    
+    // Log full error for debugging
+    console.error("Shipping rates error:", {
+      message: errorMsg,
+      stack: errorStack,
+      sendboxLive: process.env.SENDBOX_LIVE,
+      sendboxApiKeySet: !!process.env.SENDBOX_API_KEY,
+      sendboxBaseUrl: process.env.SENDBOX_BASE_URL,
+    });
+
+    // Return detailed error in dev; generic in prod
+    const isProduction = process.env.NODE_ENV === "production";
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to fetch shipping rates" },
+      {
+        error: errorMsg,
+        ...(isProduction ? {} : { stack: errorStack }),
+      },
       { status: 500 },
     );
   }

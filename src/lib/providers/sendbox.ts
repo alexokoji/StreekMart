@@ -53,6 +53,10 @@ export class SendboxProvider implements LogisticsProvider {
       return this.stubGetRates();
     }
 
+    if (!this.apiKey) {
+      throw new Error("SENDBOX_API_KEY environment variable is not set");
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}/api/shipments/rates`, {
         method: "POST",
@@ -89,14 +93,21 @@ export class SendboxProvider implements LogisticsProvider {
       });
 
       if (!response.ok) {
-        throw new Error(`Sendbox API error: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(
+          `Sendbox API error (${response.status}): ${errorText || response.statusText}`
+        );
       }
 
       const data = await response.json();
       return this.mapSendboxRatesToCouriers(data);
     } catch (err) {
-      console.error("Sendbox rate quote error:", err);
-      throw new Error("Failed to fetch shipping rates from Sendbox");
+      console.error("Sendbox getShippingRates error:", err);
+      throw new Error(
+        err instanceof Error
+          ? `Sendbox rates failed: ${err.message}`
+          : "Failed to fetch shipping rates from Sendbox"
+      );
     }
   }
 
