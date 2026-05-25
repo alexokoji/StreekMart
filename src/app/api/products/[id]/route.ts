@@ -4,7 +4,7 @@ import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/en
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
-import { convertToUsd } from "@/lib/currencyServer";
+import { convertToUsd, getServerCurrencyContext } from "@/lib/currencyServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -22,7 +22,17 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     .update({ where: { id: product.id }, data: { viewCount: { increment: 1 } } })
     .catch(() => {});
 
-  return NextResponse.json({ product });
+  // Lock prices using current exchange rate
+  const currencyCtx = await getServerCurrencyContext();
+  const productWithLockedPrices = {
+    ...product,
+    displayPrice: product.price * currencyCtx.rate,
+    displaySalePrice: product.salePrice ? product.salePrice * currencyCtx.rate : null,
+    currency: currencyCtx.code,
+    exchangeRate: currencyCtx.rate,
+  };
+
+  return NextResponse.json({ product: productWithLockedPrices });
 }
 
 const UpdateBody = z.object({

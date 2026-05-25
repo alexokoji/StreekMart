@@ -5,7 +5,7 @@ import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/en
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { resolveActingOwner } from "@/lib/managersServer";
-import { convertToUsd } from "@/lib/currencyServer";
+import { convertToUsd, getServerCurrencyContext } from "@/lib/currencyServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 import { FASHION_VALIDATOR_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";
 
@@ -17,6 +17,9 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q") ?? undefined;
   const kind = url.searchParams.get("kind") ?? undefined;
 
+  // Get current currency context to lock exchange rate for all prices
+  const currencyCtx = await getServerCurrencyContext();
+
   if (mine) {
     const guard = await requireApiUser([Permission.SELLER, Permission.DESIGNER]);
     if ("error" in guard) return guard.error;
@@ -24,7 +27,15 @@ export async function GET(req: Request) {
       where: { sellerId: guard.session.sub },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json({ products });
+    // Lock prices in seller's view
+    const productsWithLockedPrices = products.map((p) => ({
+      ...p,
+      displayPrice: p.price * currencyCtx.rate,
+      displaySalePrice: p.salePrice ? p.salePrice * currencyCtx.rate : null,
+      currency: currencyCtx.code,
+      exchangeRate: currencyCtx.rate,
+    }));
+    return NextResponse.json({ products: productsWithLockedPrices });
   }
 
   const products = await prisma.product.findMany({
@@ -40,7 +51,15 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  return NextResponse.json({ products });
+  // Lock prices for all products
+  const productsWithLockedPrices = products.map((p) => ({
+    ...p,
+    displayPrice: p.price * currencyCtx.rate,
+    displaySalePrice: p.salePrice ? p.salePrice * currencyCtx.rate : null,
+    currency: currencyCtx.code,
+    exchangeRate: currencyCtx.rate,
+  }));
+  return NextResponse.json({ products: productsWithLockedPrices });
 }
 
 const CreateBody = z.object({
