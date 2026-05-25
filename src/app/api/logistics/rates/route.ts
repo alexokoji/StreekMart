@@ -63,10 +63,16 @@ export async function POST(req: Request) {
       description: parsed.data.description,
     });
 
+    // Providers may return either an array of courier options or an object
+    // with a `couriers` array. Be permissive so both shapes work.
+    if (Array.isArray(rates)) {
+      return NextResponse.json({ ok: true, provider: parsed.data.provider, rates });
+    }
+
     return NextResponse.json({
       ok: true,
       provider: parsed.data.provider,
-      rates: rates.couriers || [],
+      rates: (rates && (rates as any).couriers) || [],
     });
   } catch (err) {
     console.error("Shipping rates error:", err);
