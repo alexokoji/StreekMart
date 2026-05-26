@@ -4,6 +4,51 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { getLogisticsService } from "@/lib/services/logistics";
 
+// Map Nigerian state codes to full state names for Sendbox API
+const NIGERIAN_STATE_CODES: Record<string, string> = {
+  AB: "Abia",
+  AD: "Adamawa",
+  AK: "Akwa Ibom",
+  AN: "Anambra",
+  BA: "Bauchi",
+  BY: "Bayelsa",
+  BE: "Benue",
+  BO: "Borno",
+  CR: "Cross River",
+  DE: "Delta",
+  EB: "Ebonyi",
+  ED: "Edo",
+  EK: "Ekiti",
+  EN: "Enugu",
+  FC: "FCT",
+  GO: "Gombe",
+  IM: "Imo",
+  JI: "Jigawa",
+  KD: "Kaduna",
+  KN: "Kano",
+  KT: "Katsina",
+  KE: "Kebbi",
+  KO: "Kogi",
+  LA: "Lagos",
+  NA: "Nasarawa",
+  NI: "Niger",
+  OG: "Ogun",
+  ON: "Ondo",
+  OS: "Osun",
+  OY: "Oyo",
+  PL: "Plateau",
+  RI: "Rivers",
+  SO: "Sokoto",
+  TA: "Taraba",
+  YO: "Yobe",
+  ZA: "Zamfara",
+};
+
+function expandStateCode(code?: string | null): string {
+  if (!code) return "";
+  return NIGERIAN_STATE_CODES[code.toUpperCase()] || code;
+}
+
 const Body = z.object({
   provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
   sellerId: z.string().optional(),
@@ -77,10 +122,10 @@ export async function POST(req: Request) {
 
     // Ensure delivery (buyer) location has all required fields
     const deliveryCity = parsed.data.deliveryCity || me.city;
-    const deliveryState = parsed.data.deliveryState || me.region || "";
+    const deliveryState = expandStateCode(parsed.data.deliveryState || me.region);
     const deliveryCountry = parsed.data.deliveryCountry || me.country || "NG";
     const pickupCity = parsed.data.pickupCity;
-    const pickupState = parsed.data.pickupState || "";
+    const pickupState = expandStateCode(parsed.data.pickupState);
     const pickupCountry = parsed.data.pickupCountry || "NG";
 
     console.log("Processed location values:", {
