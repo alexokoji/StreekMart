@@ -31,7 +31,7 @@ export class SendboxProvider implements LogisticsProvider {
   /**
    * Get shipping rate quotes from Sendbox.
    * Returns available courier options with pricing.
-   * Endpoint: POST /shipping/shipments/delivery_quote
+   * Endpoint: POST /shipping/shipment_delivery_quote
    */
   async getShippingRates(input: {
     pickupAddress: string;
@@ -63,7 +63,7 @@ export class SendboxProvider implements LogisticsProvider {
     console.log("Sendbox getShippingRates debug:", {
       tokenLength: this.accessToken?.length,
       baseUrl: this.baseUrl,
-      endpoint: `${this.baseUrl}/shipping/shipments/delivery_quote`,
+      endpoint: `${this.baseUrl}/shipping/shipment_delivery_quote`,
       isLive: this.isLive,
     });
 
@@ -84,32 +84,41 @@ export class SendboxProvider implements LogisticsProvider {
 
       const payload = {
         origin: {
-          address: input.pickupAddress || "Main Business Location",
+          first_name: "Sender",
+          last_name: "User",
+          street: input.pickupAddress || input.pickupCity,
+          street_line_2: "",
           city: input.pickupCity,
           state: input.pickupState,
-          postal_code: input.pickupPostalCode || "",
           country: "NG",
+          post_code: input.pickupPostalCode || "",
           phone: cleanPhone(input.pickupPhone),
         },
         destination: {
-          address: input.deliveryAddress || "Delivery Location",
+          first_name: "Receiver",
+          last_name: "User",
+          street: input.deliveryAddress || input.deliveryCity,
+          street_line_2: "",
           city: input.deliveryCity,
           state: input.deliveryState,
-          postal_code: input.deliveryPostalCode || "",
           country: "NG",
+          post_code: input.deliveryPostalCode || "",
           phone: cleanPhone(input.deliveryPhone),
         },
-        package: {
-          weight: input.weight || 1,
-          value: 5000, // Default 5000 NGN if not specified
-        },
+        weight: input.weight || 1,
+        total_value: 5000,
         currency: "NGN",
         region: "NG",
+        service_type: "local",
+        package_type: "general",
+        service_code: "standard",
+        channel_code: "api",
+        incoming_option: "pickup",
       };
 
       console.log("Sendbox quote request payload (FINAL):", JSON.stringify(payload, null, 2));
 
-      const response = await fetch(`${this.baseUrl}/shipping/shipments/delivery_quote`, {
+      const response = await fetch(`${this.baseUrl}/shipping/shipment_delivery_quote`, {
         method: "POST",
         headers: {
           Authorization: this.accessToken,
