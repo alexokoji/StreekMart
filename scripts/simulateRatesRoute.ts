@@ -4,13 +4,18 @@ async function main() {
   const svc = getLogisticsService()
   try {
     const rates = await svc.getShippingRates({
-      provider: 'SENDBOX' as any,
-      pickupAddress: 'Seller address',
-      pickupCity: 'Lagos',
-      pickupCountry: 'NG',
-      deliveryAddress: 'Buyer address',
-      deliveryCity: 'Abuja',
-      deliveryCountry: 'NG',
+      pickupAddress: {
+        address: 'Seller address',
+        city: 'Lagos',
+        state: 'Lagos',
+        country: 'NG',
+      },
+      deliveryAddress: {
+        address: 'Buyer address',
+        city: 'Abuja',
+        state: 'Abuja',
+        country: 'NG',
+      },
       weight: 1,
     })
     console.log('Rates result:', JSON.stringify(rates, null, 2))
