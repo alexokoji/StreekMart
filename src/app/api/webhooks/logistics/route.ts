@@ -3,6 +3,15 @@ import { prisma } from "@/lib/db";
 import { getLogisticsService } from "@/lib/services/logistics";
 import { sendEmail } from "@/lib/email";
 
+type LogisticsWebhookStatus =
+  | "PENDING"
+  | "PICKED"
+  | "IN_TRANSIT"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED"
+  | "FAILED"
+  | "CANCELLED";
+
 /**
  * POST /api/webhooks/logistics
  * Unified webhook handler for both Shipbubble and Kwik Delivery status updates.
@@ -51,7 +60,7 @@ export async function POST(req: Request) {
     let etaVal: string | undefined = undefined;
 
     // Map provider status events to internal status
-    let internalStatus: "PENDING" | "PICKED" | "IN_TRANSIT" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "CANCELLED" = "PENDING";
+    let internalStatus: LogisticsWebhookStatus = "PENDING";
 
     if (provider === "SHIPBUBBLE") {
       const type = event.event_type || event.event || "";
@@ -62,7 +71,7 @@ export async function POST(req: Request) {
       locationText = event.current_location || "";
       etaVal = event.estimated_delivery;
 
-      const shipbubbleMap: Record<string, typeof internalStatus> = {
+      const shipbubbleMap: Record<string, LogisticsWebhookStatus> = {
         shipment_created: "PENDING",
         created: "PENDING",
         shipment_picked_up: "PICKED",
@@ -88,7 +97,7 @@ export async function POST(req: Request) {
       messageText = event.message || event.description || `Kwik event: ${type}`;
       locationText = event.current_location || "";
 
-      const kwikMap: Record<string, typeof internalStatus> = {
+      const kwikMap: Record<string, LogisticsWebhookStatus> = {
         task_assigned: "PENDING",
         assigned: "PENDING",
         accepted: "PENDING",
