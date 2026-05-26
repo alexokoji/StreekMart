@@ -5,8 +5,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { createJumiaProvider } from "@/lib/logisticsProviders/jumia";
-import { getSendboxProvider } from "@/lib/providers/sendbox";
+import { getLogisticsService } from "@/lib/services/logistics";
 
 const CreateShipmentBody = z.object({
   weight: z.number().positive().optional(),
@@ -33,9 +32,9 @@ export async function POST(req: Request, context: { params: { id: string } }) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
-      buyer: { select: { name: true, phone: true } },
+      buyer: { select: { name: true, phone: true, email: true, country: true, city: true, region: true } },
       product: true,
-      seller: { select: { sellerVerified: true, businessName: true } },
+      seller: { select: { id: true, name: true, phone: true, country: true, city: true, region: true, businessName: true, sellerVerified: true } },
     },
   });
 
@@ -106,28 +105,64 @@ export async function POST(req: Request, context: { params: { id: string } }) {
       return NextResponse.json({ ok: true, shipment: { id: shipment.id } });
     }
 
-    const provider = getSendboxProvider();
-    const shipmentResult = await provider.createShipment({
+    const logistics = getLogisticsService();
+    const shipmentResult = await logistics.createShipment({
       orderId,
-      recipientName: order.buyer.name,
-      recipientPhone: order.buyer.phone || "",
-      recipientAddress: order.shippingAddress,
+      pickupAddress: {
+        name: order.seller.name || order.seller.businessName || "Seller",
+        phone: order.seller.phone || "",
+        address: `${order.seller.city || ""}, ${order.seller.region || ""}`,
+        city: order.seller.city || "",
+        state: order.seller.region || "Lagos",
+        country: order.seller.country || "NG",
+      },
+      deliveryAddress: {
+        name: order.buyer.name,
+        phone: order.buyer.phone || "",
+        address: order.shippingAddress,
+        city: order.buyer.city || "",
+        state: order.buyer.region || "Lagos",
+        country: order.buyer.country || "NG",
+      },
       weight: parsed.data.weight,
       dimensions: parsed.data.dimensions,
       description: order.product.name,
-      specialHandling: parsed.data.specialHandling,
     });
 
-    // Save shipment to database
+    // Save shipment to database with all requested columns
     const shipment = await prisma.shipment.create({
       data: {
         orderId,
-        provider: provider.getName(),
+        provider: shipmentResult.finalProvider,
         externalId: shipmentResult.externalId,
         trackingCode: shipmentResult.trackingCode,
         labelUrl: shipmentResult.labelUrl,
         receiptUrl: shipmentResult.receiptUrl,
+        estimatedDeliveryAt: shipmentResult.estimatedDelivery,
+        senderName: order.seller.name || order.seller.businessName,
+        senderPhone: order.seller.phone,
+        senderAddress: order.seller.city,
+        recipientName: order.buyer.name,
+        recipientPhone: order.buyer.phone,
+        recipientAddress: order.shippingAddress,
         status: "PENDING",
+        shippingFeeCents: shipmentResult.shippingFeeCents || 0,
+
+        // New database updates columns
+        courier: shipmentResult.courierName || "Standard",
+        courier_id: shipmentResult.courierId || "",
+        tracking_number: shipmentResult.trackingCode,
+        request_token: shipmentResult.requestToken || "",
+        shipping_fee: shipmentResult.shippingFeeCents ? shipmentResult.shippingFeeCents / 100 : 0,
+        eta: shipmentResult.estimatedDelivery,
+        shipment_status: "PENDING",
+        tracking_history: JSON.stringify([
+          {
+            status: "pending",
+            lastUpdate: new Date(),
+            message: "Shipment record created in system.",
+          },
+        ]),
       },
     });
 
@@ -136,7 +171,7 @@ export async function POST(req: Request, context: { params: { id: string } }) {
       where: { id: orderId },
       data: {
         trackingCode: shipmentResult.trackingCode,
-        logisticsProvider: provider.getName(),
+        logisticsProvider: shipmentResult.finalProvider,
         status: "SHIPPED",
         updatedAt: new Date(),
       },

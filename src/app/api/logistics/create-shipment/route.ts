@@ -7,12 +7,20 @@ import { getLogisticsService } from "@/lib/services/logistics";
 
 const Body = z.object({
   orderId: z.string(),
-  provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
+  provider: z.enum(["SHIPBUBBLE", "KWIK"]).default("SHIPBUBBLE"),
+  courierId: z.string().optional(),
   courierCode: z.string().optional(),
+  weight: z.number().positive().optional(),
+  dimensions: z.object({
+    length: z.number().positive(),
+    width: z.number().positive(),
+    height: z.number().positive(),
+  }).optional(),
+  description: z.string().optional(),
 });
 
 /**
- * POST /api/logistics/create
+ * POST /api/logistics/create-shipment
  * Create a shipment with a logistics provider.
  * Only sellers can create shipments for their orders.
  */
@@ -27,13 +35,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Fetch the order with buyer details
+    // Fetch the order with buyer and seller details
     const order = await prisma.order.findUnique({
       where: { id: parsed.data.orderId },
       include: {
         product: { select: { name: true } },
-        buyer: { select: { name: true, phone: true, country: true, city: true } },
-        seller: { select: { id: true, name: true, phone: true, country: true, city: true } },
+        buyer: { select: { name: true, phone: true, country: true, city: true, region: true } },
+        seller: { select: { id: true, name: true, phone: true, country: true, city: true, region: true } },
         shipment: true,
       },
     });
@@ -71,22 +79,38 @@ export async function POST(req: Request) {
 
     const logistics = getLogisticsService();
 
-    // Create shipment with provider
+    // Create shipment with provider (features auto-fallback to Kwik if Shipbubble fails)
     const shipmentResult = await logistics.createShipment({
-      provider: parsed.data.provider as any,
+      provider: parsed.data.provider,
       orderId: order.id,
-      recipientName: order.buyer.name,
-      recipientPhone: order.buyer.phone,
-      recipientAddress: order.shippingAddress || order.buyer.city,
-      weight: 1, // Default 1kg for fashion items
-      description: `${order.product.name} (Qty: ${order.quantity})`,
+      pickupAddress: {
+        name: order.seller.name,
+        phone: order.seller.phone,
+        address: `${order.seller.city}, ${order.seller.region || ""}`,
+        city: order.seller.city,
+        state: order.seller.region || "Lagos",
+        country: order.seller.country || "NG",
+      },
+      deliveryAddress: {
+        name: order.buyer.name,
+        phone: order.buyer.phone,
+        address: order.shippingAddress || `${order.buyer.city}, ${order.buyer.region || ""}`,
+        city: order.buyer.city,
+        state: order.buyer.region || "Lagos",
+        country: order.buyer.country || "NG",
+      },
+      courierId: parsed.data.courierId,
+      courierCode: parsed.data.courierCode,
+      weight: parsed.data.weight,
+      dimensions: parsed.data.dimensions,
+      description: parsed.data.description || `${order.product.name} (Qty: ${order.quantity})`,
     });
 
-    // Save shipment to database
+    // Save shipment to database with all requested columns
     const shipment = await prisma.shipment.create({
       data: {
         orderId: order.id,
-        provider: parsed.data.provider,
+        provider: shipmentResult.finalProvider,
         externalId: shipmentResult.externalId,
         trackingCode: shipmentResult.trackingCode,
         labelUrl: shipmentResult.labelUrl,
@@ -99,6 +123,23 @@ export async function POST(req: Request) {
         recipientPhone: order.buyer.phone,
         recipientAddress: order.shippingAddress,
         status: "PENDING",
+        shippingFeeCents: shipmentResult.shippingFeeCents || 0,
+
+        // New database updates columns
+        courier: shipmentResult.courierName || parsed.data.courierCode || "Standard",
+        courier_id: shipmentResult.courierId || parsed.data.courierId || "",
+        tracking_number: shipmentResult.trackingCode,
+        request_token: shipmentResult.requestToken || "",
+        shipping_fee: shipmentResult.shippingFeeCents ? shipmentResult.shippingFeeCents / 100 : 0,
+        eta: shipmentResult.estimatedDelivery,
+        shipment_status: "PENDING",
+        tracking_history: JSON.stringify([
+          {
+            status: "pending",
+            lastUpdate: new Date(),
+            message: "Shipment record created in system.",
+          },
+        ]),
       },
     });
 
@@ -107,8 +148,18 @@ export async function POST(req: Request) {
       where: { id: order.id },
       data: {
         trackingCode: shipmentResult.trackingCode,
-        logisticsProvider: parsed.data.provider,
+        logisticsProvider: shipmentResult.finalProvider,
         status: "SHIPPED",
+      },
+    });
+
+    // Create an order update notification for the buyer
+    await prisma.orderUpdate.create({
+      data: {
+        orderId: order.id,
+        kind: "DISPATCHED",
+        message: `Your order has been booked with ${shipment.courier}. Tracking code: ${shipmentResult.trackingCode}`,
+        createdById: guard.session.sub,
       },
     });
 
@@ -116,14 +167,16 @@ export async function POST(req: Request) {
       ok: true,
       shipment: {
         id: shipment.id,
+        provider: shipment.provider,
         externalId: shipment.externalId,
         trackingCode: shipment.trackingCode,
         labelUrl: shipment.labelUrl,
         estimatedDelivery: shipment.estimatedDeliveryAt,
+        courierName: shipment.courier,
       },
     });
   } catch (err) {
-    console.error("Create shipment error:", err);
+    console.error("[Create Shipment] Error:", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to create shipment" },
       { status: 500 },

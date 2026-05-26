@@ -1,20 +1,24 @@
 import { expect, test } from 'vitest'
-
-// Basic smoke test for rates endpoint shape. We don't start the server here;
-// instead we assert our local provider helper returns an array-like shape.
 import { getLogisticsService } from '@/lib/services/logistics'
 
-test('getShippingRates returns array-like rates for Sendbox provider', async () => {
+test('getShippingRates returns array-like rates for Shipbubble provider', async () => {
   const svc = getLogisticsService()
   const rates = await svc.getShippingRates({
-    provider: 'SENDBOX',
-    pickupAddress: 'Seller address',
-    pickupCity: 'Lagos',
-    pickupCountry: 'NG',
-    deliveryAddress: 'Buyer address',
-    deliveryCity: 'Abuja',
-    deliveryCountry: 'NG',
+    pickupAddress: {
+      address: 'Seller address',
+      city: 'Lagos',
+      state: 'Lagos',
+      country: 'NG',
+    },
+    deliveryAddress: {
+      address: 'Buyer address',
+      city: 'Abuja',
+      state: 'FCT',
+      country: 'NG',
+    },
     weight: 1,
-  } as any)
+  })
   expect(Array.isArray(rates)).toBe(true)
+  expect(rates.length).toBeGreaterThan(0)
+  expect(rates[0].provider).toBe('SHIPBUBBLE')
 })

@@ -1,25 +1,34 @@
-import { LogisticsProvider } from "@/lib/logistics";
-import { getSendboxProvider } from "@/lib/providers/sendbox";
+import { LogisticsProvider } from "@/services/logistics/logistics-provider";
+import { ShipbubbleService } from "@/services/logistics/shipbubble.service";
+import { KwikService } from "@/services/logistics/kwik.service";
+import {
+  GetRatesInput,
+  NormalizedRateResponse,
+  CreateShipmentInput,
+  CreateShipmentResult,
+  TrackingUpdate,
+} from "@/services/logistics/logistics.types";
 
-type ProviderName = "SENDBOX" | "JUMIA" | "DELLYMAN" | "GIGL" | "KWIK";
+export type ProviderName = "SHIPBUBBLE" | "KWIK";
 
-/**
- * Service for managing shipping operations across multiple logistics providers.
- * Handles provider selection, rate quoting, shipment creation, and tracking.
- */
 export class LogisticsService {
   private providers: Map<ProviderName, LogisticsProvider>;
+  private primaryProviderName: ProviderName;
+  private autoFallbackEnabled: boolean;
 
   constructor() {
     this.providers = new Map();
-    this.initializeProviders();
-  }
+    this.providers.set("SHIPBUBBLE", new ShipbubbleService());
+    this.providers.set("KWIK", new KwikService());
 
-  private initializeProviders(): void {
-    this.providers.set("SENDBOX", getSendboxProvider());
-    // Future providers can be initialized here
-    // this.providers.set("JUMIA", getJumiaProvider());
-    // this.providers.set("DELLYMAN", getDellymanProvider());
+    // Resolve primary provider from environment
+    const envProvider = process.env.LOGISTICS_PROVIDER?.toUpperCase();
+    this.primaryProviderName = envProvider === "KWIK" ? "KWIK" : "SHIPBUBBLE";
+
+    // Auto fallback setting
+    this.autoFallbackEnabled =
+      process.env.AUTO_FALLBACK_TO_KWIK === "1" ||
+      process.env.AUTO_FALLBACK_TO_KWIK === "true";
   }
 
   /**
@@ -41,110 +50,105 @@ export class LogisticsService {
   }
 
   /**
-   * Get shipping rates from a specific provider.
+   * Get shipping rates.
+   * Automatically falls back to Kwik Delivery if Shipbubble fails or returns no rates.
    */
-  async getShippingRates(args: {
-    provider: ProviderName;
-    pickupAddress: string;
-    pickupCity: string;
-    pickupState?: string;
-    pickupPostalCode?: string;
-    pickupCountry: string;
-    pickupPhone?: string;
-    deliveryAddress: string;
-    deliveryCity: string;
-    deliveryState?: string;
-    deliveryPostalCode?: string;
-    deliveryCountry: string;
-    deliveryPhone?: string;
-    weight?: number;
-    width?: number;
-    height?: number;
-    length?: number;
-    description?: string;
-  }) {
-    const provider = this.getProvider(args.provider);
+  async getShippingRates(input: GetRatesInput): Promise<NormalizedRateResponse[]> {
+    const primary = this.primaryProviderName;
+    console.log(`[Logistics] Fetching rates using primary provider: ${primary}`);
 
-    if (args.provider === "SENDBOX") {
-      const sendboxProvider = provider as any;
-      return sendboxProvider.getShippingRates({
-        pickupAddress: args.pickupAddress,
-        pickupCity: args.pickupCity,
-        pickupState: args.pickupState,
-        pickupPostalCode: args.pickupPostalCode,
-        pickupCountry: args.pickupCountry,
-        pickupPhone: args.pickupPhone,
-        deliveryAddress: args.deliveryAddress,
-        deliveryCity: args.deliveryCity,
-        deliveryState: args.deliveryState,
-        deliveryPostalCode: args.deliveryPostalCode,
-        deliveryCountry: args.deliveryCountry,
-        deliveryPhone: args.deliveryPhone,
-        weight: args.weight,
-        width: args.width,
-        height: args.height,
-        length: args.length,
-        description: args.description,
-      });
+    try {
+      const provider = this.getProvider(primary);
+      const rates = await provider.getShippingRates(input);
+
+      if (rates && rates.length > 0) {
+        return rates;
+      }
+      
+      // If no rates returned, treat as fail and trigger fallback
+      throw new Error(`No rates returned by primary provider ${primary}`);
+    } catch (err) {
+      console.warn(`[Logistics] Primary provider ${primary} rates fetch failed:`, err);
+
+      if (primary === "SHIPBUBBLE" && this.autoFallbackEnabled) {
+        console.log("[Logistics] Shipbubble failed, attempting automatic fallback to Kwik Delivery");
+        try {
+          const kwikProvider = this.getProvider("KWIK");
+          return await kwikProvider.getShippingRates(input);
+        } catch (fallbackErr) {
+          console.error("[Logistics] Fallback to Kwik Delivery also failed:", fallbackErr);
+          throw new Error(`Shipping rate fetch failed: both Shipbubble and Kwik Delivery are unavailable.`);
+        }
+      }
+      throw err;
     }
-
-    throw new Error(`Provider ${args.provider} rate quoting not implemented`);
   }
 
   /**
-   * Create a shipment with a specific provider.
+   * Create a shipment with automatic fallback.
    */
-  async createShipment(args: {
-    provider: ProviderName;
-    orderId: string;
-    recipientName: string;
-    recipientPhone: string;
-    recipientAddress: string;
-    weight?: number;
-    dimensions?: { length: number; width: number; height: number };
-    description?: string;
-    specialHandling?: string;
-  }) {
-    const provider = this.getProvider(args.provider);
-    return provider.createShipment({
-      orderId: args.orderId,
-      recipientName: args.recipientName,
-      recipientPhone: args.recipientPhone,
-      recipientAddress: args.recipientAddress,
-      weight: args.weight,
-      dimensions: args.dimensions,
-      description: args.description,
-      specialHandling: args.specialHandling,
-    });
+  async createShipment(
+    args: CreateShipmentInput & { provider?: ProviderName }
+  ): Promise<CreateShipmentResult & { finalProvider: ProviderName }> {
+    const chosenProvider = args.provider || this.primaryProviderName;
+    console.log(`[Logistics] Booking shipment with provider: ${chosenProvider}`);
+
+    try {
+      const provider = this.getProvider(chosenProvider);
+      const result = await provider.createShipment(args);
+      return {
+        ...result,
+        finalProvider: chosenProvider,
+      };
+    } catch (err) {
+      console.warn(`[Logistics] Booking with provider ${chosenProvider} failed:`, err);
+
+      // Fallback to Kwik if Shipbubble was requested and auto fallback is active
+      if (chosenProvider === "SHIPBUBBLE" && this.autoFallbackEnabled) {
+        console.log("[Logistics] Shipment booking failed on Shipbubble. Falling back to Kwik Delivery...");
+        try {
+          const kwikProvider = this.getProvider("KWIK");
+          // Re-map courier parameters to suit Kwik's single bike dispatch rate
+          const kwikInput: CreateShipmentInput = {
+            ...args,
+            courierId: "kwik_bike_delivery",
+            courierCode: "bike",
+          };
+          const result = await kwikProvider.createShipment(kwikInput);
+          return {
+            ...result,
+            finalProvider: "KWIK",
+          };
+        } catch (fallbackErr) {
+          console.error("[Logistics] Fallback shipment booking on Kwik Delivery failed:", fallbackErr);
+          throw new Error("Logistics booking failed on both Shipbubble and Kwik Delivery.");
+        }
+      }
+      throw err;
+    }
   }
 
   /**
-   * Get tracking information from a specific provider.
+   * Get tracking history.
    */
   async getTracking(args: {
     provider: ProviderName;
     externalId: string;
     trackingCode?: string;
-  }) {
+  }): Promise<TrackingUpdate[]> {
     const provider = this.getProvider(args.provider);
-    return provider.getTracking({
-      externalId: args.externalId,
-      trackingCode: args.trackingCode,
-    });
+    return provider.getTracking(args.externalId, args.trackingCode);
   }
 
   /**
-   * Verify webhook signature from a provider.
+   * Verify webhook signature.
    */
   verifyWebhookSignature(
     provider: ProviderName,
     rawBody: string,
-    headerSignature: string,
+    headerSignature: string
   ): boolean {
     const p = this.getProvider(provider);
-    if (!p.verifyWebhookSignature) {
-      return false;
-    }
     return p.verifyWebhookSignature(rawBody, headerSignature);
   }
 }

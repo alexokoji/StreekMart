@@ -67,7 +67,7 @@ export function CheckoutForm({
           if (!rate) continue;
           shippingChoices.push({
             sellerId: s.id,
-            provider: "SENDBOX",
+            provider: rate.provider || "SHIPBUBBLE",
             courierId: rate.id,
             courierName: rate.name,
             priceCents: rate.price ?? null,
@@ -155,7 +155,7 @@ export function CheckoutForm({
         setRatesBySeller((prev) => ({ ...prev, [sellerId]: null }));
         try {
           const payload = {
-            provider: "SENDBOX",
+            provider: "SHIPBUBBLE",
             sellerId: s.id,
             pickupCity: sellerCity,
             pickupState: s.region || "",
@@ -273,6 +273,27 @@ export function CheckoutForm({
               const rs = ratesBySeller[s.id];
               const sel = selectedBySeller[s.id] ?? null;
               const selRate = selectedRateForSeller(s.id);
+              
+              // Find cheapest, fastest, and recommended rates in list
+              let cheapestId: string | null = null;
+              let fastestId: string | null = null;
+              let recommendedId: string | null = null;
+              
+              if (Array.isArray(rs) && rs.length > 0) {
+                let cheapest = rs[0];
+                let fastest = rs[0];
+                for (const r of rs) {
+                  if ((r.price || 0) < (cheapest.price || 0)) cheapest = r;
+                  if ((r.estimatedDays || 99) < (fastest.estimatedDays || 99)) fastest = r;
+                }
+                cheapestId = cheapest.id;
+                fastestId = fastest.id;
+                
+                const fastestRates = rs.filter(r => r.estimatedDays === fastest.estimatedDays);
+                const recommended = fastestRates.reduce((best, r) => (r.price || 0) < (best.price || 0) ? r : best, fastestRates[0]);
+                recommendedId = recommended.id;
+              }
+
               return (
                 <div key={s.id} className="p-3 border rounded-lg">
                   <p className="text-sm font-medium">Seller: {s.name ?? s.id}</p>
@@ -289,8 +310,19 @@ export function CheckoutForm({
                         <label key={r.id} className={`flex items-center gap-3 rounded-xl border p-3 ${sel === r.id ? "border-violet-500 bg-violet-50/40" : "border-ink-200"}`}>
                           <input type="radio" name={`courier_${s.id}`} value={r.id} checked={sel === r.id} onChange={() => setSelectedBySeller((p) => ({ ...p, [s.id]: r.id }))} className="mt-0.5 h-4 w-4" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium">{r.name} <span className="text-xs text-gray-500">{r.description}</span></p>
-                            <p className="text-xs text-gray-500">Estimated: {r.estimatedDays ?? "—"} days</p>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="text-sm font-medium">{r.name}</p>
+                              {r.id === cheapestId && (
+                                <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700">Cheapest</span>
+                              )}
+                              {r.id === fastestId && (
+                                <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700">Fastest</span>
+                              )}
+                              {r.id === recommendedId && (
+                                <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold text-violet-700">Recommended</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500">Estimated: {r.estimatedDays ?? "—"} days ({r.eta || ""})</p>
                           </div>
                           <div className="ml-auto font-semibold"><Price amount={((r.price ?? 0) / 100)} /></div>
                         </label>

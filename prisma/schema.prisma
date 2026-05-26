@@ -562,6 +562,16 @@ model Shipment {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // New columns requested for Shipbubble/Kwik delivery
+  courier          String?
+  courier_id       String?
+  tracking_number  String?
+  request_token    String?
+  shipping_fee     Float?
+  eta              DateTime?
+  shipment_status  String?
+  tracking_history String?
+
   @@index([orderId])
   @@index([provider])
   @@index([status])
@@ -802,4 +812,13 @@ model SiteSetting {
   value     String
   updatedAt DateTime @updatedAt
   updatedBy String?
+}
+
+// -------------------- Shipbubble Address Code Cache --------------------
+model ShipbubbleAddressCode {
+  id          String   @id @default(cuid())
+  addressKey  String   @unique
+  addressCode String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

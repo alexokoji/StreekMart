@@ -50,7 +50,7 @@ function expandStateCode(code?: string | null): string {
 }
 
 const Body = z.object({
-  provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
+  provider: z.enum(["SHIPBUBBLE", "KWIK"]).default("SHIPBUBBLE"),
   sellerId: z.string().optional(),
   pickupCity: z.string(),
   pickupState: z.string().optional(),
@@ -154,33 +154,28 @@ export async function POST(req: Request) {
 
     const logistics = getLogisticsService();
     const rates = await logistics.getShippingRates({
-      provider: parsed.data.provider as any,
-      pickupAddress: `${pickupCity}, ${pickupState}`,
-      pickupCity,
-      pickupState,
-      pickupPostalCode: parsed.data.pickupPostalCode,
-      pickupCountry,
-      pickupPhone: sellerPhone,
-      deliveryAddress: `${deliveryCity}, ${deliveryState}`,
-      deliveryCity,
-      deliveryState,
-      deliveryPostalCode: parsed.data.deliveryPostalCode,
-      deliveryCountry,
-      deliveryPhone: me.phone || "+234000000000",
+      pickupAddress: {
+        address: `${pickupCity}, ${pickupState}`,
+        city: pickupCity,
+        state: pickupState,
+        country: pickupCountry,
+        phone: sellerPhone,
+      },
+      deliveryAddress: {
+        address: `${deliveryCity}, ${deliveryState}`,
+        city: deliveryCity,
+        state: deliveryState,
+        country: deliveryCountry,
+        phone: me.phone || "+234000000000",
+      },
       weight: parsed.data.weight,
       description: parsed.data.description,
     });
 
-    // Providers may return either an array of courier options or an object
-    // with a `couriers` array. Be permissive so both shapes work.
-    if (Array.isArray(rates)) {
-      return NextResponse.json({ ok: true, provider: parsed.data.provider, rates });
-    }
-
     return NextResponse.json({
       ok: true,
       provider: parsed.data.provider,
-      rates: (rates && (rates as any).couriers) || [],
+      rates,
     });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);

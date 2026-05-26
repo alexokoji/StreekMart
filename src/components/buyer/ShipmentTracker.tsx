@@ -32,15 +32,20 @@ export function ShipmentTracker({ orderId, trackingCode }: ShipmentTrackerProps)
   ];
 
   async function fetchTracking() {
+    if (!trackingCode) {
+      setError("No tracking code available yet");
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/logistics/track?orderId=${orderId}`);
+      const response = await fetch(`/api/logistics/track/${trackingCode}`);
 
       if (!response.ok) {
         if (response.status === 404) {
-          setError("No shipment found for this order yet");
+          setError("No shipment found for this tracking code");
         } else {
           throw new Error("Failed to fetch tracking");
         }
@@ -48,8 +53,23 @@ export function ShipmentTracker({ orderId, trackingCode }: ShipmentTrackerProps)
         return;
       }
 
-      const { tracking: data } = await response.json();
-      setTracking(data);
+      const resData = await response.json();
+      if (resData.ok && resData.updates && resData.updates.length > 0) {
+        const latest = resData.updates[resData.updates.length - 1];
+        setTracking({
+          status: latest.status || resData.status?.toLowerCase() || "pending",
+          lastUpdate: latest.lastUpdate || resData.lastSyncedAt || new Date().toISOString(),
+          currentLocation: latest.currentLocation || "",
+          estimatedDelivery: latest.estimatedDelivery || resData.estimatedDelivery || "",
+          message: latest.message || "",
+        });
+      } else {
+        setTracking({
+          status: resData.status?.toLowerCase() || "pending",
+          lastUpdate: resData.lastSyncedAt || new Date().toISOString(),
+          message: "No tracking details reported yet.",
+        });
+      }
       setLastRefresh(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch tracking");
@@ -64,7 +84,7 @@ export function ShipmentTracker({ orderId, trackingCode }: ShipmentTrackerProps)
     // Refresh every 5 minutes
     const interval = setInterval(fetchTracking, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [orderId]);
+  }, [orderId, trackingCode]);
 
   if (isLoading && !tracking) {
     return (

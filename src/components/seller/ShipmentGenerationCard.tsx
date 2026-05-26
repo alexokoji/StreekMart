@@ -38,9 +38,9 @@ export function ShipmentGenerationCard({ order, onShipmentCreated }: ShipmentGen
   const [showCourierSelect, setShowCourierSelect] = useState(false);
 
   const couriers = [
-    { id: "economy", name: "Economy", description: "5 days", price: "$15" },
-    { id: "standard", name: "Standard", description: "3 days", price: "$25" },
-    { id: "express", name: "Express", description: "1 day", price: "$50" },
+    { id: "sb_stub_speedaf", name: "Economy (Speedaf)", description: "4 business days", price: "₦1,800" },
+    { id: "sb_stub_gigl", name: "Standard (GIGL)", description: "3 business days", price: "₦2,200" },
+    { id: "sb_stub_redstar", name: "Express (Red Star)", description: "2 business days", price: "₦2,800" },
   ];
 
   async function handleCreateShipment(courierId: string) {
@@ -48,13 +48,13 @@ export function ShipmentGenerationCard({ order, onShipmentCreated }: ShipmentGen
     setError(null);
 
     try {
-      const response = await fetch("/api/logistics/create", {
+      const response = await fetch("/api/logistics/create-shipment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId: order.id,
-          provider: "SENDBOX",
-          courierCode: courierId,
+          provider: "SHIPBUBBLE",
+          courierId: courierId,
         }),
       });
 

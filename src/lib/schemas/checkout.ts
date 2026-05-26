@@ -9,7 +9,7 @@ export const CheckoutBodySchema = z.object({
     .array(
       z.object({
         sellerId: z.string(),
-        provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
+        provider: z.enum(["SHIPBUBBLE", "KWIK"]).default("SHIPBUBBLE"),
         courierId: z.string().optional(),
         courierName: z.string().optional(),
         priceCents: z.number().int().nonnegative().optional(),
