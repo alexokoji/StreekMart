@@ -39,11 +39,13 @@ export class SendboxProvider implements LogisticsProvider {
     pickupState?: string;
     pickupPostalCode?: string;
     pickupCountry: string;
+    pickupPhone?: string;
     deliveryAddress: string;
     deliveryCity: string;
     deliveryState?: string;
     deliveryPostalCode?: string;
     deliveryCountry: string;
+    deliveryPhone?: string;
     weight?: number;
     width?: number;
     height?: number;
@@ -80,7 +82,7 @@ export class SendboxProvider implements LogisticsProvider {
           state: input.pickupState,
           postal_code: input.pickupPostalCode || "",
           country: "NG",
-          phone: "+234000000000",
+          phone: input.pickupPhone || "+234000000000",
         },
         destination: {
           address: input.deliveryAddress,
@@ -88,7 +90,7 @@ export class SendboxProvider implements LogisticsProvider {
           state: input.deliveryState,
           postal_code: input.deliveryPostalCode || "",
           country: "NG",
-          phone: "+234000000000",
+          phone: input.deliveryPhone || "+234000000000",
         },
         package: {
           weight: input.weight || 1,

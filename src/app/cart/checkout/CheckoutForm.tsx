@@ -149,6 +149,7 @@ export function CheckoutForm({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               provider: "SENDBOX",
+              sellerId: s.id,
               pickupCity: sellerCity,
               pickupState: s.region || "",
               pickupCountry: s.country || "",

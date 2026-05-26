@@ -6,6 +6,7 @@ import { getLogisticsService } from "@/lib/services/logistics";
 
 const Body = z.object({
   provider: z.enum(["SENDBOX", "JUMIA", "DELLYMAN"]).default("SENDBOX"),
+  sellerId: z.string().optional(),
   pickupCity: z.string(),
   pickupState: z.string().optional(),
   pickupPostalCode: z.string().optional(),
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
     const me = await prisma.user.findUnique({
       where: { id: guard.session.sub },
-      select: { country: true, city: true, region: true },
+      select: { country: true, city: true, region: true, phone: true },
     });
 
     if (!me?.country || !me.city) {
@@ -54,6 +55,18 @@ export async function POST(req: Request) {
         { error: "Your location is not set. Update it in Account settings." },
         { status: 400 },
       );
+    }
+
+    // Fetch seller phone if sellerId provided
+    let sellerPhone = "+234000000000";
+    if (parsed.data.sellerId) {
+      const seller = await prisma.user.findUnique({
+        where: { id: parsed.data.sellerId },
+        select: { phone: true },
+      });
+      if (seller?.phone) {
+        sellerPhone = seller.phone;
+      }
     }
 
     console.log("User location from DB:", {
@@ -102,11 +115,13 @@ export async function POST(req: Request) {
       pickupState,
       pickupPostalCode: parsed.data.pickupPostalCode,
       pickupCountry,
+      pickupPhone: sellerPhone,
       deliveryAddress: deliveryCity, // Placeholder
       deliveryCity,
       deliveryState,
       deliveryPostalCode: parsed.data.deliveryPostalCode,
       deliveryCountry,
+      deliveryPhone: me.phone || "+234000000000",
       weight: parsed.data.weight,
       description: parsed.data.description,
     });

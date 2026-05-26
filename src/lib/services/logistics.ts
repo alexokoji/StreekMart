@@ -50,11 +50,13 @@ export class LogisticsService {
     pickupState?: string;
     pickupPostalCode?: string;
     pickupCountry: string;
+    pickupPhone?: string;
     deliveryAddress: string;
     deliveryCity: string;
     deliveryState?: string;
     deliveryPostalCode?: string;
     deliveryCountry: string;
+    deliveryPhone?: string;
     weight?: number;
     width?: number;
     height?: number;
@@ -71,11 +73,13 @@ export class LogisticsService {
         pickupState: args.pickupState,
         pickupPostalCode: args.pickupPostalCode,
         pickupCountry: args.pickupCountry,
+        pickupPhone: args.pickupPhone,
         deliveryAddress: args.deliveryAddress,
         deliveryCity: args.deliveryCity,
         deliveryState: args.deliveryState,
         deliveryPostalCode: args.deliveryPostalCode,
         deliveryCountry: args.deliveryCountry,
+        deliveryPhone: args.deliveryPhone,
         weight: args.weight,
         width: args.width,
         height: args.height,
