@@ -335,16 +335,32 @@ export class SendboxProvider implements LogisticsProvider {
   }
 
   private mapSendboxRatesToCouriers(data: any): SendboxRateQuote {
-    const couriers = (data.couriers || []).map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      code: c.code,
-      description: c.description,
-      estimatedDays: c.estimated_days,
-      price: c.price, // Expected in cents
-    }));
+    // Sendbox returns rates in the 'rates' array
+    const couriers = (data.rates || []).map((rate: any) => {
+      // Extract estimated days from delivery window if available
+      const deliveryEta = rate.delivery_eta_string || rate.sla_description || "";
+      
+      return {
+        id: rate.key || rate.code,
+        name: rate.name,
+        code: rate.code,
+        description: `${rate.description || rate.name} - ${rate.delivery_window || deliveryEta}`,
+        estimatedDays: this.extractDays(deliveryEta),
+        price: rate.fee, // Price in NGN
+      };
+    });
 
+    console.log("Mapped couriers from Sendbox rates:", couriers);
     return { couriers };
+  }
+
+  private extractDays(text: string): number {
+    // Extract number of days from text like "3 - 5 working days" or "4-6 working days"
+    const match = text.match(/(\d+)\s*-\s*(\d+)/);
+    if (match) {
+      return Math.ceil((parseInt(match[1]) + parseInt(match[2])) / 2);
+    }
+    return 3; // Default fallback
   }
 
   private mapSendboxShipmentToResult(data: any): CreateShipmentResult {

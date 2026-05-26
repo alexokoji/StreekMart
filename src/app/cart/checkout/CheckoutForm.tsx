@@ -107,7 +107,8 @@ export function CheckoutForm({
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!mounted) return;
-        setMe(data || null);
+        // API returns { user: {...} }, extract the user object
+        setMe(data?.user || null);
       })
       .catch(() => {});
     return () => {
@@ -120,7 +121,11 @@ export function CheckoutForm({
   // delivery is within the seller's city, the seller handles delivery
   // themselves (no external rates shown).
   useEffect(() => {
-    if (!sellers || sellers.length === 0 || !me) return;
+    if (!sellers || sellers.length === 0 || !me) {
+      console.log("Skipping rates fetch:", { sellers: !!sellers, sellersLength: sellers?.length, me: !!me });
+      return;
+    }
+    console.log("Starting rates fetch with sellers:", sellers.map(s => ({ id: s.id, city: s.city })), "and me:", { city: me.city, region: me.region, country: me.country });
     let mounted = true;
     (async () => {
       for (const s of sellers) {
@@ -128,6 +133,7 @@ export function CheckoutForm({
         const sellerCity = s.city;
 
         if (!sellerCity) {
+          console.log(`Seller ${sellerId}: no city`);
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
         }
@@ -136,37 +142,47 @@ export function CheckoutForm({
           zoneOverride === "OUTSIDE_CITY" ||
           (me.city && normalisedCity(me.city) !== normalisedCity(sellerCity));
 
+        console.log(`Seller ${sellerId}: isOutside=${isOutside}`, { sellerCity, buyerCity: me.city, zoneOverride });
+
         if (!isOutside) {
           // Within-city deliveries: seller handles delivery; no external rates.
+          console.log(`Seller ${sellerId}: within-city delivery, no external rates`);
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
         }
 
+        console.log(`Seller ${sellerId}: requesting rates...`);
         setRatesBySeller((prev) => ({ ...prev, [sellerId]: null }));
         try {
+          const payload = {
+            provider: "SENDBOX",
+            sellerId: s.id,
+            pickupCity: sellerCity,
+            pickupState: s.region || "",
+            pickupCountry: s.country || "",
+            deliveryCity: me.city || "",
+            deliveryState: me.region || "",
+            deliveryCountry: me.country || "",
+            description: "Order from UpClo",
+          };
+          console.log(`Seller ${sellerId}: rates payload`, payload);
           const res = await fetch("/api/logistics/rates", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              provider: "SENDBOX",
-              sellerId: s.id,
-              pickupCity: sellerCity,
-              pickupState: s.region || "",
-              pickupCountry: s.country || "",
-              deliveryCity: me.city || "",
-              deliveryState: me.region || "",
-              deliveryCountry: me.country || "",
-              description: "Order from UpClo",
-            }),
+            body: JSON.stringify(payload),
           });
           const d = await res.json();
+          console.log(`Seller ${sellerId}: rates response`, { status: res.status, data: d });
           if (!mounted) return;
           if (d?.ok && Array.isArray(d.rates)) {
+            console.log(`Seller ${sellerId}: received ${d.rates.length} rates`);
             setRatesBySeller((prev) => ({ ...prev, [sellerId]: d.rates }));
           } else {
+            console.log(`Seller ${sellerId}: error response or no rates`, d);
             setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           }
         } catch (err) {
+          console.error(`Seller ${sellerId}: rates fetch error`, err);
           if (!mounted) return;
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
         }
