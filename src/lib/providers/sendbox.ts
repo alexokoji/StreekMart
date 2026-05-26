@@ -75,32 +75,39 @@ export class SendboxProvider implements LogisticsProvider {
         );
       }
 
+      // Clean up phone numbers - remove +234 prefix if present
+      const cleanPhone = (phone?: string) => {
+        if (!phone) return "08000000000";
+        // Remove +234 or 0 at start and use 0 prefix
+        return phone.replace(/^\+234/, "0").replace(/^0+/, "0");
+      };
+
       const payload = {
         origin: {
-          address: input.pickupAddress,
+          address: input.pickupAddress || "Main Business Location",
           city: input.pickupCity,
           state: input.pickupState,
           postal_code: input.pickupPostalCode || "",
           country: "NG",
-          phone: input.pickupPhone || "+234000000000",
+          phone: cleanPhone(input.pickupPhone),
         },
         destination: {
-          address: input.deliveryAddress,
+          address: input.deliveryAddress || "Delivery Location",
           city: input.deliveryCity,
           state: input.deliveryState,
           postal_code: input.deliveryPostalCode || "",
           country: "NG",
-          phone: input.deliveryPhone || "+234000000000",
+          phone: cleanPhone(input.deliveryPhone),
         },
         package: {
           weight: input.weight || 1,
-          value: 0,
+          value: 5000, // Default 5000 NGN if not specified
         },
         currency: "NGN",
         region: "NG",
       };
 
-      console.log("Sendbox quote request payload:", payload);
+      console.log("Sendbox quote request payload (FINAL):", JSON.stringify(payload, null, 2));
 
       const response = await fetch(`${this.baseUrl}/shipping/shipments/delivery_quote`, {
         method: "POST",
