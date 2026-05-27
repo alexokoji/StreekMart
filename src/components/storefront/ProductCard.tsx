@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Price } from "@/components/Price";
 import { WishlistToggle } from "./WishlistToggle";
+import { ProductImageSlider } from "./ProductImageSlider";
 
 export type ProductCardData = {
   id: string;
@@ -8,7 +9,11 @@ export type ProductCardData = {
   price: number;
   salePrice: number | null;
   category: string;
+  // Legacy single-image field — call sites that only need the cover image
+  // can keep passing this. New rails should also pass `images` so multi-image
+  // products get a swipeable carousel.
   image: string | null;
+  images?: string[];
   sellerName: string;
   sellerVerified: boolean;
   promoted?: boolean;
@@ -21,14 +26,30 @@ export function ProductCard({ p, saved }: { p: ProductCardData; saved: boolean }
   const onSale = p.salePrice !== null && p.salePrice < p.price;
   const discount = onSale ? Math.round(((p.price - effective) / p.price) * 100) : 0;
 
+  // Prefer the new `images` array; fall back to the legacy single `image`
+  // so call sites that haven't been updated still render correctly.
+  const galleryImages: string[] =
+    (p.images && p.images.length > 0
+      ? p.images
+      : p.image
+      ? [p.image]
+      : []);
+
   return (
     <article className="product-card group relative">
       <Link href={`/products/${p.id}`} className="block">
         <div className="relative aspect-square bg-ink-50">
-          {p.image ? (
+          {galleryImages.length > 1 ? (
+            <ProductImageSlider
+              images={galleryImages}
+              alt={p.name}
+              objectFit="cover"
+              chevronVisibility="hover"
+            />
+          ) : galleryImages[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={p.image}
+              src={galleryImages[0]}
               alt={p.name}
               className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />

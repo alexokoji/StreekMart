@@ -10,7 +10,8 @@ import {
 import { displaySellerName } from "@/lib/businessName";
 import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
-import { ProductCard, type ProductCardData } from "@/components/storefront/ProductCard";
+import { type ProductCardData } from "@/components/storefront/ProductCard";
+import { CardGrid } from "@/components/storefront/CardGrid";
 import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
 import {
@@ -130,13 +131,15 @@ export default async function HomePage({
     }));
 
   function shape(p: typeof products[number]): ProductCardData {
+    const allImages = parseJsonArray(p.imagesJson);
     return {
       id: p.id,
       name: p.name,
       price: p.price,
       salePrice: p.salePrice,
       category: p.category,
-      image: parseJsonArray(p.imagesJson)[0] ?? null,
+      image: allImages[0] ?? null,
+      images: allImages,
       sellerName: displaySellerName(p.seller),
       sellerVerified: p.seller.sellerVerified,
       promoted: p.promotions.length > 0,
@@ -314,31 +317,31 @@ export default async function HomePage({
 
       {/* Flash sales */}
       {flashSales.length > 0 && (
-        <Section title="🔥 Flash sales" subtitle="Limited-time discounts from sellers — grab before they're gone." href="/feed">
+        <Section title="🔥 Flash sales" subtitle="Limited-time discounts from sellers — grab before they're gone." href="/products/flash-sales">
           <CardGrid items={flashSales.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
 
       {/* Trending fabrics */}
       {trendingFabrics.length > 0 && (
-        <Section title="Trending fabrics" subtitle="Yardage and rolls from independent sellers." href="/feed?category=Linen">
+        <Section title="Trending fabrics" subtitle="Yardage and rolls from independent sellers." href="/products/trending-fabrics">
           <CardGrid items={trendingFabrics.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
 
       {/* Featured (ranked) */}
-      <Section title="Featured pieces" subtitle="Ranked by engagement, sales, and active promotions." href="/feed">
+      <Section title="Featured pieces" subtitle="Ranked by engagement, sales, and active promotions." href="/products/featured">
         <CardGrid items={featured.map(shape)} savedSet={savedSet} cols={4} />
       </Section>
 
       {/* New arrivals */}
-      <Section title="New arrivals" subtitle="Fresh listings, just in." href="/feed">
+      <Section title="New arrivals" subtitle="Fresh listings, just in." href="/products/new-arrivals">
         <CardGrid items={newArrivals.map(shape)} savedSet={savedSet} cols={6} />
       </Section>
 
       {/* Best sellers */}
       {bestSellers.length > 0 && bestSellers.some((p) => p.salesCount > 0) && (
-        <Section title="Best sellers" subtitle="What buyers keep coming back for." href="/feed">
+        <Section title="Best sellers" subtitle="What buyers keep coming back for." href="/products/best-sellers">
           <CardGrid items={bestSellers.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
@@ -434,26 +437,3 @@ function Section({
   );
 }
 
-function CardGrid({
-  items,
-  savedSet,
-  cols,
-}: {
-  items: ProductCardData[];
-  savedSet: Set<string>;
-  cols: 4 | 6;
-}) {
-  // Full-width layout means we want a lot more columns on ultra-wide screens.
-  // 2 → 6 (xl) for the dense rails, 2 → 5 (xl) for the feature grid.
-  const colsClass =
-    cols === 6
-      ? "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 3xl:grid-cols-7"
-      : "grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5";
-  return (
-    <div className={colsClass}>
-      {items.map((p) => (
-        <ProductCard key={p.id} p={p} saved={savedSet.has(p.id)} />
-      ))}
-    </div>
-  );
-}

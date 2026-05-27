@@ -9,6 +9,7 @@ import { isAiEnabled } from "@/lib/ai";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { OutfitPairings } from "@/components/OutfitPairings";
 import { SameCitySuggestions } from "@/components/SameCitySuggestions";
+import { ProductImageSlider } from "@/components/storefront/ProductImageSlider";
 import { perUnitLabel } from "@/lib/units";
 
 export default async function PublicProductPage({ params }: { params: { id: string } }) {
@@ -54,34 +55,38 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           inner square + object-contain combo shows the whole image inside
           that envelope without cropping or distortion. */}
       <div className="card mx-auto w-full min-w-0 max-w-[480px] overflow-hidden lg:mx-0">
-        <div className="relative aspect-square bg-gray-100">
-          {images[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={images[0]}
-              alt={product.name}
-              className="h-full w-full object-contain"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-gray-400">No image</div>
-          )}
-          {onSale && (
-            <span className="absolute left-3 top-3 rounded-md bg-red-600 px-2 py-1 text-xs font-bold text-white">
-              −{discount}%
-            </span>
-          )}
-        </div>
-        {images.slice(1).length > 0 && (
-          <div className="grid grid-cols-4 gap-2 p-2">
-            {images.slice(1).map((src, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={src}
-                alt=""
-                className="aspect-square w-full rounded bg-gray-100 object-contain"
+        {images.length > 0 ? (
+          <div className="relative">
+            <div className="relative aspect-square bg-gray-100">
+              <ProductImageSlider
+                images={images}
+                alt={product.name}
+                objectFit="contain"
+                chevronVisibility="always"
               />
-            ))}
+              {onSale && (
+                <span className="absolute left-3 top-3 z-10 rounded-md bg-red-600 px-2 py-1 text-xs font-bold text-white">
+                  −{discount}%
+                </span>
+              )}
+            </div>
+            {images.length > 1 && (
+              <div className="grid grid-cols-5 gap-2 p-2">
+                {images.map((src, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={src}
+                    alt=""
+                    className="aspect-square w-full rounded bg-gray-100 object-contain"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="relative aspect-square bg-gray-100">
+            <div className="flex h-full items-center justify-center text-gray-400">No image</div>
           </div>
         )}
       </div>
