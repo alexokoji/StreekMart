@@ -6,6 +6,20 @@ import { Price } from "@/components/Price";
 import { type PickedAddress } from "@/components/forms/GooglePlacesPicker";
 import { SavedAddressPicker } from "@/components/forms/SavedAddressPicker";
 
+// Shipbubble quotes in NGN. Rates flow through the system in NGN-kobo (NGN × 100),
+// so we format them with a dedicated Naira formatter rather than the visitor-locale
+// <Price> pipeline. Bypassing <Price> avoids the USD round-trip that was inflating
+// the displayed amount earlier.
+const NGN_FORMATTER = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+function formatShippingNgn(priceKobo: number | null | undefined): string {
+  return NGN_FORMATTER.format(((priceKobo ?? 0) / 100));
+}
+
 type PaymentMethod = "DIRECT" | "ON_DELIVERY";
 
 export function CheckoutForm({
@@ -377,7 +391,7 @@ export function CheckoutForm({
                             </div>
                             <p className="text-xs text-gray-500">Estimated: {r.estimatedDays ?? "—"} days ({r.eta || ""})</p>
                           </div>
-                          <div className="ml-auto font-semibold"><Price amount={((r.price ?? 0) / 100)} /></div>
+                          <div className="ml-auto font-semibold">{formatShippingNgn(r.price)}</div>
                         </label>
                       ))}
                     </div>
@@ -385,7 +399,7 @@ export function CheckoutForm({
                   {selRate && (
                     <div className="mt-3 flex items-center justify-between border-t pt-3">
                       <span className="text-sm">Selected delivery</span>
-                      <span className="font-semibold"><Price amount={((selRate.price ?? 0) / 100)} /></span>
+                      <span className="font-semibold">{formatShippingNgn(selRate.price)}</span>
                     </div>
                   )}
                 </div>
@@ -393,17 +407,26 @@ export function CheckoutForm({
             })}
           </div>
 
-          {subtotal != null && (
-            <div className="mt-3 flex items-center justify-between border-t pt-3">
-              <span className="font-medium">Total (incl. selected delivery)</span>
-              <span className="font-bold">
-                <Price amount={subtotal + Object.keys(selectedBySeller).reduce((acc, sid) => {
-                  const r = selectedRateForSeller(sid);
-                  return acc + ((r?.price ?? 0) / 100);
-                }, 0)} />
-              </span>
-            </div>
-          )}
+          {subtotal != null && (() => {
+            const shippingKoboTotal = Object.keys(selectedBySeller).reduce((acc, sid) => {
+              const r = selectedRateForSeller(sid);
+              return acc + (r?.price ?? 0);
+            }, 0);
+            return (
+              <div className="mt-3 space-y-1 border-t pt-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span>Items subtotal</span>
+                  <span><Price amount={subtotal} /></span>
+                </div>
+                {shippingKoboTotal > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Shipping</span>
+                    <span>{formatShippingNgn(shippingKoboTotal)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
