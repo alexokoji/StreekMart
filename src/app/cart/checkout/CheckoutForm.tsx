@@ -145,18 +145,35 @@ export function CheckoutForm({
         const sellerCity = s.city;
 
         if (!sellerCity) {
+          console.log(`[rates] seller ${sellerId}: skipping — seller has no city set`);
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
+          setErrorBySeller((prev) => ({
+            ...prev,
+            [sellerId]: "This seller hasn't set their location yet, so we can't quote shipping.",
+          }));
           continue;
         }
 
-        const isOutside =
-          zoneOverride === "OUTSIDE_CITY" ||
-          (me.city && normalisedCity(me.city) !== normalisedCity(sellerCity));
+        // Within-city short-circuit: only kicks in when we KNOW the buyer's
+        // city and it matches the seller's. With a precise picked delivery
+        // address we still defer to Shipbubble's actual courier coverage
+        // unless the city match is explicit — a missing buyer profile city
+        // used to silently land everything here.
+        const buyerCityKnown = !!me.city;
+        const sameCity =
+          buyerCityKnown && normalisedCity(me.city!) === normalisedCity(sellerCity);
+        const isOutside = zoneOverride === "OUTSIDE_CITY" || !sameCity;
 
         if (!isOutside) {
+          console.log(`[rates] seller ${sellerId}: skipping — within-city delivery (${me.city} == ${sellerCity})`);
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
         }
+        console.log(`[rates] seller ${sellerId}: fetching rates`, {
+          buyerCity: me.city,
+          sellerCity,
+          pickedAddress: shippingAddress.formattedAddress,
+        });
 
         setRatesBySeller((prev) => ({ ...prev, [sellerId]: null }));
         setErrorBySeller((prev) => ({ ...prev, [sellerId]: null }));
@@ -308,6 +325,13 @@ export function CheckoutForm({
               }
 
               const ratesError = errorBySeller[s.id];
+              const buyerCityNorm = normalisedCity(me?.city ?? "");
+              const sellerCityNorm = normalisedCity(s.city ?? "");
+              const withinCity =
+                !!s.city &&
+                !!me?.city &&
+                buyerCityNorm === sellerCityNorm &&
+                zoneOverride !== "OUTSIDE_CITY";
               return (
                 <div key={s.id} className="p-3 border rounded-lg">
                   <p className="text-sm font-medium">Seller: {s.name ?? s.id}</p>
@@ -320,9 +344,14 @@ export function CheckoutForm({
                     <p className="text-xs text-gray-500">Not checked</p>
                   )}
                   {rs === null && <p className="text-xs text-gray-500">Loading shipping options…</p>}
-                  {Array.isArray(rs) && rs.length === 0 && !ratesError && (
+                  {Array.isArray(rs) && rs.length === 0 && !ratesError && withinCity && (
                     <p className="text-sm text-gray-500">
-                      No external shipping options — seller will handle delivery.
+                      Delivery within {s.city} — handled by the seller directly. No external courier needed.
+                    </p>
+                  )}
+                  {Array.isArray(rs) && rs.length === 0 && !ratesError && !withinCity && shippingAddress?.formattedAddress && (
+                    <p className="text-sm text-gray-500">
+                      No couriers available for this route right now.
                     </p>
                   )}
                   {ratesError && (
