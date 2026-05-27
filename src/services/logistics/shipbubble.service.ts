@@ -9,6 +9,7 @@ import {
   AddressDetails,
 } from "./logistics.types";
 import { cleanPhone, getAddressKey, extractDaysFromText } from "./logistics.mapper";
+import { convertToUsd } from "@/lib/currencyServer";
 
 export class ShipbubbleService implements LogisticsProvider {
   private apiKey: string;
@@ -357,36 +358,53 @@ export class ShipbubbleService implements LogisticsProvider {
       const { couriers } = await this.fetchRatesRaw(input);
 
       // VERSION TAG so we can confirm in logs which code path is live.
-      console.log("[Shipbubble] Normalizing rates with rate_card_amount logic v2");
-      const normalized: NormalizedRateResponse[] = couriers.map((rate: any) => {
-        // Shipbubble's authoritative price field for fetch_rates is
-        // `rate_card_amount` (verified NGN against the live response).
-        // `total` / `amount` / `price` exist on some response shapes too but
-        // can carry inflated values (sub-unit denominations on some accounts);
-        // they're kept as last-resort fallbacks only.
-        const rateCard = parseFloat(rate.rate_card_amount ?? "0");
-        // `discount.discounted` is the customer's savings amount in NGN; subtract
-        // it to get the price the buyer actually pays.
-        const discount = parseFloat(rate.discount?.discounted ?? "0");
-        const fallbackTotal = parseFloat(rate.total ?? rate.total_amount ?? rate.amount ?? rate.price ?? "0");
-        const totalAmount =
-          rateCard > 0 ? Math.max(0, rateCard - (discount > 0 ? discount : 0)) : fallbackTotal;
-        const priceCents = Math.round(totalAmount * 100); // NGN -> cents
-        console.log(
-          `[Shipbubble] Normalize "${rate.courier_name}": rateCard=${rateCard} discount=${discount} fallbackTotal=${fallbackTotal} -> totalAmount=${totalAmount} priceCents=${priceCents}`,
-        );
-        return {
-          id: String(rate.courier_id || rate.id),
-          name: rate.courier_name || rate.name || "Standard Courier",
-          provider: "SHIPBUBBLE",
-          price: priceCents,
-          estimatedDays: extractDaysFromText(rate.delivery_eta || rate.eta || "3 days"),
-          eta: rate.delivery_eta || rate.eta || "3-5 business days",
-          courierCode: rate.service_code || rate.courier_code || rate.code || "",
-          trackingLevel: String(rate.tracking_level ?? "medium"),
-          isCODAvailable: !!rate.is_cod_available,
-        };
-      });
+      console.log("[Shipbubble] Normalizing rates with rate_card_amount logic v3 (USD-cents)");
+      const normalized: NormalizedRateResponse[] = await Promise.all(
+        couriers.map(async (rate: any) => {
+          // Shipbubble's authoritative price field for fetch_rates is
+          // `rate_card_amount` (verified NGN against the live response).
+          // `total` / `amount` / `price` exist on some response shapes too but
+          // can carry inflated values (sub-unit denominations on some accounts);
+          // they're kept as last-resort fallbacks only.
+          const rateCard = parseFloat(rate.rate_card_amount ?? "0");
+          // `discount.discounted` is the customer's savings amount in NGN; subtract
+          // it to get the price the buyer actually pays.
+          const discount = parseFloat(rate.discount?.discounted ?? "0");
+          const fallbackTotal = parseFloat(rate.total ?? rate.total_amount ?? rate.amount ?? rate.price ?? "0");
+          const localAmount =
+            rateCard > 0 ? Math.max(0, rateCard - (discount > 0 ? discount : 0)) : fallbackTotal;
+          const currency = String(rate.rate_card_currency ?? "NGN").toUpperCase();
+
+          // The app stores money as USD-cents and the <Price> component
+          // converts USD → visitor's locale at render time. Shipbubble quotes
+          // in NGN, so we round-trip through USD here. Falls back to a 1:1
+          // pass-through if the conversion is unavailable for this currency.
+          let usd = localAmount;
+          try {
+            usd = await convertToUsd(localAmount, currency);
+          } catch (e) {
+            console.warn(
+              `[Shipbubble] convertToUsd failed for ${currency} ${localAmount}; using raw value:`,
+              e instanceof Error ? e.message : e,
+            );
+          }
+          const priceCents = Math.round(usd * 100);
+          console.log(
+            `[Shipbubble] Normalize "${rate.courier_name}": rateCard=${rateCard} discount=${discount} ${currency}=${localAmount} USD=${usd.toFixed(2)} priceCents=${priceCents}`,
+          );
+          return {
+            id: String(rate.courier_id || rate.id),
+            name: rate.courier_name || rate.name || "Standard Courier",
+            provider: "SHIPBUBBLE",
+            price: priceCents,
+            estimatedDays: extractDaysFromText(rate.delivery_eta || rate.eta || "3 days"),
+            eta: rate.delivery_eta || rate.eta || "3-5 business days",
+            courierCode: rate.service_code || rate.courier_code || rate.code || "",
+            trackingLevel: String(rate.tracking_level ?? "medium"),
+            isCODAvailable: !!rate.is_cod_available,
+          };
+        }),
+      );
 
       // Filter out premium couriers (DHL/FedEx) by default
       const filtered = normalized.filter((rate) => {
