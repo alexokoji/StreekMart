@@ -326,14 +326,21 @@ export class ShipbubbleService implements LogisticsProvider {
     const json = await response.json();
     const couriers: any[] = json.data?.couriers || json.data?.rates || [];
     const requestToken: string = json.data?.request_token || "";
-    // One-shot diagnostic: dump the first courier object so we can see the
-    // exact price-field shape (total vs cost vs delivery_fee, NGN vs kobo).
-    // Remove after the unit mismatch is resolved.
+    // One-shot diagnostic: print every courier's price-related fields so we
+    // can verify the parsed value matches the expected NGN figure. Remove
+    // after a few healthy rates calls confirm the new mapping is correct.
     if (couriers.length > 0) {
-      console.log(
-        "[Shipbubble] First courier raw shape:",
-        JSON.stringify(couriers[0]).slice(0, 600),
-      );
+      const summary = couriers.map((c) => ({
+        name: c.courier_name,
+        rate_card_amount: c.rate_card_amount,
+        rate_card_currency: c.rate_card_currency,
+        total: c.total,
+        amount: c.amount,
+        cost: c.cost,
+        discount: c.discount,
+        insurance: c.insurance,
+      }));
+      console.log("[Shipbubble] Courier price fields:", JSON.stringify(summary));
     }
     return { couriers, requestToken };
   }
@@ -350,7 +357,18 @@ export class ShipbubbleService implements LogisticsProvider {
       const { couriers } = await this.fetchRatesRaw(input);
 
       const normalized: NormalizedRateResponse[] = couriers.map((rate: any) => {
-        const totalAmount = parseFloat(rate.total ?? rate.total_amount ?? rate.amount ?? rate.price ?? "0");
+        // Shipbubble's authoritative price field for fetch_rates is
+        // `rate_card_amount` (verified NGN against the live response).
+        // `total` / `amount` / `price` exist on some response shapes too but
+        // can carry inflated values (sub-unit denominations on some accounts);
+        // they're kept as last-resort fallbacks only.
+        const rateCard = parseFloat(rate.rate_card_amount ?? "0");
+        // `discount.discounted` is the customer's savings amount in NGN; subtract
+        // it to get the price the buyer actually pays.
+        const discount = parseFloat(rate.discount?.discounted ?? "0");
+        const fallbackTotal = parseFloat(rate.total ?? rate.total_amount ?? rate.amount ?? rate.price ?? "0");
+        const totalAmount =
+          rateCard > 0 ? Math.max(0, rateCard - (discount > 0 ? discount : 0)) : fallbackTotal;
         return {
           id: String(rate.courier_id || rate.id),
           name: rate.courier_name || rate.name || "Standard Courier",
