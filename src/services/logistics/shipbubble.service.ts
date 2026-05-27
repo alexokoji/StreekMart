@@ -195,14 +195,14 @@ export class ShipbubbleService implements LogisticsProvider {
             "Shipbubble returned no package categories. Set SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
           );
         }
+        const nameOf = (c: any): string =>
+          String(c?.category_name ?? c?.name ?? c?.label ?? c?.title ?? "").toLowerCase();
         const preferenceOrder = ["others", "general", "merchandise", "general merchandise", "clothing"];
         for (const want of preferenceOrder) {
-          const hit = list.find(
-            (c) => (c.category_name || "").toLowerCase().includes(want),
-          );
+          const hit = list.find((c) => nameOf(c).includes(want));
           if (hit) {
             console.log(
-              `[Shipbubble] Using auto-detected category_id ${hit.category_id} (${hit.category_name}). ` +
+              `[Shipbubble] Using auto-detected category_id ${hit.category_id} (${nameOf(hit) || "unnamed"}). ` +
                 `Set SHIPBUBBLE_DEFAULT_CATEGORY_ID=${hit.category_id} to skip this lookup.`,
             );
             return hit.category_id;
@@ -210,7 +210,7 @@ export class ShipbubbleService implements LogisticsProvider {
         }
         const first = list[0];
         console.log(
-          `[Shipbubble] No preferred category match; falling back to first: ${first.category_id} (${first.category_name}).`,
+          `[Shipbubble] No preferred category match; falling back to first: ${first.category_id} (${nameOf(first) || "unnamed"}).`,
         );
         return first.category_id;
       })().catch((err) => {
@@ -255,6 +255,25 @@ export class ShipbubbleService implements LogisticsProvider {
 
     if (!response.ok) {
       const text = await response.text();
+      // Shipbubble returns 400 + {status:"failed", message:"No courier available..."}
+      // for routes outside its courier network. That's a legitimate "no rates"
+      // response, not an integration failure — surface as an empty list so the
+      // UI shows the friendly "no couriers for this route" message rather than
+      // an error banner. createShipment still throws on it because you can't
+      // book what wasn't quoted.
+      if (response.status === 400) {
+        let parsed: { status?: string; message?: string } | null = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch {
+          parsed = null;
+        }
+        const msg = (parsed?.message ?? "").toLowerCase();
+        if (parsed?.status === "failed" && msg.includes("no courier")) {
+          console.log(`[Shipbubble] No couriers available for this route: ${parsed?.message}`);
+          return { couriers: [], requestToken: "" };
+        }
+      }
       throw new Error(`Rates request failed: ${response.status} - ${text}`);
     }
 
