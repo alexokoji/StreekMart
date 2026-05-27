@@ -38,7 +38,15 @@ export class ShipbubbleService implements LogisticsProvider {
       throw new Error(`Categories request failed: ${response.status} - ${text}`);
     }
     const json = await response.json();
-    const list = json?.data ?? [];
+    // Tolerate the two shapes Shipbubble has been observed to return: a plain
+    // array at `data`, or an object with a `categories` key inside `data`.
+    const list =
+      (Array.isArray(json?.data) && json.data) ||
+      (Array.isArray(json?.data?.categories) && json.data.categories) ||
+      [];
+    if (!Array.isArray(list) || list.length === 0) {
+      console.warn("[Shipbubble] Categories endpoint returned no data. Raw response:", JSON.stringify(json));
+    }
     return Array.isArray(list) ? list : [];
   }
 
@@ -187,30 +195,52 @@ export class ShipbubbleService implements LogisticsProvider {
     const fromEnv = raw ? parseInt(raw, 10) : NaN;
     if (Number.isFinite(fromEnv)) return fromEnv;
 
+    // Manual cache-bust: set SHIPBUBBLE_CATEGORY_REFRESH=1 to force a fresh
+    // fetch in long-lived processes (warm Vercel lambda, dev server) without
+    // restarting. Useful right after connecting new couriers in the Shipbubble
+    // dashboard — categories provisioning can lag a few minutes.
+    if (process.env.SHIPBUBBLE_CATEGORY_REFRESH === "1") {
+      this.categoryIdPromise = null;
+    }
+
     if (!this.categoryIdPromise) {
       this.categoryIdPromise = (async () => {
         const list = await this.fetchCategories();
         if (list.length === 0) {
           throw new Error(
-            "Shipbubble returned no package categories. Set SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
+            "Shipbubble returned no package categories. This usually means no couriers are connected to your Shipbubble account yet — connect at least one in app.shipbubble.com, then retry. Or pin SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
           );
         }
         const nameOf = (c: any): string =>
-          String(c?.category_name ?? c?.name ?? c?.label ?? c?.title ?? "").toLowerCase();
+          String(c?.category_name ?? c?.name ?? c?.label ?? c?.title ?? "").trim();
+        // Only consider entries with a real human-readable name — Shipbubble's
+        // pre-courier stub list returns numeric-id-only objects (e.g. 98190590)
+        // that fetch_rates rejects downstream. Refusing them up-front keeps the
+        // failure tight and actionable.
+        const named = list.filter((c) => nameOf(c).length > 0);
+        if (named.length === 0) {
+          console.warn(
+            "[Shipbubble] Categories endpoint returned only unnamed entries:",
+            JSON.stringify(list).slice(0, 500),
+          );
+          throw new Error(
+            "Shipbubble returned categories without names — your couriers haven't fully provisioned yet. Wait a few minutes after connecting them in app.shipbubble.com, or pin SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
+          );
+        }
         const preferenceOrder = ["others", "general", "merchandise", "general merchandise", "clothing"];
         for (const want of preferenceOrder) {
-          const hit = list.find((c) => nameOf(c).includes(want));
+          const hit = named.find((c) => nameOf(c).toLowerCase().includes(want));
           if (hit) {
             console.log(
-              `[Shipbubble] Using auto-detected category_id ${hit.category_id} (${nameOf(hit) || "unnamed"}). ` +
+              `[Shipbubble] Using auto-detected category_id ${hit.category_id} (${nameOf(hit)}). ` +
                 `Set SHIPBUBBLE_DEFAULT_CATEGORY_ID=${hit.category_id} to skip this lookup.`,
             );
             return hit.category_id;
           }
         }
-        const first = list[0];
+        const first = named[0];
         console.log(
-          `[Shipbubble] No preferred category match; falling back to first: ${first.category_id} (${nameOf(first) || "unnamed"}).`,
+          `[Shipbubble] No preferred category match; falling back to first named: ${first.category_id} (${nameOf(first)}).`,
         );
         return first.category_id;
       })().catch((err) => {
