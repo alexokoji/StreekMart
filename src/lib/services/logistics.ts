@@ -51,7 +51,12 @@ export class LogisticsService {
 
   /**
    * Get shipping rates.
-   * Automatically falls back to Kwik Delivery if Shipbubble fails or returns no rates.
+   *
+   * Falls back to Kwik Delivery only when the primary provider actually throws
+   * (network/auth/integration failure). An empty list is a legitimate "this
+   * route isn't covered" answer and is returned as-is — Kwik only does Lagos
+   * bike delivery, so falling back to it for a non-Lagos lane just produces a
+   * second 'no coverage' answer, not a useful one.
    */
   async getShippingRates(input: GetRatesInput): Promise<NormalizedRateResponse[]> {
     const primary = this.primaryProviderName;
@@ -59,14 +64,7 @@ export class LogisticsService {
 
     try {
       const provider = this.getProvider(primary);
-      const rates = await provider.getShippingRates(input);
-
-      if (rates && rates.length > 0) {
-        return rates;
-      }
-      
-      // If no rates returned, treat as fail and trigger fallback
-      throw new Error(`No rates returned by primary provider ${primary}`);
+      return (await provider.getShippingRates(input)) ?? [];
     } catch (err) {
       console.warn(`[Logistics] Primary provider ${primary} rates fetch failed:`, err);
 
