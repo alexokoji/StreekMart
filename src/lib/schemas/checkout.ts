@@ -2,6 +2,12 @@ import { z } from "zod";
 
 export const CheckoutBodySchema = z.object({
   shippingAddress: z.string().min(5).max(500),
+  // Structured fields from the Google Places picker. Optional so legacy
+  // free-text submissions still validate.
+  shippingFormattedAddress: z.string().max(500).optional(),
+  shippingLatitude: z.number().min(-90).max(90).optional(),
+  shippingLongitude: z.number().min(-180).max(180).optional(),
+  shippingPlaceId: z.string().max(255).optional(),
   notes: z.string().max(500).optional(),
   paymentMethod: z.enum(["DIRECT", "ON_DELIVERY"]).default("DIRECT"),
   zoneOverride: z.enum(["WITHIN_CITY", "OUTSIDE_CITY"]).optional(),

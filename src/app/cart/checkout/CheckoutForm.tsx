@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Price } from "@/components/Price";
+import { type PickedAddress } from "@/components/forms/GooglePlacesPicker";
+import { SavedAddressPicker } from "@/components/forms/SavedAddressPicker";
 
 type PaymentMethod = "DIRECT" | "ON_DELIVERY";
 
@@ -24,7 +26,7 @@ export function CheckoutForm({
       : searchParams?.get("zone") === "outside"
         ? "OUTSIDE_CITY"
         : undefined;
-  const [shippingAddress, setShippingAddress] = useState("");
+  const [shippingAddress, setShippingAddress] = useState<PickedAddress | null>(null);
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("DIRECT");
   const [err, setErr] = useState<string | null>(null);
@@ -48,10 +50,18 @@ export function CheckoutForm({
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    if (!shippingAddress?.formattedAddress) {
+      setErr("Please pick a shipping address from the map.");
+      return;
+    }
     setBusy(true);
     try {
       const body: any = {
-        shippingAddress,
+        shippingAddress: shippingAddress.formattedAddress,
+        shippingFormattedAddress: shippingAddress.formattedAddress,
+        shippingLatitude: shippingAddress.latitude || undefined,
+        shippingLongitude: shippingAddress.longitude || undefined,
+        shippingPlaceId: shippingAddress.placeId || undefined,
         notes: notes || undefined,
         paymentMethod,
         zoneOverride,
@@ -154,7 +164,7 @@ export function CheckoutForm({
         console.log(`Seller ${sellerId}: requesting rates...`);
         setRatesBySeller((prev) => ({ ...prev, [sellerId]: null }));
         try {
-          const payload = {
+          const payload: Record<string, unknown> = {
             provider: "SHIPBUBBLE",
             sellerId: s.id,
             pickupCity: sellerCity,
@@ -165,6 +175,12 @@ export function CheckoutForm({
             deliveryCountry: me.country || "",
             description: "Order from UpClo",
           };
+          if (shippingAddress?.formattedAddress) {
+            payload.deliveryFormattedAddress = shippingAddress.formattedAddress;
+            payload.deliveryPlaceId = shippingAddress.placeId || undefined;
+            payload.deliveryLatitude = shippingAddress.latitude || undefined;
+            payload.deliveryLongitude = shippingAddress.longitude || undefined;
+          }
           console.log(`Seller ${sellerId}: rates payload`, payload);
           const res = await fetch("/api/logistics/rates", {
             method: "POST",
@@ -191,19 +207,18 @@ export function CheckoutForm({
     return () => {
       mounted = false;
     };
-  }, [sellers, me, zoneOverride]);
+  }, [sellers, me, zoneOverride, shippingAddress?.placeId]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <label className="label">Shipping address</label>
-        <textarea
-          className="input min-h-[100px]"
-          required
-          minLength={5}
-          placeholder="Street, city, postal code, country"
+        <SavedAddressPicker
+          kind="DELIVERY"
           value={shippingAddress}
-          onChange={(e) => setShippingAddress(e.target.value)}
+          onChange={(picked) => setShippingAddress(picked)}
+          countryRestriction={(me?.country || "NG").toLowerCase()}
+          required
         />
       </div>
       <div>

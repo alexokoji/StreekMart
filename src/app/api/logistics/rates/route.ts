@@ -60,6 +60,13 @@ const Body = z.object({
   deliveryState: z.string().optional(),
   deliveryPostalCode: z.string().optional(),
   deliveryCountry: z.string(),
+  // Optional structured delivery address from the Google Places picker. When
+  // present we forward it verbatim to Shipbubble — its validator expects
+  // exactly this Google-formatted string.
+  deliveryFormattedAddress: z.string().max(500).optional(),
+  deliveryPlaceId: z.string().max(255).optional(),
+  deliveryLatitude: z.number().min(-90).max(90).optional(),
+  deliveryLongitude: z.number().min(-180).max(180).optional(),
   weight: z.number().positive().optional(),
   description: z.string().optional(),
 });
@@ -102,15 +109,39 @@ export async function POST(req: Request) {
       );
     }
 
-    // Fetch seller phone if sellerId provided
+    // Fetch seller phone + default pickup address if sellerId provided. The
+    // pickup address (when set in seller settings) is a Google-validated street
+    // address — using its formattedAddress is what gets Shipbubble to accept
+    // the pickup leg.
     let sellerPhone = "+234000000000";
+    let sellerPickup: {
+      formattedAddress: string;
+      placeId?: string;
+      latitude?: number;
+      longitude?: number;
+      phone?: string;
+    } | null = null;
     if (parsed.data.sellerId) {
       const seller = await prisma.user.findUnique({
         where: { id: parsed.data.sellerId },
-        select: { phone: true },
+        select: {
+          phone: true,
+          addresses: {
+            where: { kind: "PICKUP", isDefault: true },
+            take: 1,
+          },
+        },
       });
-      if (seller?.phone) {
-        sellerPhone = seller.phone;
+      if (seller?.phone) sellerPhone = seller.phone;
+      const pickup = seller?.addresses?.[0];
+      if (pickup) {
+        sellerPickup = {
+          formattedAddress: pickup.formattedAddress,
+          placeId: pickup.placeId ?? undefined,
+          latitude: pickup.latitude ?? undefined,
+          longitude: pickup.longitude ?? undefined,
+          phone: pickup.phone ?? undefined,
+        };
       }
     }
 
@@ -155,18 +186,27 @@ export async function POST(req: Request) {
     const logistics = getLogisticsService();
     const rates = await logistics.getShippingRates({
       pickupAddress: {
-        address: `${pickupCity}, ${pickupState}`,
+        address: sellerPickup?.formattedAddress || `${pickupCity}, ${pickupState}`,
         city: pickupCity,
         state: pickupState,
         country: pickupCountry,
-        phone: sellerPhone,
+        phone: sellerPickup?.phone || sellerPhone,
+        formattedAddress: sellerPickup?.formattedAddress,
+        placeId: sellerPickup?.placeId,
+        latitude: sellerPickup?.latitude,
+        longitude: sellerPickup?.longitude,
       },
       deliveryAddress: {
-        address: `${deliveryCity}, ${deliveryState}`,
+        address:
+          parsed.data.deliveryFormattedAddress || `${deliveryCity}, ${deliveryState}`,
         city: deliveryCity,
         state: deliveryState,
         country: deliveryCountry,
         phone: me.phone || "+234000000000",
+        formattedAddress: parsed.data.deliveryFormattedAddress,
+        placeId: parsed.data.deliveryPlaceId,
+        latitude: parsed.data.deliveryLatitude,
+        longitude: parsed.data.deliveryLongitude,
       },
       weight: parsed.data.weight,
       description: parsed.data.description,
@@ -185,9 +225,11 @@ export async function POST(req: Request) {
     console.error("Shipping rates error:", {
       message: errorMsg,
       stack: errorStack,
-      sendboxLive: process.env.SENDBOX_LIVE,
-      sendboxApiKeySet: !!process.env.SENDBOX_API_KEY,
-      sendboxBaseUrl: process.env.SENDBOX_BASE_URL,
+      provider: parsed.data.provider,
+      shipbubbleEnabled: process.env.SHIPBUBBLE_ENABLED,
+      shipbubbleApiKeySet: !!process.env.SHIPBUBBLE_API_KEY,
+      shipbubbleBaseUrl: process.env.SHIPBUBBLE_BASE_URL,
+      shipbubbleCategoryIdSet: !!process.env.SHIPBUBBLE_DEFAULT_CATEGORY_ID,
     });
 
     // Return detailed error in dev; generic in prod

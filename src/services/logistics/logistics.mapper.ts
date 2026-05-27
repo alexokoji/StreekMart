@@ -20,8 +20,24 @@ export function cleanPhone(phone?: string): string {
 
 /**
  * Generate a consistent address key for database caching.
+ *
+ * When a Google Place ID is present we key the cache by placeId + contact
+ * (name/phone/email) because Shipbubble bakes the contact into the validated
+ * address record. Falling back to address fields preserves cache hits for
+ * legacy free-text addresses.
  */
 export function getAddressKey(addr: AddressDetails): string {
+  if (addr.placeId) {
+    return [
+      "placeId",
+      addr.placeId,
+      addr.name || "",
+      addr.phone ? cleanPhone(addr.phone) : "",
+      addr.email || "",
+    ]
+      .map((str) => str.trim().toLowerCase())
+      .join("|");
+  }
   return [
     addr.name || "",
     addr.phone ? cleanPhone(addr.phone) : "",

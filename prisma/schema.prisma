@@ -115,6 +115,42 @@ model User {
   verificationRequests VerificationRequest[]
   payoutRequests PayoutRequest[]
   businessNameChangeRequests BusinessNameChangeRequest[]
+  addresses     Address[]
+}
+
+// Saved addresses (address book).
+//
+// One record per place the user wants to reuse — DELIVERY for buyers shipping
+// to a recurring location, PICKUP for sellers' warehouse/store. A user can
+// have many of each. The `isDefault` flag is enforced as "at most one default
+// per (userId, kind)" by application code (no Prisma partial-unique support
+// on SQLite — see /api/account/addresses for the transactional guard).
+model Address {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "DELIVERY" | "PICKUP" — same model serves buyer and seller use cases.
+  kind              String
+  // Optional human label like "Home", "Office", "Aba warehouse".
+  label             String?
+  // Contact for couriers (defaults to User.phone if blank).
+  phone             String?
+  // Verified Google-formatted address string. This is what Shipbubble's
+  // /shipping/address/validate accepts as-is.
+  formattedAddress  String
+  placeId           String?
+  latitude          Float?
+  longitude         Float?
+  // Coarse fields kept for zone/locality queries (within-city checks etc.).
+  city              String?
+  region            String?
+  country           String?
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId, kind])
+  @@index([userId, kind, isDefault])
 }
 
 // Business-name change queue. A user submits one of these to ask the admin
@@ -471,6 +507,13 @@ model Order {
   // PENDING | PAID | SHIPPED | COMPLETED | CANCELLED
   status          String   @default("PENDING")
   shippingAddress String?
+  // Structured shipping address fields, populated when buyer picks an address via
+  // the Google Places picker at checkout. shippingAddress mirrors formattedAddress
+  // for backwards compatibility with code that reads the legacy column.
+  shippingFormattedAddress String?
+  shippingLatitude         Float?
+  shippingLongitude        Float?
+  shippingPlaceId          String?
   notes           String?
   // "DIRECT" (pay upfront via Monnify) | "ON_DELIVERY" (pay cash on arrival).
   // ON_DELIVERY is gated on User.trustedBuyer — see /api/cart/checkout.

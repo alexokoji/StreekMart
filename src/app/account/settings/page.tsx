@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { ProfileSettingsForm } from "@/components/forms/ProfileSettingsForm";
+import { AddressBookManager } from "@/components/forms/AddressBookManager";
 import { LogoutButton } from "@/components/layout/LogoutButton";
 
 export default async function BuyerAccountSettingsPage() {
@@ -51,6 +52,21 @@ export default async function BuyerAccountSettingsPage() {
                 }
               : null,
           }}
+        />
+      </div>
+
+      <div className="card p-6">
+        <div className="mb-3">
+          <h2 className="text-base font-semibold">Saved delivery addresses</h2>
+          <p className="text-xs text-ink-500">
+            Picked once at checkout, reused on every order. Set a default to skip
+            address entry next time.
+          </p>
+        </div>
+        <AddressBookManager
+          kind="DELIVERY"
+          countryRestriction={(user.country || "NG").toLowerCase()}
+          emptyHint="You haven't saved any delivery addresses yet. Add one to speed up checkout."
         />
       </div>
 

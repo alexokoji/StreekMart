@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { Permission } from "@/lib/enums";
 import { requireUser } from "@/lib/auth";
 import { ProfileSettingsForm } from "@/components/forms/ProfileSettingsForm";
+import { AddressBookManager } from "@/components/forms/AddressBookManager";
 import { DeliveryFeesView } from "@/components/dashboard/DeliveryFeesView";
 import { ShareButton } from "@/components/ShareButton";
 
@@ -59,6 +60,22 @@ export default async function SellerSettingsPage() {
                 }
               : null,
           }}
+        />
+      </div>
+
+      <div className="card p-6">
+        <div className="mb-3">
+          <h2 className="font-display text-lg font-semibold">Pickup locations</h2>
+          <p className="text-sm text-ink-600">
+            The street address couriers will pick from. We use the default one when
+            booking Shipbubble shipments — pick one Google can resolve or the booking
+            will be rejected.
+          </p>
+        </div>
+        <AddressBookManager
+          kind="PICKUP"
+          countryRestriction={(user.country || "NG").toLowerCase()}
+          emptyHint="No pickup location set. Add one so couriers know where to collect orders."
         />
       </div>
 

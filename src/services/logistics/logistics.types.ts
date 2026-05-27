@@ -7,6 +7,13 @@ export interface AddressDetails {
   state: string;
   country: string;
   postalCode?: string;
+  // Optional structured fields produced by the Google Places picker. When
+  // present we prefer formattedAddress for Shipbubble validation and use
+  // placeId as the stable cache key for the resolved address_code.
+  formattedAddress?: string;
+  placeId?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface GetRatesInput {

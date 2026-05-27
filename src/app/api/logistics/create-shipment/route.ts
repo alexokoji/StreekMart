@@ -35,13 +35,28 @@ export async function POST(req: Request) {
   }
 
   try {
-    // Fetch the order with buyer and seller details
+    // Fetch the order with buyer and seller details. Pull the seller's default
+    // PICKUP address (Google-validated) so the Shipbubble pickup leg uses a
+    // formatted string the validator accepts.
     const order = await prisma.order.findUnique({
       where: { id: parsed.data.orderId },
       include: {
         product: { select: { name: true } },
         buyer: { select: { name: true, phone: true, country: true, city: true, region: true } },
-        seller: { select: { id: true, name: true, phone: true, country: true, city: true, region: true } },
+        seller: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            country: true,
+            city: true,
+            region: true,
+            addresses: {
+              where: { kind: "PICKUP", isDefault: true },
+              take: 1,
+            },
+          },
+        },
         shipment: true,
       },
     });
@@ -78,6 +93,8 @@ export async function POST(req: Request) {
     }
 
     const logistics = getLogisticsService();
+    const sellerPickup = order.seller.addresses?.[0];
+    const buyerFormatted = order.shippingFormattedAddress;
 
     // Create shipment with provider (features auto-fallback to Kwik if Shipbubble fails)
     const shipmentResult = await logistics.createShipment({
@@ -85,19 +102,32 @@ export async function POST(req: Request) {
       orderId: order.id,
       pickupAddress: {
         name: order.seller.name,
-        phone: order.seller.phone,
-        address: `${order.seller.city}, ${order.seller.region || ""}`,
+        phone: sellerPickup?.phone || order.seller.phone,
+        address:
+          sellerPickup?.formattedAddress ||
+          `${order.seller.city}, ${order.seller.region || ""}`,
         city: order.seller.city,
         state: order.seller.region || "Lagos",
         country: order.seller.country || "NG",
+        formattedAddress: sellerPickup?.formattedAddress,
+        placeId: sellerPickup?.placeId ?? undefined,
+        latitude: sellerPickup?.latitude ?? undefined,
+        longitude: sellerPickup?.longitude ?? undefined,
       },
       deliveryAddress: {
         name: order.buyer.name,
         phone: order.buyer.phone,
-        address: order.shippingAddress || `${order.buyer.city}, ${order.buyer.region || ""}`,
+        address:
+          buyerFormatted ||
+          order.shippingAddress ||
+          `${order.buyer.city}, ${order.buyer.region || ""}`,
         city: order.buyer.city,
         state: order.buyer.region || "Lagos",
         country: order.buyer.country || "NG",
+        formattedAddress: buyerFormatted ?? undefined,
+        placeId: order.shippingPlaceId ?? undefined,
+        latitude: order.shippingLatitude ?? undefined,
+        longitude: order.shippingLongitude ?? undefined,
       },
       courierId: parsed.data.courierId,
       courierCode: parsed.data.courierCode,
