@@ -56,6 +56,9 @@ export default async function HomePage({
             businessName: true,
             exposureScore: true,
             sellerVerified: true,
+            sellerTier: true,
+            sellerRatingAvg: true,
+            sellerRatingCount: true,
           },
         },
         // Only APPROVED, currently-running promotions feed into rank-boost.
@@ -132,6 +135,8 @@ export default async function HomePage({
 
   function shape(p: typeof products[number]): ProductCardData {
     const allImages = parseJsonArray(p.imagesJson);
+    const sellerTier = (p.seller as { sellerTier?: number | null }).sellerTier
+      ?? (p.seller.sellerVerified ? 2 : 1);
     return {
       id: p.id,
       name: p.name,
@@ -141,7 +146,7 @@ export default async function HomePage({
       image: allImages[0] ?? null,
       images: allImages,
       sellerName: displaySellerName(p.seller),
-      sellerVerified: p.seller.sellerVerified,
+      sellerTier,
       promoted: p.promotions.length > 0,
       rating: p.ratingAvg,
       ratingCount: p.ratingCount,
@@ -159,6 +164,9 @@ export default async function HomePage({
           salesCount: b.salesCount,
           ownerExposureScore: b.seller.exposureScore,
           promotionBoost: b.promotions[0]?.boost ?? 1,
+          verified: (b.seller.sellerTier ?? 0) >= 2,
+          sellerRatingAvg: b.seller.sellerRatingAvg,
+          sellerRatingCount: b.seller.sellerRatingCount,
         }) -
         rankScore({
           createdAt: a.createdAt,
@@ -168,6 +176,9 @@ export default async function HomePage({
           salesCount: a.salesCount,
           ownerExposureScore: a.seller.exposureScore,
           promotionBoost: a.promotions[0]?.boost ?? 1,
+          verified: (a.seller.sellerTier ?? 0) >= 2,
+          sellerRatingAvg: a.seller.sellerRatingAvg,
+          sellerRatingCount: a.seller.sellerRatingCount,
         }),
     );
 

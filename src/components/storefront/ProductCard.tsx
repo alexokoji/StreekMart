@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Price } from "@/components/Price";
 import { WishlistToggle } from "./WishlistToggle";
 import { ProductImageSlider } from "./ProductImageSlider";
+import { TierBadge } from "@/components/TierBadge";
 
 export type ProductCardData = {
   id: string;
@@ -15,7 +16,9 @@ export type ProductCardData = {
   image: string | null;
   images?: string[];
   sellerName: string;
-  sellerVerified: boolean;
+  // Tier: 1 = unverified, 2 = blue check, 3 = gold check. Replaces the
+  // older boolean `sellerVerified` (still derivable as tier >= 2).
+  sellerTier: number;
   promoted?: boolean;
   rating?: number;
   ratingCount?: number;
@@ -90,7 +93,7 @@ export function ProductCard({ p, saved }: { p: ProductCardData; saved: boolean }
         </div>
         <p className="mt-0.5 line-clamp-1 text-xs text-ink-500">
           {p.sellerName}
-          {p.sellerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
+          <TierBadge tier={p.sellerTier} className="ml-1" />
         </p>
       </div>
     </article>

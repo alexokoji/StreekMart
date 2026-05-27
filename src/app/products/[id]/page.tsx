@@ -10,6 +10,7 @@ import { AddToCartButton } from "@/components/AddToCartButton";
 import { OutfitPairings } from "@/components/OutfitPairings";
 import { SameCitySuggestions } from "@/components/SameCitySuggestions";
 import { ProductImageSlider } from "@/components/storefront/ProductImageSlider";
+import { TierBadge } from "@/components/TierBadge";
 import { perUnitLabel } from "@/lib/units";
 
 export default async function PublicProductPage({ params }: { params: { id: string } }) {
@@ -23,6 +24,8 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           bio: true, avatarUrl: true,
           isSeller: true, isDesigner: true,
           sellerVerified: true, designerVerified: true,
+          sellerTier: true, designerTier: true,
+          sellerRatingAvg: true, sellerRatingCount: true,
           exposureScore: true,
           country: true, city: true,
         },
@@ -102,9 +105,11 @@ export default async function PublicProductPage({ params }: { params: { id: stri
           <Link href={`/u/${product.seller.slug ?? product.seller.id}`} className="break-words font-medium text-brand-700 hover:underline">
             {displaySellerName(product.seller)}
           </Link>
-          {product.seller.sellerVerified && (
-            <span title="Verified by StreekMart" className="ml-1 inline-flex h-4 w-4 -translate-y-0.5 items-center justify-center rounded-full bg-emerald-accent text-[9px] font-bold text-white">✓</span>
-          )}
+          <TierBadge
+            tier={(product.seller as { sellerTier?: number | null }).sellerTier
+              ?? (product.seller.sellerVerified ? 2 : 1)}
+            className="ml-1 -translate-y-0.5"
+          />
           {" · "}{timeAgo(product.createdAt)}
         </p>
 

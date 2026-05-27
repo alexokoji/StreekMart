@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
+import { recomputeSellerTier, recomputeDesignerTier } from "@/lib/tiers";
 
 // PATCH /api/admin/users/[id]/verify { kind, value }
 //
@@ -41,5 +42,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     },
     select: { id: true, sellerVerified: true, designerVerified: true },
   });
+
+  // Recompute the matching tier — flipping the verification flag either
+  // grants (Tier 1 → 2 when a pickup address is in place) or revokes
+  // (Tier 2 → 1) the blue check. Gold stays sticky.
+  if (parsed.data.kind === "SELLER") await recomputeSellerTier(target.id);
+  if (parsed.data.kind === "DESIGNER") await recomputeDesignerTier(target.id);
+
   return NextResponse.json({ user: updated });
 }

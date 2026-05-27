@@ -32,7 +32,18 @@ export type Rankable = {
    * dominant; quality content still wins.
    */
   verified?: boolean;
+  /**
+   * Seller rating fields (only relevant for products). Translate into a
+   * 0.9×–1.1× multiplier when the seller has accumulated at least
+   * RATING_MIN_SAMPLE reviews — below that threshold one disgruntled buyer
+   * can't crater a new seller and a single rave can't shoot them to the top.
+   */
+  sellerRatingAvg?: number;
+  sellerRatingCount?: number;
 };
+
+const RATING_MIN_SAMPLE = 3;
+const RATING_RANGE = 0.1; // 0.9× at avg 1, 1.1× at avg 5, 1.0× at avg 3.
 
 export function rankScore(item: Rankable): number {
   const created = typeof item.createdAt === "string" ? new Date(item.createdAt) : item.createdAt;
@@ -63,7 +74,19 @@ export function rankScore(item: Rankable): number {
   // Verification — small but visible bonus.
   const verifiedMul = item.verified ? 1.15 : 1.0;
 
-  return ((engagement + 1) / decay) * ownerLift * promo * follow * cadence * verifiedMul;
+  // Seller rating — small directional nudge (0.9× to 1.1×) once a seller
+  // has enough reviews to be trusted as signal. Below the threshold the
+  // multiplier is a no-op so new sellers aren't penalised.
+  let ratingMul = 1.0;
+  const ratingCount = item.sellerRatingCount ?? 0;
+  const ratingAvg = item.sellerRatingAvg ?? 0;
+  if (ratingCount >= RATING_MIN_SAMPLE && ratingAvg > 0) {
+    // Map [1, 5] → [-1, 1] centered on 3, then scale by RATING_RANGE.
+    const centered = (ratingAvg - 3) / 2;
+    ratingMul = 1 + centered * RATING_RANGE;
+  }
+
+  return ((engagement + 1) / decay) * ownerLift * promo * follow * cadence * verifiedMul * ratingMul;
 }
 
 // Bump exposure score on engagement events. Call from API handlers.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { recomputeSellerTier } from "@/lib/tiers";
 
 const AddressKind = z.enum(["DELIVERY", "PICKUP"]);
 
@@ -68,6 +69,11 @@ export async function POST(req: Request) {
       },
     });
   });
+
+  // A new PICKUP address can unlock Tier 2 for an already-verified seller.
+  if (kind === "PICKUP") {
+    await recomputeSellerTier(userId);
+  }
 
   return NextResponse.json({ ok: true, address });
 }

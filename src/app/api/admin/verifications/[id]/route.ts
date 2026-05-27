@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
 import { sendEmail, verificationDecisionEmail } from "@/lib/email";
+import { recomputeSellerTier, recomputeDesignerTier } from "@/lib/tiers";
 
 // PATCH /api/admin/verifications/[id] { decision, note? }
 //
@@ -54,6 +55,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       });
     }
   });
+
+  // Recompute the matching tier after the verification flag flips. Sellers
+  // also gain Tier 2 only if they already have a default pickup address —
+  // the helper handles that check. Run outside the transaction so the
+  // verifiedAt write is durable even if tier eval hits an unexpected error.
+  if (decided === "APPROVED") {
+    if (reqRow.kind === "SELLER") await recomputeSellerTier(reqRow.userId);
+    if (reqRow.kind === "DESIGNER") await recomputeDesignerTier(reqRow.userId);
+  }
 
   // Notify the requester. Fire-and-forget — failure is logged elsewhere
   // (see lib/email.ts) and doesn't roll back the decision.

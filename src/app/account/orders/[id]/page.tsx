@@ -6,6 +6,7 @@ import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { deliveryZoneLabel, type DeliveryZone } from "@/lib/location";
+import { SellerRatingForm } from "@/components/orders/SellerRatingForm";
 
 // /account/orders/[id]
 //
@@ -37,6 +38,7 @@ export default async function BuyerOrderDetailPage({
         },
       },
       updates: { orderBy: { createdAt: "asc" } },
+      sellerReview: true,
     },
   });
 
@@ -105,6 +107,23 @@ export default async function BuyerOrderDetailPage({
             }))}
             status={order.status}
           />
+
+          {order.status === "COMPLETED" && (
+            <SellerRatingForm
+              orderId={order.id}
+              sellerName={displaySellerName(order.seller)}
+              completedAt={(order.completedAt ?? order.updatedAt).toISOString()}
+              existing={
+                order.sellerReview
+                  ? {
+                      rating: order.sellerReview.rating,
+                      body: order.sellerReview.body,
+                      edited: order.sellerReview.edited,
+                    }
+                  : null
+              }
+            />
+          )}
         </div>
 
         <aside className="space-y-4">

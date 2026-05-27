@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { recomputeSellerTier } from "@/lib/tiers";
 
 const PatchBody = z.object({
   label: z.string().max(60).nullable().optional(),
@@ -78,6 +79,11 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
       }
     }
   });
+
+  // Deleting the last PICKUP address can drop a seller from Tier 2 → 1.
+  if (existing.kind === "PICKUP") {
+    await recomputeSellerTier(guard.session.sub);
+  }
 
   return NextResponse.json({ ok: true });
 }

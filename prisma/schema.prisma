@@ -57,11 +57,28 @@ model User {
   isSeller     Boolean  @default(false)
   isDesigner   Boolean  @default(false)
   // Verification flags — only verified sellers/designers get a badge in UI.
+  // Kept as the canonical "admin has approved them" gate. The tier columns
+  // below derive presentation from this plus profile completeness.
   sellerVerified   Boolean @default(false)
   designerVerified Boolean @default(false)
+  // Tiered badge state.
+  //   1 = Unverified (default).
+  //   2 = Blue check. Admin has approved verification AND the relevant
+  //       profile data is in place (sellers also need a default PICKUP
+  //       address — recompute lives in src/lib/tiers.ts).
+  //   3 = Gold check. Admin-granted only; sticky once awarded. Incentive /
+  //       criteria TBD — for now treat as an explicit override.
+  sellerTier       Int     @default(1)
+  designerTier     Int     @default(1)
   // Audit for verification decisions — set when an admin approves the request.
   verifiedAt   DateTime?
   verifiedBy   String?
+  // Seller rating rollup. Source of truth is the SellerReview table;
+  // these two columns are recomputed on every review create/update/delete
+  // so listing rails and the rank algorithm can read them without an
+  // aggregation query per product.
+  sellerRatingAvg   Float @default(0)
+  sellerRatingCount Int   @default(0)
   // Platform admin flag — gates /admin and the /api/admin/* endpoints.
   isAdmin      Boolean  @default(false)
   // Trusted-buyer flag — set by an admin once a buyer has completed enough
@@ -116,6 +133,8 @@ model User {
   payoutRequests PayoutRequest[]
   businessNameChangeRequests BusinessNameChangeRequest[]
   addresses     Address[]
+  sellerReviewsReceived SellerReview[] @relation("SellerReviewsReceived")
+  sellerReviewsWritten  SellerReview[] @relation("SellerReviewsWritten")
 }
 
 // Saved addresses (address book).
@@ -558,6 +577,7 @@ model Order {
   updates         OrderUpdate[]
   shipment        Shipment?
   shippingRates   ShippingRate[]
+  sellerReview    SellerReview?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -662,6 +682,35 @@ model Review {
   @@unique([productId, authorId])
 }
 
+// -------------------- Seller Reviews --------------------
+//
+// One review per delivered order, written by the buyer about the seller.
+// Distinct from `Review` (which is per-product). Eligibility is enforced
+// by the API layer: only the buyer on a COMPLETED order can write here,
+// and only within 30 days of completion. After the window the row is
+// frozen (no PATCH) — see /api/seller-reviews.
+model SellerReview {
+  id        String   @id @default(cuid())
+  // The order this review covers. One review per order — the unique
+  // constraint makes idempotent upserts straightforward.
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerId  String
+  seller    User     @relation("SellerReviewsReceived", fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User     @relation("SellerReviewsWritten",  fields: [buyerId], references: [id], onDelete: Cascade)
+  rating    Int      // 1..5
+  body      String?
+  // Whether the buyer has revised the rating from their first submission.
+  // Surfaced as a small "edited" indicator in the UI for transparency.
+  edited    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId, createdAt])
+  @@index([buyerId, createdAt])
+}
+
 // -------------------- Chat / Messaging --------------------
 
 model Chat {
@@ -691,9 +740,15 @@ model Message {
   sender    User      @relation("MessageSender", fields: [senderId], references: [id])
   body      String
   readAt    DateTime?
+  // Client-generated UUID used to make sends idempotent. The server uses it
+  // as a "have I seen this before?" check; identical retries collapse to one
+  // row. Optional so legacy rows and non-idempotent callers still work —
+  // the unique constraint only collides when both sides provide a value.
+  clientMessageId String?
   createdAt DateTime  @default(now())
 
   @@index([chatId, createdAt])
+  @@unique([chatId, senderId, clientMessageId])
 }
 
 // -------------------- Favorites / Wishlist & Likes --------------------

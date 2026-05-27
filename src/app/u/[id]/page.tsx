@@ -9,6 +9,8 @@ import { Price } from "@/components/Price";
 import { FollowButton } from "./FollowButton";
 import { CoverImageUploader } from "./CoverImageUploader";
 import { ShareButton } from "@/components/ShareButton";
+import { TierBadge } from "@/components/TierBadge";
+import { topTier } from "@/lib/tiers";
 
 // Public profile page — surfaces a user's seller storefront and (if they're
 // also a designer) their portfolio posts. URL: /u/<userId>?tab=products|posts
@@ -46,6 +48,10 @@ const PROFILE_SELECT = {
   isDesigner: true,
   sellerVerified: true,
   designerVerified: true,
+  sellerTier: true,
+  designerTier: true,
+  sellerRatingAvg: true,
+  sellerRatingCount: true,
   exposureScore: true,
   createdAt: true,
   _count: { select: { products: true, posts: true, followedBy: true } },
@@ -151,7 +157,10 @@ export default async function PublicProfilePage({
       : Promise.resolve(null),
   ]);
 
-  const verified = profile.sellerVerified || profile.designerVerified;
+  const profileTier = topTier({
+    sellerTier: profile.sellerTier,
+    designerTier: profile.designerTier,
+  });
 
   return (
     <div className="space-y-6">
@@ -199,16 +208,18 @@ export default async function PublicProfilePage({
             <div className="min-w-0 flex-1 pb-1">
               <h1 className="flex flex-wrap items-center gap-2 font-display text-base font-semibold leading-tight text-white drop-shadow sm:text-lg">
                 <span className="truncate">{displayName}</span>
-                {verified && (
-                  <span
-                    title="Verified by StreekMart"
-                    className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-accent shadow-sm"
-                  >
-                    <span aria-hidden="true">✓</span>
-                    <span className="not-italic">Verified</span>
-                  </span>
-                )}
+                <TierBadge tier={profileTier} variant="pill" />
               </h1>
+              {profile.isSeller && profile.sellerRatingCount > 0 && (
+                <p className="mt-1 text-[11px] font-medium text-white/90 drop-shadow">
+                  <span aria-hidden="true">★</span>{" "}
+                  {profile.sellerRatingAvg.toFixed(1)}{" "}
+                  <span className="opacity-80">
+                    ({profile.sellerRatingCount} review
+                    {profile.sellerRatingCount === 1 ? "" : "s"})
+                  </span>
+                </p>
+              )}
             </div>
           </div>
         </div>

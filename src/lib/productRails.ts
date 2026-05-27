@@ -37,6 +37,9 @@ const sellerInclude = {
       name: true,
       businessName: true,
       sellerVerified: true,
+      sellerTier: true,
+      sellerRatingAvg: true,
+      sellerRatingCount: true,
       exposureScore: true,
     },
   },
@@ -159,6 +162,9 @@ async function fetchFeatured(offset: number, limit: number): Promise<RailResult>
         salesCount: b.salesCount,
         ownerExposureScore: b.seller.exposureScore,
         promotionBoost: b.promotions[0]?.boost ?? 1,
+        verified: (b.seller.sellerTier ?? 0) >= 2,
+        sellerRatingAvg: b.seller.sellerRatingAvg,
+        sellerRatingCount: b.seller.sellerRatingCount,
       }) -
       rankScore({
         createdAt: a.createdAt,
@@ -168,6 +174,9 @@ async function fetchFeatured(offset: number, limit: number): Promise<RailResult>
         salesCount: a.salesCount,
         ownerExposureScore: a.seller.exposureScore,
         promotionBoost: a.promotions[0]?.boost ?? 1,
+        verified: (a.seller.sellerTier ?? 0) >= 2,
+        sellerRatingAvg: a.seller.sellerRatingAvg,
+        sellerRatingCount: a.seller.sellerRatingCount,
       }),
   );
   const slice = ranked.slice(offset, offset + limit);

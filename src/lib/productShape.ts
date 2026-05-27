@@ -20,12 +20,17 @@ type ProductLike = {
     name: string;
     businessName?: string | null;
     sellerVerified?: boolean;
+    sellerTier?: number | null;
   };
   promotions?: { boost?: number }[];
 };
 
 export function shapeProductForCard(p: ProductLike): ProductCardData {
   const allImages = parseJsonArray(p.imagesJson);
+  // Backfill tier from the legacy boolean for rows whose tier hasn't been
+  // computed yet (e.g. during the migration window).
+  const sellerTier =
+    p.seller.sellerTier ?? (p.seller.sellerVerified ? 2 : 1);
   return {
     id: p.id,
     name: p.name,
@@ -35,7 +40,7 @@ export function shapeProductForCard(p: ProductLike): ProductCardData {
     image: allImages[0] ?? null,
     images: allImages,
     sellerName: displaySellerName(p.seller),
-    sellerVerified: !!p.seller.sellerVerified,
+    sellerTier,
     promoted: (p.promotions?.length ?? 0) > 0,
     rating: p.ratingAvg,
     ratingCount: p.ratingCount,
