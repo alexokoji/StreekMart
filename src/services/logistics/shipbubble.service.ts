@@ -211,8 +211,11 @@ export class ShipbubbleService implements LogisticsProvider {
             "Shipbubble returned no package categories. This usually means no couriers are connected to your Shipbubble account yet — connect at least one in app.shipbubble.com, then retry. Or pin SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
           );
         }
+        // Shipbubble's live response uses `category` (not `category_name`) for
+        // the display name. Other field names are kept as defensive fallbacks
+        // in case the response shape changes again.
         const nameOf = (c: any): string =>
-          String(c?.category_name ?? c?.name ?? c?.label ?? c?.title ?? "").trim();
+          String(c?.category ?? c?.category_name ?? c?.name ?? c?.label ?? c?.title ?? "").trim();
         // Only consider entries with a real human-readable name — Shipbubble's
         // pre-courier stub list returns numeric-id-only objects (e.g. 98190590)
         // that fetch_rates rejects downstream. Refusing them up-front keeps the
@@ -227,7 +230,20 @@ export class ShipbubbleService implements LogisticsProvider {
             "Shipbubble returned categories without names — your couriers haven't fully provisioned yet. Wait a few minutes after connecting them in app.shipbubble.com, or pin SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
           );
         }
-        const preferenceOrder = ["others", "general", "merchandise", "general merchandise", "clothing"];
+        // Ordered by best fit for a fashion / apparel marketplace. The first
+        // match (case-insensitive substring) wins. "Light weight items" is
+        // Shipbubble's catch-all for non-fragile small parcels — the right
+        // default when no explicit "Clothing" / "Apparel" entry exists.
+        const preferenceOrder = [
+          "apparel",
+          "clothing",
+          "light weight",
+          "lightweight",
+          "general merchandise",
+          "merchandise",
+          "general",
+          "others",
+        ];
         for (const want of preferenceOrder) {
           const hit = named.find((c) => nameOf(c).toLowerCase().includes(want));
           if (hit) {
