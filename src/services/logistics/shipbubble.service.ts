@@ -356,6 +356,8 @@ export class ShipbubbleService implements LogisticsProvider {
     try {
       const { couriers } = await this.fetchRatesRaw(input);
 
+      // VERSION TAG so we can confirm in logs which code path is live.
+      console.log("[Shipbubble] Normalizing rates with rate_card_amount logic v2");
       const normalized: NormalizedRateResponse[] = couriers.map((rate: any) => {
         // Shipbubble's authoritative price field for fetch_rates is
         // `rate_card_amount` (verified NGN against the live response).
@@ -369,11 +371,15 @@ export class ShipbubbleService implements LogisticsProvider {
         const fallbackTotal = parseFloat(rate.total ?? rate.total_amount ?? rate.amount ?? rate.price ?? "0");
         const totalAmount =
           rateCard > 0 ? Math.max(0, rateCard - (discount > 0 ? discount : 0)) : fallbackTotal;
+        const priceCents = Math.round(totalAmount * 100); // NGN -> cents
+        console.log(
+          `[Shipbubble] Normalize "${rate.courier_name}": rateCard=${rateCard} discount=${discount} fallbackTotal=${fallbackTotal} -> totalAmount=${totalAmount} priceCents=${priceCents}`,
+        );
         return {
           id: String(rate.courier_id || rate.id),
           name: rate.courier_name || rate.name || "Standard Courier",
           provider: "SHIPBUBBLE",
-          price: Math.round(totalAmount * 100), // NGN -> cents
+          price: priceCents,
           estimatedDays: extractDaysFromText(rate.delivery_eta || rate.eta || "3 days"),
           eta: rate.delivery_eta || rate.eta || "3-5 business days",
           courierCode: rate.service_code || rate.courier_code || rate.code || "",
