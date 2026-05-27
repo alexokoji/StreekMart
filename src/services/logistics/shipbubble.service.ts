@@ -326,6 +326,15 @@ export class ShipbubbleService implements LogisticsProvider {
     const json = await response.json();
     const couriers: any[] = json.data?.couriers || json.data?.rates || [];
     const requestToken: string = json.data?.request_token || "";
+    // One-shot diagnostic: dump the first courier object so we can see the
+    // exact price-field shape (total vs cost vs delivery_fee, NGN vs kobo).
+    // Remove after the unit mismatch is resolved.
+    if (couriers.length > 0) {
+      console.log(
+        "[Shipbubble] First courier raw shape:",
+        JSON.stringify(couriers[0]).slice(0, 600),
+      );
+    }
     return { couriers, requestToken };
   }
 
@@ -363,7 +372,10 @@ export class ShipbubbleService implements LogisticsProvider {
         return !isPremium;
       });
 
-      return filtered.length > 0 ? filtered : normalized;
+      // Sort cheapest first so the UI's default selection is the lowest price.
+      const out = (filtered.length > 0 ? filtered : normalized).slice();
+      out.sort((a, b) => a.price - b.price);
+      return out;
     } catch (err) {
       console.error("[Shipbubble] Failed to get shipping rates:", err);
       throw err;
