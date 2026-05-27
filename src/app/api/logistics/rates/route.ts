@@ -183,6 +183,31 @@ export async function POST(req: Request) {
       );
     }
 
+    // Shipbubble's address validator (Google Places) rejects vague "City, State"
+    // strings. Refuse early when we know the call would fail, with a message
+    // that points to the fix instead of bubbling up Shipbubble's raw 400.
+    if (parsed.data.provider === "SHIPBUBBLE") {
+      if (!sellerPickup?.formattedAddress) {
+        return NextResponse.json(
+          {
+            error:
+              "This seller hasn't added a pickup location yet. Ask them to set one in Seller settings before placing the order.",
+            code: "SELLER_PICKUP_MISSING",
+          },
+          { status: 400 },
+        );
+      }
+      if (!parsed.data.deliveryFormattedAddress && !parsed.data.deliveryPlaceId) {
+        return NextResponse.json(
+          {
+            error: "Pick a delivery address from the map to see shipping options.",
+            code: "DELIVERY_ADDRESS_REQUIRED",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     const logistics = getLogisticsService();
     const rates = await logistics.getShippingRates({
       pickupAddress: {

@@ -46,17 +46,14 @@ export class ShipbubbleService implements LogisticsProvider {
     if (addr.formattedAddress && addr.formattedAddress.trim()) {
       return addr.formattedAddress.trim();
     }
-    const parts = [addr.address, addr.city, addr.state, addr.postalCode, addr.country]
-      .map((p) => (p || "").toString().trim())
-      .filter(Boolean);
-    // De-duplicate adjacent identical parts (addr.address often already contains city/state)
-    const deduped: string[] = [];
-    for (const p of parts) {
-      if (!deduped.length || deduped[deduped.length - 1].toLowerCase() !== p.toLowerCase()) {
-        deduped.push(p);
-      }
-    }
-    return deduped.join(", ");
+    // The caller typically pre-builds `addr.address` to already include city/state,
+    // so naïvely joining all five fields produces duplicated garbage like
+    // "Aba, Abia, Aba, Abia, NG". Just trust addr.address and tack on the country
+    // when it isn't already a suffix.
+    const base = (addr.address || "").trim();
+    const country = (addr.country || "").trim();
+    if (!country) return base;
+    return base.toLowerCase().endsWith(country.toLowerCase()) ? base : `${base}, ${country}`;
   }
 
   /**

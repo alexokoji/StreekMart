@@ -34,6 +34,7 @@ export function CheckoutForm({
   const [me, setMe] = useState<{city?: string; country?: string; region?: string} | null>(null);
   // Per-seller rates + selections
   const [ratesBySeller, setRatesBySeller] = useState<Record<string, any[] | null>>({});
+  const [errorBySeller, setErrorBySeller] = useState<Record<string, string | null>>({});
   const [selectedBySeller, setSelectedBySeller] = useState<Record<string, string | null>>({});
 
   function normalisedCity(s?: string | null) {
@@ -131,11 +132,12 @@ export function CheckoutForm({
   // delivery is within the seller's city, the seller handles delivery
   // themselves (no external rates shown).
   useEffect(() => {
-    if (!sellers || sellers.length === 0 || !me) {
-      console.log("Skipping rates fetch:", { sellers: !!sellers, sellersLength: sellers?.length, me: !!me });
-      return;
-    }
-    console.log("Starting rates fetch with sellers:", sellers.map(s => ({ id: s.id, city: s.city })), "and me:", { city: me.city, region: me.region, country: me.country });
+    if (!sellers || sellers.length === 0 || !me) return;
+    // Don't burn API quota until the buyer has picked a real delivery address —
+    // rates depend on a precise endpoint, and Shipbubble's validator rejects
+    // vague city-only fallbacks.
+    if (!shippingAddress?.formattedAddress) return;
+
     let mounted = true;
     (async () => {
       for (const s of sellers) {
@@ -143,7 +145,6 @@ export function CheckoutForm({
         const sellerCity = s.city;
 
         if (!sellerCity) {
-          console.log(`Seller ${sellerId}: no city`);
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
         }
@@ -152,17 +153,13 @@ export function CheckoutForm({
           zoneOverride === "OUTSIDE_CITY" ||
           (me.city && normalisedCity(me.city) !== normalisedCity(sellerCity));
 
-        console.log(`Seller ${sellerId}: isOutside=${isOutside}`, { sellerCity, buyerCity: me.city, zoneOverride });
-
         if (!isOutside) {
-          // Within-city deliveries: seller handles delivery; no external rates.
-          console.log(`Seller ${sellerId}: within-city delivery, no external rates`);
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
           continue;
         }
 
-        console.log(`Seller ${sellerId}: requesting rates...`);
         setRatesBySeller((prev) => ({ ...prev, [sellerId]: null }));
+        setErrorBySeller((prev) => ({ ...prev, [sellerId]: null }));
         try {
           const payload: Record<string, unknown> = {
             provider: "SHIPBUBBLE",
@@ -174,40 +171,41 @@ export function CheckoutForm({
             deliveryState: me.region || "",
             deliveryCountry: me.country || "",
             description: "Order from UpClo",
+            deliveryFormattedAddress: shippingAddress.formattedAddress,
+            deliveryPlaceId: shippingAddress.placeId || undefined,
+            deliveryLatitude: shippingAddress.latitude || undefined,
+            deliveryLongitude: shippingAddress.longitude || undefined,
           };
-          if (shippingAddress?.formattedAddress) {
-            payload.deliveryFormattedAddress = shippingAddress.formattedAddress;
-            payload.deliveryPlaceId = shippingAddress.placeId || undefined;
-            payload.deliveryLatitude = shippingAddress.latitude || undefined;
-            payload.deliveryLongitude = shippingAddress.longitude || undefined;
-          }
-          console.log(`Seller ${sellerId}: rates payload`, payload);
           const res = await fetch("/api/logistics/rates", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
           const d = await res.json();
-          console.log(`Seller ${sellerId}: rates response`, { status: res.status, data: d });
           if (!mounted) return;
           if (d?.ok && Array.isArray(d.rates)) {
-            console.log(`Seller ${sellerId}: received ${d.rates.length} rates`);
             setRatesBySeller((prev) => ({ ...prev, [sellerId]: d.rates }));
           } else {
-            console.log(`Seller ${sellerId}: error response or no rates`, d);
             setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
+            setErrorBySeller((prev) => ({
+              ...prev,
+              [sellerId]: d?.error ?? "Couldn't fetch shipping options.",
+            }));
           }
         } catch (err) {
-          console.error(`Seller ${sellerId}: rates fetch error`, err);
           if (!mounted) return;
           setRatesBySeller((prev) => ({ ...prev, [sellerId]: [] }));
+          setErrorBySeller((prev) => ({
+            ...prev,
+            [sellerId]: err instanceof Error ? err.message : "Network error",
+          }));
         }
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [sellers, me, zoneOverride, shippingAddress?.placeId]);
+  }, [sellers, me, zoneOverride, shippingAddress?.placeId, shippingAddress?.formattedAddress]);
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -309,15 +307,26 @@ export function CheckoutForm({
                 recommendedId = recommended.id;
               }
 
+              const ratesError = errorBySeller[s.id];
               return (
                 <div key={s.id} className="p-3 border rounded-lg">
                   <p className="text-sm font-medium">Seller: {s.name ?? s.id}</p>
-                  {rs === undefined && <p className="text-xs text-gray-500">Not checked</p>}
+                  {!shippingAddress?.formattedAddress && (
+                    <p className="text-xs text-gray-500">
+                      Pick a delivery address above to see shipping options.
+                    </p>
+                  )}
+                  {shippingAddress?.formattedAddress && rs === undefined && (
+                    <p className="text-xs text-gray-500">Not checked</p>
+                  )}
                   {rs === null && <p className="text-xs text-gray-500">Loading shipping options…</p>}
-                  {Array.isArray(rs) && rs.length === 0 && (
+                  {Array.isArray(rs) && rs.length === 0 && !ratesError && (
                     <p className="text-sm text-gray-500">
                       No external shipping options — seller will handle delivery.
                     </p>
+                  )}
+                  {ratesError && (
+                    <p className="text-sm text-amber-700">{ratesError}</p>
                   )}
                   {Array.isArray(rs) && rs.length > 0 && (
                     <div className="mt-2 space-y-2">
