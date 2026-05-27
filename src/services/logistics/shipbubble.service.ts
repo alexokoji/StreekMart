@@ -14,11 +14,32 @@ export class ShipbubbleService implements LogisticsProvider {
   private apiKey: string;
   private baseUrl: string;
   private isEnabled: boolean;
+  // Memoised category lookup. Per-process — Vercel cold starts re-fetch once.
+  // Set SHIPBUBBLE_DEFAULT_CATEGORY_ID in env to skip the lookup entirely.
+  private categoryIdPromise: Promise<number> | null = null;
 
   constructor() {
     this.apiKey = process.env.SHIPBUBBLE_API_KEY || "";
     this.baseUrl = process.env.SHIPBUBBLE_BASE_URL || "https://api.shipbubble.com/v1";
     this.isEnabled = process.env.SHIPBUBBLE_ENABLED === "1" || process.env.SHIPBUBBLE_ENABLED === "true";
+  }
+
+  /**
+   * Fetch the live list of Shipbubble package categories. Public so admins can
+   * surface the list in the dashboard to pick a stable id for SHIPBUBBLE_DEFAULT_CATEGORY_ID.
+   */
+  async fetchCategories(): Promise<Array<{ category_id: number; category_name: string }>> {
+    const response = await fetch(`${this.baseUrl}/shipping/labels/categories`, {
+      method: "GET",
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Categories request failed: ${response.status} - ${text}`);
+    }
+    const json = await response.json();
+    const list = json?.data ?? [];
+    return Array.isArray(list) ? list : [];
   }
 
   getName(): "SHIPBUBBLE" | "KWIK" {
@@ -150,12 +171,55 @@ export class ShipbubbleService implements LogisticsProvider {
     };
   }
 
-  private getDefaultCategoryId(): number {
+  /**
+   * Resolve the package category_id for fetch_rates calls.
+   *
+   * Order of preference:
+   *   1. SHIPBUBBLE_DEFAULT_CATEGORY_ID env var (skip the network round-trip)
+   *   2. Live list from /shipping/labels/categories, preferring a "general" /
+   *      "others" / "merchandise" entry, falling back to the first item.
+   *
+   * Cached at the instance level — Vercel cold starts re-fetch once. If you set
+   * the env var, all of this is bypassed.
+   */
+  private async getCategoryId(): Promise<number> {
     const raw = process.env.SHIPBUBBLE_DEFAULT_CATEGORY_ID;
-    const parsed = raw ? parseInt(raw, 10) : NaN;
-    // Shipbubble requires a real category_id from GET /shipping/labels/categories.
-    // Caller must set SHIPBUBBLE_DEFAULT_CATEGORY_ID; fallback is a common "General" id.
-    return Number.isFinite(parsed) ? parsed : 99;
+    const fromEnv = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(fromEnv)) return fromEnv;
+
+    if (!this.categoryIdPromise) {
+      this.categoryIdPromise = (async () => {
+        const list = await this.fetchCategories();
+        if (list.length === 0) {
+          throw new Error(
+            "Shipbubble returned no package categories. Set SHIPBUBBLE_DEFAULT_CATEGORY_ID manually.",
+          );
+        }
+        const preferenceOrder = ["others", "general", "merchandise", "general merchandise", "clothing"];
+        for (const want of preferenceOrder) {
+          const hit = list.find(
+            (c) => (c.category_name || "").toLowerCase().includes(want),
+          );
+          if (hit) {
+            console.log(
+              `[Shipbubble] Using auto-detected category_id ${hit.category_id} (${hit.category_name}). ` +
+                `Set SHIPBUBBLE_DEFAULT_CATEGORY_ID=${hit.category_id} to skip this lookup.`,
+            );
+            return hit.category_id;
+          }
+        }
+        const first = list[0];
+        console.log(
+          `[Shipbubble] No preferred category match; falling back to first: ${first.category_id} (${first.category_name}).`,
+        );
+        return first.category_id;
+      })().catch((err) => {
+        // Clear the cache on failure so the next call retries instead of locking in a rejected promise.
+        this.categoryIdPromise = null;
+        throw err;
+      });
+    }
+    return this.categoryIdPromise;
   }
 
   private todayDateString(): string {
@@ -178,7 +242,7 @@ export class ShipbubbleService implements LogisticsProvider {
       // Shipbubble's API uses the misspelling "reciever_address_code" — preserve it.
       reciever_address_code: recipientCode,
       pickup_date: this.todayDateString(),
-      category_id: this.getDefaultCategoryId(),
+      category_id: await this.getCategoryId(),
       package_items: this.buildPackageItems(input),
       package_dimension: this.buildPackageDimension(input),
     };
