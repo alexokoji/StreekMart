@@ -4,7 +4,6 @@ import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/en
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
-import { convertToUsd, getServerCurrencyContext } from "@/lib/currencyServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -22,17 +21,17 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     .update({ where: { id: product.id }, data: { viewCount: { increment: 1 } } })
     .catch(() => {});
 
-  // Lock prices using current exchange rate
-  const currencyCtx = await getServerCurrencyContext();
-  const productWithLockedPrices = {
-    ...product,
-    displayPrice: product.price * currencyCtx.rate,
-    displaySalePrice: product.salePrice ? product.salePrice * currencyCtx.rate : null,
-    currency: currencyCtx.code,
-    exchangeRate: currencyCtx.rate,
-  };
-
-  return NextResponse.json({ product: productWithLockedPrices });
+  // NGN is the canonical storage + display currency. Send the stored value
+  // verbatim — the client renders it via <Price>.
+  return NextResponse.json({
+    product: {
+      ...product,
+      displayPrice: product.price,
+      displaySalePrice: product.salePrice,
+      currency: "NGN",
+      exchangeRate: 1,
+    },
+  });
 }
 
 const UpdateBody = z.object({
@@ -97,31 +96,19 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 
   const { images, sizes, currency, price, salePrice, ...rest } = parsed.data;
-
-  // Convert price/salePrice from the seller's currency → USD if needed.
-  let priceUsd = price;
-  let salePriceForUpdate = salePrice;
-  if (currency && currency.toUpperCase() !== "USD") {
-    try {
-      if (typeof price === "number") priceUsd = await convertToUsd(price, currency);
-      if (typeof salePrice === "number") salePriceForUpdate = await convertToUsd(salePrice, currency);
-    } catch (err) {
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Unsupported currency" },
-        { status: 400 },
-      );
-    }
-  }
+  // `currency` is accepted but ignored — NGN is the canonical storage
+  // currency. Multi-currency entry is a future feature.
+  void currency;
 
   const updated = await prisma.product.update({
     where: { id: params.id },
     data: {
       ...rest,
-      ...(typeof priceUsd === "number" ? { price: priceUsd } : {}),
+      ...(typeof price === "number" ? { price } : {}),
       // `salePrice` distinguishes "not in payload" (undefined) from
       // "explicitly cleared" (null) — only write the field when the caller
       // actually sent it.
-      ...(salePrice !== undefined ? { salePrice: salePriceForUpdate ?? null } : {}),
+      ...(salePrice !== undefined ? { salePrice: salePrice ?? null } : {}),
       ...(rest.category ? { kind: kindForCategory(rest.category) } : {}),
       ...(images ? { imagesJson: JSON.stringify(images) } : {}),
       ...(sizes !== undefined ? { sizesJson: JSON.stringify(sizes) } : {}),

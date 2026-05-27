@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORY_GROUPS } from "@/lib/enums";
-import { useCurrency } from "@/components/CurrencyProvider";
 import { ImageUploader } from "@/components/forms/ImageUploader";
 import { PRODUCT_UNITS, type ProductUnit, unitConfig } from "@/lib/units";
 import {
@@ -43,27 +42,12 @@ const ALL_CATEGORIES = Object.entries(CATEGORY_GROUPS) as ReadonlyArray<
 
 export function ProductForm({ initial, mode, redirectBase = "/seller/products" }: Props) {
   const router = useRouter();
-  // Active display currency — geolocated or user-selected. The form mirrors
-  // it: sellers always type prices in their own currency; the server
-  // converts to the canonical USD before storage.
-  const ctx = useCurrency();
-  // Convert the stored USD price into the active currency for the input
-  // field. We do this once on first render via useMemo so the value is
-  // stable across re-renders triggered by other fields. The original USD
-  // value lives only in `initial.price` — we never write it back into state.
-  const initialLocalPrice = useMemo(
-    () => (initial?.price ? roundCents(initial.price * ctx.rate) : 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-  const initialLocalSale = useMemo(
-    () =>
-      typeof initial?.salePrice === "number"
-        ? roundCents(initial.salePrice * ctx.rate)
-        : "",
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // NGN is the canonical currency. Sellers type Naira amounts and we store
+  // them as-is. Multi-currency entry is a future feature; for now both the
+  // display and the storage values match 1:1.
+  const initialLocalPrice = initial?.price ? roundCents(initial.price) : 0;
+  const initialLocalSale =
+    typeof initial?.salePrice === "number" ? roundCents(initial.salePrice) : "";
 
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -117,10 +101,10 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
       const payload = {
         name,
         description,
-        // Sent in the seller's active currency. The API converts to USD.
+        // Sent and stored as NGN — the canonical currency for now.
         price: Number(price),
         salePrice: salePrice === "" ? null : Number(salePrice),
-        currency: ctx.code,
+        currency: "NGN",
         category,
         status,
         stock: Number(stock),
@@ -269,12 +253,12 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
           <label className="label">
             Price{" "}
             <span className="text-[11px] font-normal text-ink-500">
-              ({ctx.flag} {ctx.code} per {unitConfig(unit).longLabel})
+              (🇳🇬 NGN per {unitConfig(unit).longLabel})
             </span>
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-500">
-              {ctx.symbol}
+              ₦
             </span>
             <input
               type="number"
@@ -287,7 +271,7 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
             />
           </div>
           <p className="mt-1 text-[11px] text-ink-500">
-            Stored as USD; auto-converts to other currencies for buyers.
+            Stored as Naira. Multi-currency display is a future feature.
           </p>
         </div>
         <div>
@@ -312,7 +296,7 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
           </label>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-500">
-              {ctx.symbol}
+              ₦
             </span>
             <input
               type="number"

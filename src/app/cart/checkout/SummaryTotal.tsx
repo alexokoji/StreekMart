@@ -10,24 +10,23 @@ const NGN_FORMATTER = new Intl.NumberFormat("en-NG", {
 });
 
 /**
- * The summary aside's Total line. Receives the NGN-equivalent of the items
- * subtotal as a server-computed prop (so we don't ship FX rates to the client)
- * and adds the shipping total that CheckoutForm pushes via context.
- *
- * Both pieces are in NGN-kobo here so the math is a plain integer sum.
+ * The summary aside's Total line. Receives the items subtotal in NGN
+ * (regular units, matching how product prices are stored) and adds the
+ * shipping total the form pushes via context (NGN-kobo for precision).
  */
-export function SummaryTotal({ subtotalNgnKobo }: { subtotalNgnKobo: number }) {
+export function SummaryTotal({ subtotalNgn }: { subtotalNgn: number }) {
   const { shippingKoboTotal } = useCheckoutTotals();
-  const total = subtotalNgnKobo + shippingKoboTotal;
+  const shippingNgn = shippingKoboTotal / 100;
+  const total = subtotalNgn + shippingNgn;
   return (
     <div className="mt-3 space-y-1 border-t pt-3 text-base font-bold">
       <div className="flex justify-between">
         <span>Total</span>
-        <span>{NGN_FORMATTER.format(total / 100)}</span>
+        <span>{NGN_FORMATTER.format(total)}</span>
       </div>
-      {shippingKoboTotal > 0 && (
+      {shippingNgn > 0 && (
         <p className="text-right text-xs font-normal text-ink-500">
-          Includes {NGN_FORMATTER.format(shippingKoboTotal / 100)} shipping
+          Includes {NGN_FORMATTER.format(shippingNgn)} shipping
         </p>
       )}
     </div>

@@ -4,7 +4,9 @@ import { Logo } from "@/components/Logo";
 import { LogoutButton } from "./LogoutButton";
 import { CartIcon } from "./CartIcon";
 import { AccountChip } from "./AccountChip";
-import { CurrencySelector } from "./CurrencySelector";
+// CurrencySelector hidden for the Nigeria-only launch; re-enable when
+// multi-currency display returns.
+// import { CurrencySelector } from "./CurrencySelector";
 
 type NavUser = {
   id: string;
@@ -102,9 +104,9 @@ export async function TopNav({ user }: { user: NavUser }) {
             )}
           </nav>
 
-          {/* Currency selector — visible on every breakpoint so prices can be
-              switched without opening a settings page. */}
-          <CurrencySelector />
+          {/* Currency selector hidden while NGN is the only display currency.
+              Re-enable when multi-currency display is reintroduced. */}
+          {/* <CurrencySelector /> */}
 
           {user ? (
             <>

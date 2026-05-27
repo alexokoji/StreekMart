@@ -5,8 +5,6 @@ import { requireUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
-import { convertUsdTo } from "@/lib/currencyServer";
-
 import { CheckoutForm } from "./CheckoutForm";
 import { CheckoutTotalsProvider } from "./CheckoutTotalsContext";
 import { SummaryTotal } from "./SummaryTotal";
@@ -52,13 +50,6 @@ export default async function CheckoutPage() {
       .filter((item) => item.seller.id === sellerItem.id)
       .reduce((sum, item) => sum + item.price, 0),
   }));
-
-  // Compute the items subtotal in NGN-kobo so the Summary can sum it against
-  // the NGN-kobo shipping total the form pushes into context. Shipbubble
-  // quotes in NGN, the rest of the app stores USD; this is the conversion
-  // boundary.
-  const subtotalNgn = await convertUsdTo(subtotal, "NGN");
-  const subtotalNgnKobo = Math.round(subtotalNgn * 100);
 
   return (
     <CheckoutTotalsProvider>
@@ -114,7 +105,7 @@ export default async function CheckoutPage() {
             </ul>
           )}
         </div>
-        <SummaryTotal subtotalNgnKobo={subtotalNgnKobo} />
+        <SummaryTotal subtotalNgn={subtotal} />
       </aside>
     </div>
     </CheckoutTotalsProvider>

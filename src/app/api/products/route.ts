@@ -5,7 +5,6 @@ import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/en
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { resolveActingOwner } from "@/lib/managersServer";
-import { convertToUsd, getServerCurrencyContext } from "@/lib/currencyServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 import { FASHION_VALIDATOR_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";
 
@@ -17,9 +16,9 @@ export async function GET(req: Request) {
   const q = url.searchParams.get("q") ?? undefined;
   const kind = url.searchParams.get("kind") ?? undefined;
 
-  // Get current currency context to lock exchange rate for all prices
-  const currencyCtx = await getServerCurrencyContext();
-
+  // NGN is the canonical storage + display currency. The legacy USD →
+  // localized-display conversion has been removed; clients render p.price
+  // directly via <Price>.
   if (mine) {
     const guard = await requireApiUser([Permission.SELLER, Permission.DESIGNER]);
     if ("error" in guard) return guard.error;
@@ -27,15 +26,15 @@ export async function GET(req: Request) {
       where: { sellerId: guard.session.sub },
       orderBy: { createdAt: "desc" },
     });
-    // Lock prices in seller's view
-    const productsWithLockedPrices = products.map((p) => ({
-      ...p,
-      displayPrice: p.price * currencyCtx.rate,
-      displaySalePrice: p.salePrice ? p.salePrice * currencyCtx.rate : null,
-      currency: currencyCtx.code,
-      exchangeRate: currencyCtx.rate,
-    }));
-    return NextResponse.json({ products: productsWithLockedPrices });
+    return NextResponse.json({
+      products: products.map((p) => ({
+        ...p,
+        displayPrice: p.price,
+        displaySalePrice: p.salePrice,
+        currency: "NGN",
+        exchangeRate: 1,
+      })),
+    });
   }
 
   const products = await prisma.product.findMany({
@@ -51,15 +50,15 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  // Lock prices for all products
-  const productsWithLockedPrices = products.map((p) => ({
-    ...p,
-    displayPrice: p.price * currencyCtx.rate,
-    displaySalePrice: p.salePrice ? p.salePrice * currencyCtx.rate : null,
-    currency: currencyCtx.code,
-    exchangeRate: currencyCtx.rate,
-  }));
-  return NextResponse.json({ products: productsWithLockedPrices });
+  return NextResponse.json({
+    products: products.map((p) => ({
+      ...p,
+      displayPrice: p.price,
+      displaySalePrice: p.salePrice,
+      currency: "NGN",
+      exchangeRate: 1,
+    })),
+  });
 }
 
 const CreateBody = z.object({
@@ -145,23 +144,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // Convert the seller's local-currency price into USD for storage. Any
-  // unsupported currency is reported as a 400 so the form can re-prompt.
-  let priceUsd = price;
-  let salePriceUsd: number | null = salePrice ?? null;
-  if (currency && currency.toUpperCase() !== "USD") {
-    try {
-      priceUsd = await convertToUsd(price, currency);
-      if (typeof salePrice === "number") {
-        salePriceUsd = await convertToUsd(salePrice, currency);
-      }
-    } catch (err) {
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Unsupported currency" },
-        { status: 400 },
-      );
-    }
-  }
+  // NGN is the canonical storage currency — sellers type prices in Naira and
+  // we store them as-is. The legacy USD round-trip has been removed; the
+  // `currency` field on the payload is ignored for now and will come back
+  // when multi-currency entry is reintroduced.
+  const priceStored = price;
+  const salePriceStored: number | null = salePrice ?? null;
+  void currency;
 
   // 1. Hard category check (fashion-only allowlist).
   if (!CATEGORIES.includes(category)) {
@@ -185,8 +174,8 @@ export async function POST(req: Request) {
       sellerId: ownerId,
       name,
       description,
-      price: priceUsd,
-      salePrice: salePriceUsd,
+      price: priceStored,
+      salePrice: salePriceStored,
       category,
       kind: kindForCategory(category),
       status: status ?? ProductStatus.ACTIVE,
