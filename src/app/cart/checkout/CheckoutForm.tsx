@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Price } from "@/components/Price";
 import { type PickedAddress } from "@/components/forms/GooglePlacesPicker";
 import { SavedAddressPicker } from "@/components/forms/SavedAddressPicker";
+import { useCheckoutTotals } from "./CheckoutTotalsContext";
 
 // Shipbubble quotes in NGN. Rates flow through the system in NGN-kobo (NGN × 100),
 // so we format them with a dedicated Naira formatter rather than the visitor-locale
@@ -42,6 +42,7 @@ export function CheckoutForm({
         : undefined;
   const [shippingAddress, setShippingAddress] = useState<PickedAddress | null>(null);
   const [notes, setNotes] = useState("");
+  const { setShippingKoboTotal } = useCheckoutTotals();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("DIRECT");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -125,6 +126,17 @@ export function CheckoutForm({
       setBusy(false);
     }
   }
+
+  // Push the running shipping total (kobo) to the shared context so the
+  // sidebar summary's Total line can sum it against the items subtotal.
+  useEffect(() => {
+    const total = Object.entries(selectedBySeller).reduce((acc, [sellerId, rateId]) => {
+      if (!rateId) return acc;
+      const rate = ratesBySeller[sellerId]?.find((r) => r.id === rateId);
+      return acc + (rate?.price ?? 0);
+    }, 0);
+    setShippingKoboTotal(total);
+  }, [selectedBySeller, ratesBySeller, setShippingKoboTotal]);
 
   useEffect(() => {
     let mounted = true;
@@ -407,26 +419,6 @@ export function CheckoutForm({
             })}
           </div>
 
-          {subtotal != null && (() => {
-            const shippingKoboTotal = Object.keys(selectedBySeller).reduce((acc, sid) => {
-              const r = selectedRateForSeller(sid);
-              return acc + (r?.price ?? 0);
-            }, 0);
-            return (
-              <div className="mt-3 space-y-1 border-t pt-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span>Items subtotal</span>
-                  <span><Price amount={subtotal} /></span>
-                </div>
-                {shippingKoboTotal > 0 && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Shipping</span>
-                    <span>{formatShippingNgn(shippingKoboTotal)}</span>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 

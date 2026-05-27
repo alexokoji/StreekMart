@@ -121,6 +121,26 @@ export async function convertToUsd(amount: number, code: string): Promise<number
   return amount / rate;
 }
 
+// Inverse of `convertToUsd` — convert a USD amount into the target currency
+// using the same cached rate table. Used at the checkout boundary to express
+// USD-stored item subtotals in NGN so they can be summed against NGN shipping.
+export async function convertUsdTo(amountUsd: number, code: string): Promise<number> {
+  if (!Number.isFinite(amountUsd) || amountUsd < 0) {
+    throw new Error("convertUsdTo: amount must be a non-negative finite number");
+  }
+  const upper = code.toUpperCase();
+  if (upper === "USD") return amountUsd;
+  if (!CURRENCY_BY_CODE.has(upper)) {
+    throw new Error(`convertUsdTo: unsupported currency "${code}"`);
+  }
+  const rates = await getRates();
+  const rate = rates[upper] ?? FALLBACK_RATES[upper];
+  if (!rate || rate <= 0) {
+    throw new Error(`convertUsdTo: no rate available for "${upper}"`);
+  }
+  return amountUsd * rate;
+}
+
 export async function getServerCurrencyContext(): Promise<CurrencyContext> {
   // 1. cookie wins
   const cookieCode = cookies().get(COOKIE_NAME)?.value;
