@@ -202,16 +202,32 @@ function splitTopLevel(s) {
 /**
  * Sanitise a Prisma column definition for use in `ALTER TABLE ADD COLUMN`.
  *   - Drops `PRIMARY KEY` (forbidden by SQLite for additive ALTER).
- *   - Keeps NOT NULL only when there's a DEFAULT, otherwise existing rows
- *     would violate NOT NULL and the ALTER would fail.
+ *   - DATETIME NOT NULL columns without a DEFAULT (typically Prisma's
+ *     `@updatedAt`) get `DEFAULT CURRENT_TIMESTAMP` added so existing
+ *     rows land with a real value instead of NULL. Without this, Prisma
+ *     would reject the row on read with P2032 ("expected non-nullable
+ *     DateTime, found null") — exactly the crash mode that drove this
+ *     workaround to exist.
+ *   - For other NOT NULL columns without a DEFAULT, the NOT NULL is
+ *     stripped (SQLite refuses to add NOT NULL columns with no default).
+ *     The application code is responsible for setting these on next write.
  */
 function makeAlterDefinition(definition) {
   let out = definition.replace(/\bPRIMARY KEY\b/gi, "").trim();
   const hasDefault = /\bDEFAULT\b/i.test(out);
   const hasNotNull = /\bNOT NULL\b/i.test(out);
+  const isDateTime = /\bDATETIME\b/i.test(out);
   if (hasNotNull && !hasDefault) {
-    // Strip NOT NULL — existing rows have no value to satisfy it.
-    out = out.replace(/\bNOT NULL\b/gi, "").trim();
+    if (isDateTime) {
+      // Backfill with CURRENT_TIMESTAMP so existing rows satisfy NOT NULL
+      // and Prisma reads them cleanly. The @updatedAt semantics still hold
+      // — Prisma overwrites on the next update — and createdAt-style
+      // columns already have their own DEFAULT in the original definition.
+      out = `${out} DEFAULT CURRENT_TIMESTAMP`;
+    } else {
+      // Strip NOT NULL — existing rows have no value to satisfy it.
+      out = out.replace(/\bNOT NULL\b/gi, "").trim();
+    }
   }
   return out;
 }
