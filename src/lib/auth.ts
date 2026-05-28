@@ -57,6 +57,8 @@ export async function getCurrentUser() {
       isDesigner: true,
       sellerVerified: true,
       designerVerified: true,
+      sellerTier: true,
+      designerTier: true,
       isAdmin: true,
       // Suspension gate — we return null when set so every guard above
       // (requireUser, requireAdmin) treats the user as signed-out.
@@ -144,7 +146,7 @@ export async function requireApiUser(perm?: Permission | Permission[]) {
   }
   const me = await prisma.user.findUnique({
     where: { id: session.sub },
-    select: { id: true, suspendedAt: true },
+    select: { id: true, suspendedAt: true, lastSeenAt: true },
   });
   if (!me || me.suspendedAt) {
     return {
@@ -153,6 +155,14 @@ export async function requireApiUser(perm?: Permission | Permission[]) {
         { status: 401 },
       ),
     };
+  }
+  // Throttled presence heartbeat. Bumping lastSeenAt on every API call
+  // would double the write rate; the 30s threshold keeps the chat
+  // online-indicator accurate while avoiding wallet-style churn.
+  if (!me.lastSeenAt || Date.now() - me.lastSeenAt.getTime() > 30_000) {
+    prisma.user
+      .update({ where: { id: me.id }, data: { lastSeenAt: new Date() } })
+      .catch((err) => console.warn("[auth] lastSeenAt update failed:", err));
   }
   if (perm) {
     const required = Array.isArray(perm) ? perm : [perm];

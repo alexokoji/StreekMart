@@ -11,11 +11,31 @@ async function assertParticipant(chatId: string, userId: string) {
   return !!member;
 }
 
-const senderSelect = {
+// Shared shape — reactions roll up to a `{ emoji, count, mine }` summary
+// so the client doesn't have to dedupe per render.
+const messageInclude = {
   sender: { select: { id: true, name: true, isSeller: true, isDesigner: true } },
+  reactions: { select: { id: true, emoji: true, userId: true } },
+  replyTo: {
+    select: {
+      id: true,
+      body: true,
+      senderId: true,
+      deletedAt: true,
+      attachmentUrl: true,
+      attachmentMime: true,
+      sender: { select: { id: true, name: true } },
+    },
+  },
 } as const;
 
-// GET /api/chats/[id]/messages?after=<iso> — used for polling (near-real-time chat).
+// GET /api/chats/[id]/messages?after=<iso>&updatedAfter=<iso>
+//
+// Two-cursor poll. `after` returns brand-new messages since the cursor;
+// `updatedAfter` returns existing messages whose body / reactions / read
+// state has changed (edits, deletes, reactions). The client merges by id.
+// Also returns the peer's typing flag + the peer's lastReadAt cursor so
+// the sender can paint ✓✓ read receipts.
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const guard = await requireApiUser();
   if ("error" in guard) return guard.error;
@@ -25,28 +45,85 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const url = new URL(req.url);
   const after = url.searchParams.get("after");
-  const messages = await prisma.message.findMany({
-    where: {
-      chatId: params.id,
-      ...(after ? { createdAt: { gt: new Date(after) } } : {}),
-    },
-    orderBy: { createdAt: "asc" },
-    include: senderSelect,
-    take: 200,
+  const updatedAfter = url.searchParams.get("updatedAfter");
+
+  const TYPING_WINDOW_MS = 5_000;
+
+  const [newMessages, updatedMessages, peers] = await Promise.all([
+    prisma.message.findMany({
+      where: {
+        chatId: params.id,
+        ...(after ? { createdAt: { gt: new Date(after) } } : {}),
+      },
+      orderBy: { createdAt: "asc" },
+      include: messageInclude,
+      take: 200,
+    }),
+    updatedAfter
+      ? prisma.message.findMany({
+          where: {
+            chatId: params.id,
+            updatedAt: { gt: new Date(updatedAfter) },
+            // Exclude rows already returned via `newMessages` — those carry
+            // the same updatedAt as createdAt for freshly-inserted rows.
+            ...(after ? { createdAt: { lte: new Date(after) } } : {}),
+          },
+          orderBy: { updatedAt: "asc" },
+          include: messageInclude,
+          take: 200,
+        })
+      : Promise.resolve([]),
+    prisma.chatParticipant.findMany({
+      where: { chatId: params.id, NOT: { userId: guard.session.sub } },
+      select: {
+        userId: true,
+        lastReadAt: true,
+        lastTypingAt: true,
+        user: { select: { lastSeenAt: true } },
+      },
+    }),
+  ]);
+
+  const now = Date.now();
+  // Peer is "online" when they pinged the API within the last 90s. Tight
+  // enough that a closed-tab user goes offline within a minute or so;
+  // loose enough that a brief network blip doesn't flap them.
+  const PRESENCE_WINDOW_MS = 90_000;
+  const peerTyping = peers
+    .filter((p) => p.lastTypingAt && now - p.lastTypingAt.getTime() < TYPING_WINDOW_MS)
+    .map((p) => p.userId);
+  const peerReads = peers.map((p) => ({
+    userId: p.userId,
+    lastReadAt: p.lastReadAt?.toISOString() ?? null,
+  }));
+  const peerOnline = peers
+    .filter((p) => p.user.lastSeenAt && now - p.user.lastSeenAt.getTime() < PRESENCE_WINDOW_MS)
+    .map((p) => p.userId);
+
+  return NextResponse.json({
+    messages: newMessages,
+    updates: updatedMessages,
+    peerTyping,
+    peerReads,
+    peerOnline,
+    serverNow: new Date().toISOString(),
   });
-  return NextResponse.json({ messages });
 }
 
 const PostBody = z.object({
-  body: z.string().min(1).max(4000),
-  // Client-generated identifier (typically a UUID) used to make POSTs
-  // idempotent. Optional so direct API callers without retry semantics
-  // still work; when provided, repeated submissions return the original
-  // message instead of inserting a duplicate.
+  body: z.string().max(4000),
   clientMessageId: z.string().min(1).max(128).optional(),
+  replyToId: z.string().min(1).max(64).optional(),
+  attachmentUrl: z.string().url().optional(),
+  attachmentMime: z.string().min(1).max(120).optional(),
+  attachmentName: z.string().min(1).max(255).optional(),
+  attachmentSize: z.number().int().nonnegative().max(50 * 1024 * 1024).optional(),
 });
 
-// POST /api/chats/[id]/messages — send a message in this chat.
+// POST /api/chats/[id]/messages
+//
+// Sends a new message. Required: at least one of `body` or `attachmentUrl`.
+// Optional: `replyToId` for quoted replies, idempotency `clientMessageId`.
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const guard = await requireApiUser();
   if ("error" in guard) return guard.error;
@@ -60,15 +137,39 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const chatId = params.id;
   const senderId = guard.session.sub;
-  const { body: text, clientMessageId } = parsed.data;
+  const {
+    body: text,
+    clientMessageId,
+    replyToId,
+    attachmentUrl,
+    attachmentMime,
+    attachmentName,
+    attachmentSize,
+  } = parsed.data;
 
-  // Idempotency fast-path: if we've already accepted this clientMessageId
-  // for this sender + chat, hand back the original row. Lets a retrying
-  // client collapse double-sends without creating duplicate messages.
+  if (!text.trim() && !attachmentUrl) {
+    return NextResponse.json(
+      { error: "Message must include text or an attachment." },
+      { status: 400 },
+    );
+  }
+
+  // Validate the replyToId exists in this chat — stops cross-chat leakage.
+  if (replyToId) {
+    const parent = await prisma.message.findFirst({
+      where: { id: replyToId, chatId },
+      select: { id: true },
+    });
+    if (!parent) {
+      return NextResponse.json({ error: "Reply target not found in this chat." }, { status: 400 });
+    }
+  }
+
+  // Idempotency fast-path.
   if (clientMessageId) {
     const existing = await prisma.message.findFirst({
       where: { chatId, senderId, clientMessageId },
-      include: senderSelect,
+      include: messageInclude,
     });
     if (existing) {
       return NextResponse.json({ message: existing, duplicate: true });
@@ -83,12 +184,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         senderId,
         body: text,
         clientMessageId: clientMessageId ?? null,
+        replyToId: replyToId ?? null,
+        attachmentUrl: attachmentUrl ?? null,
+        attachmentMime: attachmentMime ?? null,
+        attachmentName: attachmentName ?? null,
+        attachmentSize: attachmentSize ?? null,
       },
-      include: senderSelect,
+      include: messageInclude,
     });
   } catch (err) {
-    // Race condition: a parallel POST with the same clientMessageId won the
-    // insert between our findFirst and create. Re-fetch and return that row.
     if (
       clientMessageId &&
       err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -96,7 +200,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     ) {
       const winner = await prisma.message.findFirst({
         where: { chatId, senderId, clientMessageId },
-        include: senderSelect,
+        include: messageInclude,
       });
       if (winner) {
         return NextResponse.json({ message: winner, duplicate: true });
@@ -105,11 +209,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     throw err;
   }
 
-  // Bump chat updatedAt so listings re-sort.
-  await prisma.chat.update({
-    where: { id: chatId },
-    data: { updatedAt: new Date() },
-  });
+  // Bump chat updatedAt + clear sender's typing flag.
+  await Promise.all([
+    prisma.chat.update({
+      where: { id: chatId },
+      data: { updatedAt: new Date() },
+    }),
+    prisma.chatParticipant.update({
+      where: { chatId_userId: { chatId, userId: senderId } },
+      data: { lastTypingAt: null },
+    }),
+  ]);
 
   return NextResponse.json({ message });
 }

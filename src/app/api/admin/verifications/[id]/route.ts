@@ -44,11 +44,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     });
 
     if (decided === "APPROVED") {
+      const isSeller = reqRow.kind === "SELLER";
+      const grantTier3 = reqRow.tier === 3;
+      // Tier 2 approval flips the boolean (recompute then maps it to tier 2).
+      // Tier 3 approval is an explicit set — gold is sticky in the helper, so
+      // the only way it ever shows up on a user row is via this branch.
       await tx.user.update({
         where: { id: reqRow.userId },
         data: {
-          ...(reqRow.kind === "SELLER" ? { sellerVerified: true } : {}),
-          ...(reqRow.kind === "DESIGNER" ? { designerVerified: true } : {}),
+          ...(isSeller ? { sellerVerified: true } : {}),
+          ...(!isSeller ? { designerVerified: true } : {}),
+          ...(grantTier3 && isSeller ? { sellerTier: 3 } : {}),
+          ...(grantTier3 && !isSeller ? { designerTier: 3 } : {}),
           verifiedAt: new Date(),
           verifiedBy: guard.user.id,
         },
@@ -56,10 +63,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   });
 
-  // Recompute the matching tier after the verification flag flips. Sellers
-  // also gain Tier 2 only if they already have a default pickup address —
-  // the helper handles that check. Run outside the transaction so the
-  // verifiedAt write is durable even if tier eval hits an unexpected error.
+  // Recompute the matching tier after the verification flag flips. For
+  // Tier 2 approvals this brings the user from 1 → 2 (helper requires
+  // sellers to also have a default pickup address). For Tier 3 approvals
+  // we've already set the tier in the transaction; recompute is a no-op
+  // there because the helper treats 3 as sticky.
   if (decided === "APPROVED") {
     if (reqRow.kind === "SELLER") await recomputeSellerTier(reqRow.userId);
     if (reqRow.kind === "DESIGNER") await recomputeDesignerTier(reqRow.userId);

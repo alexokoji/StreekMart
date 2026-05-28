@@ -12,7 +12,7 @@ export default async function DesignerVerificationPage() {
           Followers and buyers see a check next to your name when you&apos;re verified.
         </p>
       </div>
-      <VerificationPanel kind="DESIGNER" alreadyVerified={user.designerVerified} />
+      <VerificationPanel kind="DESIGNER" currentTier={user.designerTier} />
     </div>
   );
 }

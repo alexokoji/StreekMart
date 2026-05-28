@@ -110,25 +110,53 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Verification gate — only verified sellers OR verified designers can list
-  // products. The check runs against the OWNER (so a manager listing on
-  // behalf of a verified seller works fine), not the actor.
+  // Verification + tier-cap gate. Run against the OWNER so a manager
+  // listing on behalf of someone else inherits the owner's tier.
   const owner = await prisma.user.findUnique({
     where: { id: ownerId },
-    select: { isSeller: true, isDesigner: true, sellerVerified: true, designerVerified: true },
+    select: {
+      isSeller: true,
+      isDesigner: true,
+      sellerVerified: true,
+      designerVerified: true,
+      sellerTier: true,
+      designerTier: true,
+    },
   });
   if (!owner) {
     return NextResponse.json({ error: "Owner not found" }, { status: 404 });
   }
-  const allowedToSell =
-    (owner.isSeller && owner.sellerVerified) ||
-    (owner.isDesigner && owner.designerVerified);
-  if (!allowedToSell) {
+
+  // Effective tier for listing purposes: the higher of the seller/designer
+  // tier the owner holds. Designers without a seller tier still get to
+  // post via this path (legacy).
+  const effectiveTier = Math.max(owner.sellerTier ?? 1, owner.designerTier ?? 1);
+  if (effectiveTier < 2) {
     return NextResponse.json(
       {
         error:
-          "Your account isn't verified yet. Submit a verification request from your dashboard — once approved, you'll be able to list products.",
+          "Your account is at Tier 1 — submit identity verification (Tier 2) from your dashboard to start listing products.",
         needsVerification: true,
+      },
+      { status: 403 },
+    );
+  }
+
+  // Tier-cap: hard cap on the number of ACTIVE listings the owner can hold.
+  // Drafts and archived rows don't count — only what buyers can actually see.
+  const { productLimitFor } = await import("@/lib/tiers");
+  const limit = productLimitFor(effectiveTier);
+  const activeCount = await prisma.product.count({
+    where: { sellerId: ownerId, status: ProductStatus.ACTIVE },
+  });
+  if (activeCount >= limit) {
+    return NextResponse.json(
+      {
+        error:
+          `You've reached your Tier ${effectiveTier} listing cap (${limit} active products). ` +
+          (effectiveTier === 2
+            ? "Upgrade to Tier 3 from your verification dashboard to raise the cap to 100."
+            : "Archive an existing product to free up a slot."),
       },
       { status: 403 },
     );

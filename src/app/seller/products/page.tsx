@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { ProductStatusToggle } from "@/components/ProductStatusToggle";
+import { productLimitFor } from "@/lib/tiers";
 
 export default async function SellerProductsPage() {
   const user = await requireUser("SELLER");
@@ -12,11 +14,79 @@ export default async function SellerProductsPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  // Tier-cap surface so sellers know how much headroom they have. Only
+  // ACTIVE listings count against the cap; drafts and archived rows are
+  // free real estate.
+  const tier = user.sellerTier ?? 1;
+  const limit = productLimitFor(tier);
+  const activeCount = products.filter((p) => p.status === ProductStatus.ACTIVE).length;
+  const atCap = limit > 0 && activeCount >= limit;
+  const capPct = limit > 0 ? Math.min(100, Math.round((activeCount / limit) * 100)) : 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">My products</h1>
-        <Link href="/seller/products/new" className="btn-primary">+ Add product</Link>
+        {tier >= 2 && !atCap && (
+          <Link href="/seller/products/new" className="btn-primary">+ Add product</Link>
+        )}
+      </div>
+
+      {/* Tier-cap card */}
+      <div
+        className={`card flex flex-wrap items-center gap-3 p-4 ${
+          tier < 2 ? "border-amber-200 bg-amber-50/40" : ""
+        }`}
+      >
+        <span
+          className={
+            tier === 3
+              ? "badge bg-gold-50 text-gold-700"
+              : tier === 2
+              ? "badge bg-sky-50 text-sky-700"
+              : "badge bg-ink-50 text-ink-600"
+          }
+        >
+          Tier {tier}
+        </span>
+        <div className="min-w-0 flex-1">
+          {tier === 1 ? (
+            <p className="text-sm">
+              You can&apos;t list products at Tier 1.{" "}
+              <Link href="/seller/verification" className="font-semibold text-violet-700 hover:underline">
+                Submit identity verification
+              </Link>{" "}
+              to unlock listings.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm">
+                <span className="font-semibold">{activeCount}</span> of{" "}
+                <span className="font-semibold">{limit}</span> active listings used
+                {atCap && (
+                  <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                    Cap reached
+                  </span>
+                )}
+              </p>
+              <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
+                <div
+                  className={`h-full ${atCap ? "bg-amber-500" : "bg-violet-500"}`}
+                  style={{ width: `${capPct}%` }}
+                />
+              </div>
+              {tier === 2 && (
+                <p className="mt-1 text-xs text-ink-500">
+                  Upgrade to Tier 3 from your{" "}
+                  <Link href="/seller/verification" className="font-medium text-violet-700 hover:underline">
+                    verification dashboard
+                  </Link>{" "}
+                  to raise the cap to 100 and drop withdrawal fees to 1.5%.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {products.length === 0 ? (

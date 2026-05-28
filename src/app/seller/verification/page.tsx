@@ -12,7 +12,7 @@ export default async function SellerVerificationPage() {
           A check mark next to your shop name signals trust to buyers.
         </p>
       </div>
-      <VerificationPanel kind="SELLER" alreadyVerified={user.sellerVerified} />
+      <VerificationPanel kind="SELLER" currentTier={user.sellerTier} />
     </div>
   );
 }

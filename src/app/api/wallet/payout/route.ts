@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import {
-  disburse,
-  WITHDRAWAL_FEE_BPS,
-  WITHDRAWAL_FEE_FLAT_CENTS,
-} from "@/lib/monnify";
+import { disburse, WITHDRAWAL_FEE_FLAT_CENTS } from "@/lib/monnify";
 import { availableBalanceCents, ensureWallet, recordTransaction } from "@/lib/wallet";
+import { withdrawalFeeBpsFor } from "@/lib/tiers";
 
 // POST /api/wallet/payout { amountCents, bankCode, accountNumber, accountName }
 //
@@ -36,8 +33,18 @@ export async function POST(req: Request) {
 
   const { amountCents, bankCode, accountNumber, accountName } = parsed.data;
 
-  // Compute the fee first so we can guarantee the wallet covers everything.
-  const feeCents = WITHDRAWAL_FEE_FLAT_CENTS + Math.round((amountCents * WITHDRAWAL_FEE_BPS) / 10000);
+  // Withdrawal fee scales with the seller's tier:
+  //   Tier 2 (blue) → 3% (300 bps)
+  //   Tier 3 (gold) → 1.5% (150 bps)
+  // Designers fall back to the seller schedule too — they have a parallel
+  // tier path and the same fee structure applies.
+  const me = await prisma.user.findUnique({
+    where: { id: guard.session.sub },
+    select: { sellerTier: true, designerTier: true },
+  });
+  const effectiveTier = Math.max(me?.sellerTier ?? 1, me?.designerTier ?? 1);
+  const feeBps = withdrawalFeeBpsFor(effectiveTier);
+  const feeCents = WITHDRAWAL_FEE_FLAT_CENTS + Math.round((amountCents * feeBps) / 10000);
   const totalDebit = amountCents + feeCents;
 
   await ensureWallet(guard.session.sub);

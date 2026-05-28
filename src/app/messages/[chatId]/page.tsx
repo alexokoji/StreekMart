@@ -35,7 +35,24 @@ export default async function ChatPage({ params }: { params: { chatId: string } 
   const initialMessages = await prisma.message.findMany({
     where: { chatId: chat.id },
     orderBy: { createdAt: "asc" },
-    include: { sender: { select: { id: true, name: true, isSeller: true, isDesigner: true } } },
+    // Prisma returns all scalar columns by default, so attachmentName/size
+    // already arrive without an explicit select. The include below is for
+    // the joined relations only.
+    include: {
+      sender: { select: { id: true, name: true, isSeller: true, isDesigner: true } },
+      reactions: { select: { id: true, emoji: true, userId: true } },
+      replyTo: {
+        select: {
+          id: true,
+          body: true,
+          senderId: true,
+          deletedAt: true,
+          attachmentUrl: true,
+          attachmentMime: true,
+          sender: { select: { id: true, name: true } },
+        },
+      },
+    },
     take: 200,
   });
 
@@ -52,7 +69,12 @@ export default async function ChatPage({ params }: { params: { chatId: string } 
           </p>
         )}
       </div>
-      <ChatPanel chatId={chat.id} currentUserId={user.id} initialMessages={initialMessages} />
+      <ChatPanel
+        chatId={chat.id}
+        currentUserId={user.id}
+        initialMessages={initialMessages}
+        peerName={other ? displaySellerName(other) : ""}
+      />
     </div>
   );
 }

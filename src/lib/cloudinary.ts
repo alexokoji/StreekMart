@@ -36,6 +36,18 @@ export async function uploadBufferToCloudinary(args: {
   buffer: Buffer;
   folder: string;
   publicId?: string;
+  // "image" → product photos / avatars (existing behaviour).
+  // "video" → MediaRecorder audio/video clips (Cloudinary stores both
+  //           under the video pipeline; audio gets transcoded server-side).
+  // "raw"  → opaque file payloads (PDF, docx, zip etc.) served as
+  //          downloads.
+  // "auto" → let Cloudinary detect from the bytes. Cheapest for "user
+  //          could upload anything" surfaces like chat attachments.
+  resourceType?: "image" | "video" | "raw" | "auto";
+  // Original filename, used by Cloudinary to derive an extension on the
+  // delivered URL when resourceType is "raw" so a PDF actually downloads
+  // as foo.pdf and not foo.bin.
+  originalFilename?: string;
 }): Promise<{ url: string; publicId: string; bytes: number; width?: number; height?: number }> {
   const cl = getCloudinary();
   const result: UploadApiResponse = await new Promise((resolve, reject) => {
@@ -43,12 +55,10 @@ export async function uploadBufferToCloudinary(args: {
       {
         folder: args.folder,
         public_id: args.publicId,
-        resource_type: "image",
-        // Cloudinary auto-generates a unique public_id when none is supplied,
-        // so we don't need `unique_filename`/`overwrite` flags here — they
-        // were no-ops without `use_filename: true`. Leaving them out keeps
-        // the request payload minimal so a stricter Cloudinary plan or a
-        // signature mismatch can't trip on unexpected fields.
+        resource_type: args.resourceType ?? "image",
+        ...(args.originalFilename
+          ? { use_filename: true, unique_filename: true, filename_override: args.originalFilename }
+          : {}),
       },
       (err, res) => {
         if (err || !res) reject(err ?? new Error("Cloudinary upload failed"));

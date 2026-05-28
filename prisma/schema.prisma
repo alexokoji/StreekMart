@@ -89,6 +89,11 @@ model User {
   suspendedAt      DateTime?
   suspendedBy      String?
   suspensionReason String?
+  // Presence heartbeat — bumped by requireApiUser when stale (>30s old).
+  // The chat polling endpoint reads this to surface "online" / "offline"
+  // for the peer. We deliberately don't show a "last seen X minutes ago"
+  // anywhere — only the live online flag, derived as `now - lastSeenAt < 90s`.
+  lastSeenAt   DateTime?
   // Trusted-buyer flag — set by an admin once a buyer has completed enough
   // delivery-confirmed orders. Required to use Pay-on-Delivery at checkout.
   trustedBuyer Boolean  @default(false)
@@ -143,6 +148,7 @@ model User {
   addresses     Address[]
   sellerReviewsReceived SellerReview[] @relation("SellerReviewsReceived")
   sellerReviewsWritten  SellerReview[] @relation("SellerReviewsWritten")
+  messageReactions      MessageReaction[]
 }
 
 // Saved addresses (address book).
@@ -306,6 +312,14 @@ model VerificationRequest {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   // SELLER | DESIGNER
   kind          String
+  // Which tier the requester is applying for.
+  //   2 = blue check (identity verification via NIN / Passport / Driver's License).
+  //   3 = gold check (business verification via CAC document + optional storefront photo).
+  // Tier 3 applications require the user to already be Tier 2.
+  tier          Int       @default(2)
+  // Tier 2 identity fields. idType: "NIN" | "PASSPORT" | "DRIVERS_LICENSE".
+  idType        String?
+  idNumber      String?
   // PENDING | APPROVED | REJECTED
   status        String    @default("PENDING")
   // Business fields — replace the old free-text "tell us about yourself" with
@@ -740,6 +754,16 @@ model ChatParticipant {
   userId   String
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   joinedAt DateTime @default(now())
+  // Read receipt cursor: every message in this chat with createdAt <= lastReadAt
+  // is considered read by this participant. Updated by the read endpoint when
+  // the chat is open and new messages roll in. Read state for individual
+  // messages is derived from this cursor — saves a per-message write per poll.
+  lastReadAt   DateTime?
+  // Typing indicator. Client heartbeats this field while the user is typing;
+  // the peer's poll reads it and compares against `now() - 5s` to decide
+  // whether to show "Alex is typing…". Stale entries are ignored, so no
+  // explicit "stopped typing" message is needed.
+  lastTypingAt DateTime?
 
   @@unique([chatId, userId])
 }
@@ -751,6 +775,28 @@ model Message {
   senderId  String
   sender    User      @relation("MessageSender", fields: [senderId], references: [id])
   body      String
+  // Quoted reply: parent message id. Null for top-level messages. The
+  // relation is intentionally NOT cascade — deleting the parent shows
+  // "original message deleted" in the reply UI rather than wiping the
+  // child too.
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+  // Image attachment. The chat UI uploads via /api/upload first, then
+  // stores the resulting URL + mime here. Body can still hold a caption.
+  attachmentUrl  String?
+  attachmentMime String?
+  // Original filename + size of the upload. Surfaced in the file-card UI
+  // for non-media attachments (PDF / docx / etc.) so the recipient sees
+  // what's there before downloading.
+  attachmentName String?
+  attachmentSize Int?
+  // Edit / delete state. `editedAt` set when the sender revises body; UI
+  // shows an "edited" indicator. `deletedAt` is a soft-delete — body
+  // and attachment are blanked client-side but the row stays so the
+  // surrounding conversation reads coherently.
+  editedAt  DateTime?
+  deletedAt DateTime?
   readAt    DateTime?
   // Client-generated UUID used to make sends idempotent. The server uses it
   // as a "have I seen this before?" check; identical retries collapse to one
@@ -758,9 +804,33 @@ model Message {
   // the unique constraint only collides when both sides provide a value.
   clientMessageId String?
   createdAt DateTime  @default(now())
+  // Bumped on edit, delete, reaction change. The polling endpoint uses it
+  // to ship "updated since X" payloads without re-fetching the whole
+  // window.
+  updatedAt DateTime  @updatedAt
+
+  reactions MessageReaction[]
 
   @@index([chatId, createdAt])
+  @@index([chatId, updatedAt])
   @@unique([chatId, senderId, clientMessageId])
+}
+
+// Emoji reactions on individual messages. WhatsApp-style — one reaction
+// per (message, user, emoji) tuple, but a user can stack multiple emojis
+// on the same message if they want. Toggle semantics: the API endpoint
+// creates the row if absent, deletes if present.
+model MessageReaction {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 // -------------------- Favorites / Wishlist & Likes --------------------
