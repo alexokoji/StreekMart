@@ -81,6 +81,8 @@ export default async function AdminUsersPage({
               isAdmin={u.isAdmin}
               sellerVerified={u.sellerVerified}
               designerVerified={u.designerVerified}
+              sellerTier={u.sellerTier}
+              designerTier={u.designerTier}
               suspendedAt={u.suspendedAt}
             />
           </li>

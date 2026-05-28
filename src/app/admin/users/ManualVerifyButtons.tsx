@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 // Per-user moderation controls for the admin user list. Hits:
 //   PATCH /api/admin/users/[id]/verify   (verify/unverify role)
+//   PATCH /api/admin/users/[id]/tier     (set seller/designer tier 1/2/3)
 //   PATCH /api/admin/users/[id]/suspend  (soft suspend/reinstate)
 //   DELETE /api/admin/users/[id]         (hard cascade delete)
 //
@@ -20,6 +21,8 @@ export function ManualVerifyButtons({
   isAdmin,
   sellerVerified,
   designerVerified,
+  sellerTier,
+  designerTier,
   suspendedAt,
 }: {
   userId: string;
@@ -30,6 +33,8 @@ export function ManualVerifyButtons({
   isAdmin: boolean;
   sellerVerified: boolean;
   designerVerified: boolean;
+  sellerTier: number;
+  designerTier: number;
   suspendedAt: Date | string | null;
 }) {
   const router = useRouter();
@@ -45,6 +50,34 @@ export function ManualVerifyButtons({
         body: JSON.stringify({ kind, value }),
       });
       if (res.ok) router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setTier(kind: "SELLER" | "DESIGNER", tier: 1 | 2 | 3) {
+    // Confirm downgrades — the perks (product cap, withdrawal fee) drop and
+    // a Tier 3 → lower change in particular should be deliberate.
+    const current = kind === "SELLER" ? sellerTier : designerTier;
+    if (tier < current) {
+      const label = kind === "SELLER" ? "seller" : "designer";
+      if (!window.confirm(`Downgrade ${name}'s ${label} tier from ${current} to ${tier}? They'll be notified by email.`)) {
+        return;
+      }
+    }
+    setBusy(`tier-${kind}`);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/tier`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, tier }),
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Tier change failed.");
+      }
     } finally {
       setBusy(null);
     }
@@ -129,24 +162,42 @@ export function ManualVerifyButtons({
         </span>
       )}
       {isSeller && (
-        <button
-          type="button"
-          className={sellerVerified ? "btn-secondary text-xs" : "btn-primary text-xs"}
-          onClick={() => flip("SELLER", !sellerVerified)}
-          disabled={busy !== null}
-        >
-          {sellerVerified ? "Unverify seller" : "Verify seller"}
-        </button>
+        <>
+          <button
+            type="button"
+            className={sellerVerified ? "btn-secondary text-xs" : "btn-primary text-xs"}
+            onClick={() => flip("SELLER", !sellerVerified)}
+            disabled={busy !== null}
+          >
+            {sellerVerified ? "Unverify seller" : "Verify seller"}
+          </button>
+          <TierSelect
+            label="Seller tier"
+            kind="SELLER"
+            value={sellerTier}
+            disabled={busy !== null}
+            onChange={(t) => setTier("SELLER", t)}
+          />
+        </>
       )}
       {isDesigner && (
-        <button
-          type="button"
-          className={designerVerified ? "btn-secondary text-xs" : "btn-primary text-xs"}
-          onClick={() => flip("DESIGNER", !designerVerified)}
-          disabled={busy !== null}
-        >
-          {designerVerified ? "Unverify designer" : "Verify designer"}
-        </button>
+        <>
+          <button
+            type="button"
+            className={designerVerified ? "btn-secondary text-xs" : "btn-primary text-xs"}
+            onClick={() => flip("DESIGNER", !designerVerified)}
+            disabled={busy !== null}
+          >
+            {designerVerified ? "Unverify designer" : "Verify designer"}
+          </button>
+          <TierSelect
+            label="Designer tier"
+            kind="DESIGNER"
+            value={designerTier}
+            disabled={busy !== null}
+            onChange={(t) => setTier("DESIGNER", t)}
+          />
+        </>
       )}
       {/* Suspension is reversible; deletion isn't. Both hidden for admins
           so a misclick can't lock out the platform's own admin row. */}
@@ -182,5 +233,44 @@ export function ManualVerifyButtons({
         </button>
       )}
     </div>
+  );
+}
+
+// Compact tier dropdown rendered next to the verify button. Picking the
+// same tier that's already set is a no-op on the server (the route returns
+// `unchanged: true`) so changing the visible value is the only signal we
+// need from the dropdown — no separate Apply button.
+function TierSelect({
+  label,
+  kind,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  kind: "SELLER" | "DESIGNER";
+  value: number;
+  disabled: boolean;
+  onChange: (tier: 1 | 2 | 3) => void;
+}) {
+  return (
+    <label className="inline-flex items-center gap-1 text-[11px] text-ink-500">
+      <span className="sr-only">{label}</span>
+      <select
+        aria-label={label}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          if (next === 1 || next === 2 || next === 3) onChange(next);
+        }}
+        className="rounded-md border border-ink-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-ink-700 disabled:opacity-50"
+        title={`Set ${kind.toLowerCase()} tier`}
+      >
+        <option value={1}>T1 · Unverified</option>
+        <option value={2}>T2 · Blue ✓</option>
+        <option value={3}>T3 · Gold ★</option>
+      </select>
+    </label>
   );
 }

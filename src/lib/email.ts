@@ -257,6 +257,49 @@ export function verificationDecisionEmail(opts: {
   };
 }
 
+export function tierChangeEmail(opts: {
+  name: string;
+  kind: "SELLER" | "DESIGNER";
+  tier: 1 | 2 | 3;
+  previousTier: 1 | 2 | 3 | number;
+}): { subject: string; html: string; text: string } {
+  const role = opts.kind.toLowerCase();
+  const went = opts.tier > opts.previousTier ? "upgraded" : opts.tier < opts.previousTier ? "moved" : "set";
+  const tierLabel =
+    opts.tier === 3 ? "Tier 3 (Gold ★)"
+      : opts.tier === 2 ? "Tier 2 (Blue ✓)"
+      : "Tier 1 (Unverified)";
+  // Perks copy mirrors the rules in lib/tiers.ts — keep these in sync if the
+  // product caps or withdrawal fees change there.
+  const perks =
+    opts.tier === 3
+      ? `<ul style="padding-left:20px; margin:12px 0;">
+           <li>List up to <strong>100 products</strong></li>
+           <li>Withdrawal fee drops to <strong>1.5%</strong></li>
+           <li>Gold badge shows on your storefront and posts</li>
+         </ul>`
+      : opts.tier === 2
+      ? `<ul style="padding-left:20px; margin:12px 0;">
+           <li>List up to <strong>30 products</strong></li>
+           <li>Withdrawal fee: <strong>3%</strong></li>
+           <li>Blue check shows on your storefront and posts</li>
+         </ul>`
+      : `<p>Your account is now Tier 1 — listings are paused until verification is restored. Reach out to support if this was unexpected.</p>`;
+  return {
+    subject:
+      opts.tier > opts.previousTier
+        ? `Your ${role} account is now ${tierLabel}`
+        : `Your ${role} tier has changed`,
+    html: wrap(`
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p>An admin has ${went} your ${role} account to <strong>${tierLabel}</strong>.</p>
+      ${perks}
+      <p style="margin-top:20px;"><a href="${appUrl()}/${role === "seller" ? "seller" : "designer"}" style="color:#7c3aed; font-weight:600;">Open your dashboard →</a></p>
+    `),
+    text: `Your ${role} account has been ${went} to ${tierLabel}.`,
+  };
+}
+
 export function accountSuspendedEmail(opts: {
   name: string;
   reason?: string | null;
