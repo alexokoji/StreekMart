@@ -7,7 +7,7 @@ import { requireApiUser } from "@/lib/auth";
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const comments = await prisma.comment.findMany({
     where: { postId: params.id },
-    include: { author: { select: { id: true, name: true, isDesigner: true, designerVerified: true } } },
+    include: { author: { select: { id: true, name: true, isDesigner: true, designerVerified: true, designerTier: true } } },
     orderBy: { createdAt: "asc" },
     take: 200,
   });
@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const comment = await prisma.comment.create({
     data: { postId: post.id, authorId: guard.session.sub, body: parsed.data.body },
-    include: { author: { select: { id: true, name: true, isDesigner: true, designerVerified: true } } },
+    include: { author: { select: { id: true, name: true, isDesigner: true, designerVerified: true, designerTier: true } } },
   });
 
   return NextResponse.json({ comment });

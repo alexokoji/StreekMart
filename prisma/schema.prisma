@@ -81,6 +81,14 @@ model User {
   sellerRatingCount Int   @default(0)
   // Platform admin flag — gates /admin and the /api/admin/* endpoints.
   isAdmin      Boolean  @default(false)
+  // Soft-suspension. When set, the account can't sign in, all sessions are
+  // invalidated at the next request (auth gate checks this column), and
+  // their products/posts are hidden from the storefront. Reversible — an
+  // admin clears the field to reinstate. A hard removal is a separate
+  // path that uses Prisma's onDelete:Cascade on User to wipe everything.
+  suspendedAt      DateTime?
+  suspendedBy      String?
+  suspensionReason String?
   // Trusted-buyer flag — set by an admin once a buyer has completed enough
   // delivery-confirmed orders. Required to use Pay-on-Delivery at checkout.
   trustedBuyer Boolean  @default(false)

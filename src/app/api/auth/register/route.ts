@@ -122,8 +122,13 @@ export async function POST(req: Request) {
 
   // Welcome email — fire-and-forget. Stub mode (no RESEND_API_KEY) just
   // logs to stdout, so dev signups never fail because email isn't wired.
+  // Log failures so prod incidents are debuggable; signup still succeeds.
   const tpl = welcomeEmail(user.name);
-  void sendEmail({ to: user.email, ...tpl }).catch(() => {});
+  void sendEmail({ to: user.email, ...tpl })
+    .then((r) => {
+      if (!r.ok) console.error("[email:welcome] failed", { to: user.email, error: r.error });
+    })
+    .catch((err) => console.error("[email:welcome] threw", { to: user.email, err }));
 
   return NextResponse.json({
     id: user.id,

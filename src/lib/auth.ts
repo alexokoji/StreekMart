@@ -40,7 +40,7 @@ export async function getSession(): Promise<SessionPayload | null> {
 export async function getCurrentUser() {
   const session = await getSession();
   if (!session) return null;
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { id: session.sub },
     select: {
       id: true,
@@ -58,6 +58,9 @@ export async function getCurrentUser() {
       sellerVerified: true,
       designerVerified: true,
       isAdmin: true,
+      // Suspension gate — we return null when set so every guard above
+      // (requireUser, requireAdmin) treats the user as signed-out.
+      suspendedAt: true,
       bio: true,
       avatarUrl: true,
       exposureScore: true,
@@ -69,6 +72,12 @@ export async function getCurrentUser() {
       deliveryOutsideCountryCents: true,
     },
   });
+  if (!user) return null;
+  // Suspended accounts are treated as not signed in. Sessions remain valid
+  // JWT-wise (no per-session revocation list); this DB check is what
+  // actually blocks them. Admins reinstate by clearing `suspendedAt`.
+  if (user.suspendedAt) return null;
+  return user;
 }
 
 // Admin guard for /admin pages. Throws via redirect if not signed in or
@@ -123,10 +132,27 @@ export async function requireUser(perm?: Permission | Permission[]) {
 
 // API route guard. Returns either a session (with attached permission flags)
 // or a NextResponse 401/403 to short-circuit the handler.
+//
+// Includes a suspension check that 401s when the account has been suspended
+// since the cookie was minted. The JWT itself isn't revocable, so this DB
+// hit is what enforces revocation — accept the small per-request cost for
+// the safety of "suspending a bad actor immediately stops their writes."
 export async function requireApiUser(perm?: Permission | Permission[]) {
   const session = await getSession();
   if (!session) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  const me = await prisma.user.findUnique({
+    where: { id: session.sub },
+    select: { id: true, suspendedAt: true },
+  });
+  if (!me || me.suspendedAt) {
+    return {
+      error: NextResponse.json(
+        { error: "Account is suspended or no longer exists." },
+        { status: 401 },
+      ),
+    };
   }
   if (perm) {
     const required = Array.isArray(perm) ? perm : [perm];

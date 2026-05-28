@@ -39,21 +39,31 @@ export type SendResult = {
 
 // Single send. Returns ok=false with a reason on failure so callers can log
 // + continue rather than crash the request that triggered the send.
+//
+// Failure-mode logging happens here at the source so we don't depend on
+// every caller wiring its own try/catch. The log line format
+// `[email:send] <reason>` is the single grep target for prod incidents.
 export async function sendEmail(args: SendArgs): Promise<SendResult> {
   const toList = Array.isArray(args.to) ? args.to : [args.to];
 
   if (!isEmailEnabled()) {
     // Stub mode — print + pretend we sent. Useful for dev / CI.
-    console.log("[email:stub]", { to: toList, subject: args.subject });
+    // In prod this line is the smoking gun for "emails not arriving":
+    // RESEND_API_KEY isn't set on the Vercel env.
+    console.warn(
+      "[email:stub] RESEND_API_KEY not set — email NOT sent.",
+      { to: toList, subject: args.subject },
+    );
     return { ok: true, id: "stub-" + Date.now() };
   }
 
+  const from = fromAddress();
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Resend } = require("resend") as typeof import("resend");
     const client = new Resend(process.env.RESEND_API_KEY);
     const res = await client.emails.send({
-      from: fromAddress(),
+      from,
       to: toList,
       subject: args.subject,
       html: args.html,
@@ -61,18 +71,66 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
       replyTo: args.replyTo,
     });
     if (res.error) {
+      console.error("[email:send] Resend rejected", {
+        to: toList,
+        subject: args.subject,
+        from,
+        error: res.error,
+      });
       return { ok: false, error: res.error.message };
     }
+    console.log("[email:send] ok", { to: toList, subject: args.subject, id: res.data?.id });
     return { ok: true, id: res.data?.id };
   } catch (err) {
+    console.error("[email:send] threw", {
+      to: toList,
+      subject: args.subject,
+      from,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return { ok: false, error: err instanceof Error ? err.message : "Unknown email error" };
   }
 }
 
 // Resolve a recipient set for an admin broadcast.
-export type BroadcastAudience = "ALL" | "BUYERS" | "SELLERS" | "DESIGNERS" | "VERIFIED" | "SPECIFIC";
+//
+// SPECIFIC takes an array of User IDs. EMAILS takes an array of email
+// addresses — useful when the admin already has the addresses (e.g. CSV
+// export, support ticket) and doesn't want to look up IDs first. Unknown
+// addresses are still included as send targets so a "blast to my mailing
+// list" use case works even for non-users.
+export type BroadcastAudience =
+  | "ALL"
+  | "BUYERS"
+  | "SELLERS"
+  | "DESIGNERS"
+  | "VERIFIED"
+  | "SPECIFIC"
+  | "EMAILS";
 
-export async function resolveAudienceEmails(audience: BroadcastAudience, specificIds: string[] = []) {
+type Recipient = { id: string; email: string; name: string };
+
+export async function resolveAudienceEmails(
+  audience: BroadcastAudience,
+  specificIds: string[] = [],
+  specificEmails: string[] = [],
+): Promise<Recipient[]> {
+  if (audience === "EMAILS") {
+    if (specificEmails.length === 0) return [];
+    // Normalise + de-dupe addresses; the form may include duplicates.
+    const normalized = Array.from(
+      new Set(specificEmails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
+    );
+    // Pull matching users so the audit row + email envelope have a real
+    // name when available. Unknown addresses fall through with id="".
+    const users = await prisma.user.findMany({
+      where: { email: { in: normalized } },
+      select: { id: true, email: true, name: true },
+    });
+    const byEmail = new Map(users.map((u) => [u.email.toLowerCase(), u]));
+    return normalized.map((email) => byEmail.get(email) ?? { id: "", email, name: email });
+  }
+
   const where: Record<string, unknown> = {};
   switch (audience) {
     case "ALL":
@@ -96,6 +154,10 @@ export async function resolveAudienceEmails(audience: BroadcastAudience, specifi
       where.id = { in: specificIds };
       break;
   }
+  // Never blast to suspended accounts — they can't sign in or interact
+  // with the platform, and sending them content would just generate
+  // bounce / unsubscribe noise.
+  where.suspendedAt = null;
   const users = await prisma.user.findMany({
     where,
     select: { id: true, email: true, name: true },
@@ -186,6 +248,36 @@ export function verificationDecisionEmail(opts: {
     text: opts.approved
       ? `You're a verified ${role} on ${SITE}.`
       : `Your ${role} verification needs another look.${opts.note ? " " + opts.note : ""}`,
+  };
+}
+
+export function accountSuspendedEmail(opts: {
+  name: string;
+  reason?: string | null;
+}): { subject: string; html: string; text: string } {
+  return {
+    subject: `Your ${SITE} account has been suspended`,
+    html: wrap(`
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p>Your ${SITE} account has been suspended by an admin. You won&rsquo;t be able to sign in or use the platform until the suspension is lifted.</p>
+      ${opts.reason
+        ? `<p style="padding:12px; background:#fbeef0; color:#6b1a2a; border-radius:10px;"><strong>Reason:</strong> ${escapeHtml(opts.reason)}</p>`
+        : ""}
+      <p>If you believe this is a mistake, reply to this email and our team will review.</p>
+    `),
+    text: `Your ${SITE} account has been suspended.${opts.reason ? " Reason: " + opts.reason : ""}`,
+  };
+}
+
+export function accountReinstatedEmail(name: string): { subject: string; html: string; text: string } {
+  return {
+    subject: `Your ${SITE} account is active again`,
+    html: wrap(`
+      <p>Hi ${escapeHtml(name)},</p>
+      <p>Good news — your ${SITE} account has been reinstated. You can sign in and continue where you left off.</p>
+      <p style="margin-top:24px;"><a href="${appUrl()}/login" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">Sign in</a></p>
+    `),
+    text: `Your ${SITE} account is active again. Sign in at ${appUrl()}/login.`,
   };
 }
 

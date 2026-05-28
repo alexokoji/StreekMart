@@ -99,6 +99,15 @@ export async function GET(req: Request) {
     });
   }
 
+  // Suspension gate — block sign-in for suspended accounts at the OAuth
+  // landing too. Redirect to /login with an error flag so the user sees
+  // a clear message instead of a session that immediately 401s.
+  if (user.suspendedAt) {
+    const url = new URL("/login", origin);
+    url.searchParams.set("error", "suspended");
+    return NextResponse.redirect(url);
+  }
+
   await setSessionCookie({
     sub: user.id,
     email: user.email,

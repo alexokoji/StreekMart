@@ -134,12 +134,13 @@ export async function POST(req: Request) {
     );
   }
 
-  // Sale price sanity check — done BEFORE conversion so the seller's typed
-  // numbers are validated as a pair in their own currency. Conversion is
-  // monotonic so the relationship survives.
+  // Sale price sanity check.
   if (typeof salePrice === "number" && salePrice >= price) {
+    const formatN = (n: number) => `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return NextResponse.json(
-      { error: "Sale price must be less than the regular price." },
+      {
+        error: `Sale price ${formatN(salePrice)} must be less than the regular price ${formatN(price)}.`,
+      },
       { status: 400 },
     );
   }

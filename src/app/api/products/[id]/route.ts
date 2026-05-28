@@ -80,17 +80,25 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     );
   }
 
-  // Sale price sanity (against the next effective price). Validated in the
-  // *seller's typed currency* so it matches what they see in the form;
-  // conversion to USD happens after this check.
+  // Sale price sanity (against the next effective price). The seller may
+  // have only changed one of the two fields, in which case nextPrice is the
+  // existing stored value — and that's the common cause of confusing
+  // rejections after currency migrations (the regular price still shows the
+  // legacy figure). Surface both numbers in the message so the seller can
+  // see what tripped the check.
   const nextPrice = parsed.data.price ?? product.price;
   if (
     parsed.data.salePrice !== undefined &&
     parsed.data.salePrice !== null &&
     parsed.data.salePrice >= nextPrice
   ) {
+    const formatN = (n: number) => `₦${n.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     return NextResponse.json(
-      { error: "Sale price must be less than the regular price." },
+      {
+        error:
+          `Sale price ${formatN(parsed.data.salePrice)} must be less than the regular price ${formatN(nextPrice)}. ` +
+          `Tip: update the regular price first if it still shows an old value.`,
+      },
       { status: 400 },
     );
   }

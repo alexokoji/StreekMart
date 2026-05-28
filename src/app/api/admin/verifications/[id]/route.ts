@@ -78,7 +78,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       approved: decided === "APPROVED",
       note: parsed.data.note,
     });
-    void sendEmail({ to: requester.email, ...tpl }).catch(() => {});
+    void sendEmail({ to: requester.email, ...tpl })
+      .then((r) => {
+        if (!r.ok) console.error("[email:verification-decision] failed", { to: requester.email, error: r.error });
+      })
+      .catch((err) => console.error("[email:verification-decision] threw", { to: requester.email, err }));
   }
 
   return NextResponse.json({ ok: true, status: decided });

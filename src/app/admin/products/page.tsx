@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { Price } from "@/components/Price";
 import { timeAgo, parseJsonArray } from "@/lib/utils";
+import { ProductModerationButtons } from "./ProductModerationButtons";
 
 export default async function AdminProductsPage({
   searchParams,
@@ -71,10 +72,25 @@ export default async function AdminProductsPage({
                   {p.salesCount} sales
                 </p>
               </div>
-              <span className="badge bg-ink-50 text-ink-700">{p.status}</span>
+              <span
+                className={
+                  p.status === "ARCHIVED"
+                    ? "badge bg-amber-50 text-amber-700"
+                    : p.status === "ACTIVE"
+                    ? "badge bg-emerald-50 text-emerald-700"
+                    : "badge bg-ink-50 text-ink-700"
+                }
+              >
+                {p.status}
+              </span>
               <p className="w-20 text-right text-sm font-semibold">
                 <Price amount={p.salePrice ?? p.price} />
               </p>
+              <ProductModerationButtons
+                productId={p.id}
+                productName={p.name}
+                status={p.status}
+              />
             </li>
           );
         })}

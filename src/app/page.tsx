@@ -14,6 +14,7 @@ import { type ProductCardData } from "@/components/storefront/ProductCard";
 import { CardGrid } from "@/components/storefront/CardGrid";
 import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
+import { TierBadge } from "@/components/TierBadge";
 import {
   PromotionSlider,
   type PromotionSlide,
@@ -76,10 +77,13 @@ export default async function HomePage({
       take: 200,
     }),
     prisma.user.findMany({
-      where: { isDesigner: true },
+      // Home "Top designers" rail is curated — only Tier 2+ designers
+      // appear so the section is a signal of quality, not a directory of
+      // every account flagged isDesigner. Matches the feed rail's filter.
+      where: { isDesigner: true, designerTier: { gte: 2 } },
       orderBy: { exposureScore: "desc" },
       take: 8,
-      select: { id: true, name: true, bio: true, exposureScore: true, designerVerified: true },
+      select: { id: true, name: true, bio: true, exposureScore: true, designerVerified: true, designerTier: true },
     }),
     user
       ? prisma.favorite.findMany({
@@ -360,7 +364,8 @@ export default async function HomePage({
       {/* Smart suggestions — personalised for signed-in users, trending for guests. */}
       <SmartSuggestions />
 
-      {/* Top designers */}
+      {/* Top designers — only renders when at least one verified designer exists. */}
+      {designers.length > 0 && (
       <section>
         <div className="mb-4 flex items-end justify-between gap-3">
           <div className="min-w-0">
@@ -383,7 +388,10 @@ export default async function HomePage({
               <div className="min-w-0 flex-1">
                 <p className="font-medium">
                   {d.name}
-                  {d.designerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
+                  <TierBadge
+                    tier={d.designerTier ?? (d.designerVerified ? 2 : 1)}
+                    className="ml-1"
+                  />
                 </p>
                 <p className="line-clamp-1 text-xs text-ink-500">{d.bio ?? "Independent designer"}</p>
               </div>
@@ -391,6 +399,7 @@ export default async function HomePage({
           ))}
         </div>
       </section>
+      )}
 
       {/* CTA — become a seller/designer */}
       <section className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-10 text-center">

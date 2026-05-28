@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { timeAgo } from "@/lib/utils";
+import { TierBadge } from "@/components/TierBadge";
 
 type PostData = {
   id: string;
@@ -20,6 +21,7 @@ type PostData = {
     name: string;
     bio: string | null;
     designerVerified: boolean;
+    designerTier?: number | null;
   };
 };
 
@@ -27,7 +29,13 @@ type Comment = {
   id: string;
   body: string;
   createdAt: string;
-  author: { id: string; name: string; isDesigner: boolean; designerVerified: boolean };
+  author: {
+    id: string;
+    name: string;
+    isDesigner: boolean;
+    designerVerified: boolean;
+    designerTier?: number | null;
+  };
 };
 
 export function PostCard({
@@ -170,7 +178,10 @@ export function PostCard({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold">
             {post.author.name}
-            {post.author.designerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
+            <TierBadge
+              tier={post.author.designerTier ?? (post.author.designerVerified ? 2 : 1)}
+              className="ml-1"
+            />
             {post.promoted && <span className="ml-2 badge bg-gold-50 text-gold-700">Promoted</span>}
           </p>
           <p className="text-[11px] text-ink-500">
@@ -257,7 +268,10 @@ export function PostCard({
                 <li key={c.id} className="rounded-lg bg-ink-50 px-3 py-2">
                   <p className="text-xs font-semibold">
                     {c.author.name}
-                    {c.author.designerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
+                    <TierBadge
+                      tier={c.author.designerTier ?? (c.author.designerVerified ? 2 : 1)}
+                      className="ml-1"
+                    />
                   </p>
                   <p className="text-sm text-ink-800">{c.body}</p>
                   <p className="text-[10px] text-ink-400">{timeAgo(c.createdAt)}</p>

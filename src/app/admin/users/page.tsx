@@ -30,7 +30,10 @@ export default async function AdminUsersPage({
       isDesigner: true,
       sellerVerified: true,
       designerVerified: true,
+      sellerTier: true,
+      designerTier: true,
       isAdmin: true,
+      suspendedAt: true,
       createdAt: true,
     },
   });
@@ -62,16 +65,8 @@ export default async function AdminUsersPage({
               </p>
               <p className="text-xs text-ink-500">{u.email} · joined {timeAgo(u.createdAt)}</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
-                {u.isSeller && (
-                  <span className={`badge ${u.sellerVerified ? "bg-emerald-50 text-emerald-accent" : "bg-violet-50 text-violet-700"}`}>
-                    Seller{u.sellerVerified ? " ✓" : ""}
-                  </span>
-                )}
-                {u.isDesigner && (
-                  <span className={`badge ${u.designerVerified ? "bg-emerald-50 text-emerald-accent" : "bg-fuchsia-50 text-fuchsia-700"}`}>
-                    Designer{u.designerVerified ? " ✓" : ""}
-                  </span>
-                )}
+                {u.isSeller && <RoleBadge label="Seller" tier={u.sellerTier} />}
+                {u.isDesigner && <RoleBadge label="Designer" tier={u.designerTier} />}
                 {!u.isSeller && !u.isDesigner && !u.isAdmin && (
                   <span className="badge bg-ink-50 text-ink-500">Buyer</span>
                 )}
@@ -79,14 +74,39 @@ export default async function AdminUsersPage({
             </div>
             <ManualVerifyButtons
               userId={u.id}
+              email={u.email}
+              name={u.name}
               isSeller={u.isSeller}
               isDesigner={u.isDesigner}
+              isAdmin={u.isAdmin}
               sellerVerified={u.sellerVerified}
               designerVerified={u.designerVerified}
+              suspendedAt={u.suspendedAt}
             />
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+// Tier-aware role chip for the admin user list. Gold for Tier 3, sky for
+// Tier 2, neutral for Tier 1. Suffix "✓" / "★" hints at the badge state
+// without needing the shared TierBadge component (the chip itself carries
+// the role label).
+function RoleBadge({ label, tier }: { label: string; tier: number | null | undefined }) {
+  const t = tier ?? 1;
+  if (t >= 3) {
+    return (
+      <span className="badge bg-gold-50 text-gold-700">{label} ★</span>
+    );
+  }
+  if (t >= 2) {
+    return (
+      <span className="badge bg-sky-50 text-sky-700">{label} ✓</span>
+    );
+  }
+  return (
+    <span className="badge bg-ink-50 text-ink-600">{label}</span>
   );
 }

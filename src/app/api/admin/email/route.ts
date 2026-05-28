@@ -20,8 +20,11 @@ import {
 const Body = z.object({
   subject: z.string().min(2).max(200),
   body: z.string().min(2).max(20_000),
-  audience: z.enum(["ALL", "BUYERS", "SELLERS", "DESIGNERS", "VERIFIED", "SPECIFIC"]),
+  audience: z.enum(["ALL", "BUYERS", "SELLERS", "DESIGNERS", "VERIFIED", "SPECIFIC", "EMAILS"]),
   specificIds: z.array(z.string()).max(2000).optional(),
+  // For audience=EMAILS: a list of raw email addresses. Mix of users and
+  // non-users is fine; the resolver attaches user metadata where it can.
+  specificEmails: z.array(z.string().email()).max(2000).optional(),
 });
 
 const SEND_CONCURRENCY = 4;
@@ -42,11 +45,21 @@ export async function POST(req: Request) {
   const recipients = await resolveAudienceEmails(
     parsed.data.audience as BroadcastAudience,
     parsed.data.specificIds ?? [],
+    parsed.data.specificEmails ?? [],
   );
 
   if (recipients.length === 0) {
     return NextResponse.json({ error: "Audience resolved to 0 recipients." }, { status: 400 });
   }
+
+  // For EMAILS audience some recipients won't have a user id (non-users);
+  // store the raw emails in the audit field instead. Otherwise store the
+  // resolved user ids as before. The column is `String @default("[]")`
+  // — semantically just a JSON array, the field name is historical.
+  const auditList =
+    parsed.data.audience === "EMAILS"
+      ? recipients.map((r) => r.email)
+      : recipients.map((r) => r.id);
 
   // Create the audit row up-front so we have an ID even if the send fails.
   const broadcast = await prisma.emailBroadcast.create({
@@ -55,7 +68,7 @@ export async function POST(req: Request) {
       subject: parsed.data.subject,
       body: parsed.data.body,
       audience: parsed.data.audience,
-      recipientIdsJson: JSON.stringify(recipients.map((r) => r.id)),
+      recipientIdsJson: JSON.stringify(auditList),
       recipientCount: recipients.length,
       status: "STUB",
     },

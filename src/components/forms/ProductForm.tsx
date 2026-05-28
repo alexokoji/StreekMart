@@ -305,8 +305,18 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
               className="input pl-8"
               value={salePrice}
               onChange={(e) => setSalePrice(e.target.value === "" ? "" : Number(e.target.value))}
+              aria-invalid={salePrice !== "" && Number(salePrice) >= Number(price)}
             />
           </div>
+          {/* Live guard: catches the "sale price ≥ regular price" mistake
+              before the server roundtrip so sellers see the problem
+              inline. Same rule the API enforces in /api/products[/id]. */}
+          {salePrice !== "" && Number(salePrice) >= Number(price) && (
+            <p className="mt-1 text-[11px] text-red-600">
+              Must be less than the regular price (₦{Number(price).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).
+              Bump the regular price first if it&apos;s still showing an older value.
+            </p>
+          )}
         </div>
         <div>
           <label className="label">Stock</label>
@@ -412,7 +422,11 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
         {mode === "edit" ? (
           <button type="button" className="btn-danger" onClick={onDelete} disabled={busy}>Delete</button>
         ) : <span />}
-        <button type="submit" className="btn-primary" disabled={busy}>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={busy || (salePrice !== "" && Number(salePrice) >= Number(price))}
+        >
           {busy ? "Saving…" : mode === "create" ? "Create listing" : "Save changes"}
         </button>
       </div>

@@ -169,9 +169,13 @@ export async function finalizePaidOrders(args: {
         orderId: o.id,
         productName: o.product.name,
         deliveryCode: o.deliveryCode,
-        totalDisplay: `$${o.totalPrice.toFixed(2)}`,
+        totalDisplay: `₦${o.totalPrice.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       });
-      void sendEmail({ to: buyer.email, ...tpl }).catch(() => {});
+      void sendEmail({ to: buyer.email, ...tpl })
+        .then((r) => {
+          if (!r.ok) console.error("[email:order-placed] failed", { orderId: o.id, to: buyer.email, error: r.error });
+        })
+        .catch((err) => console.error("[email:order-placed] threw", { orderId: o.id, to: buyer.email, err }));
     }
   }
 

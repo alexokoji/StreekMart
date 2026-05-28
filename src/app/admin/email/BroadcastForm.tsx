@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Audience = "ALL" | "BUYERS" | "SELLERS" | "DESIGNERS" | "VERIFIED" | "SPECIFIC";
+type Audience = "ALL" | "BUYERS" | "SELLERS" | "DESIGNERS" | "VERIFIED" | "SPECIFIC" | "EMAILS";
 
 const AUDIENCES: { value: Audience; label: string; help: string }[] = [
   { value: "ALL", label: "Everyone", help: "Every account on the platform." },
@@ -11,7 +11,8 @@ const AUDIENCES: { value: Audience; label: string; help: string }[] = [
   { value: "SELLERS", label: "Sellers", help: "Anyone with the Seller permission." },
   { value: "DESIGNERS", label: "Designers", help: "Anyone with the Designer permission." },
   { value: "VERIFIED", label: "Verified accounts", help: "Verified sellers or designers." },
-  { value: "SPECIFIC", label: "Specific users", help: "Paste a comma-separated list of user IDs." },
+  { value: "SPECIFIC", label: "Specific users (by ID)", help: "Paste a comma-separated list of user IDs." },
+  { value: "EMAILS", label: "Specific addresses (by email)", help: "Paste a comma- or newline-separated list of email addresses. Non-users still receive the email." },
 ];
 
 export function BroadcastForm() {
@@ -20,6 +21,7 @@ export function BroadcastForm() {
   const [body, setBody] = useState("");
   const [audience, setAudience] = useState<Audience>("ALL");
   const [specificIds, setSpecificIds] = useState("");
+  const [specificEmails, setSpecificEmails] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -36,10 +38,23 @@ export function BroadcastForm() {
               .map((s) => s.trim())
               .filter(Boolean)
           : undefined;
+      const emails =
+        audience === "EMAILS"
+          ? specificEmails
+              .split(/[\s,;]+/)
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
       const res = await fetch("/api/admin/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, body, audience, specificIds: ids }),
+        body: JSON.stringify({
+          subject,
+          body,
+          audience,
+          specificIds: ids,
+          specificEmails: emails,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -53,6 +68,7 @@ export function BroadcastForm() {
       setSubject("");
       setBody("");
       setSpecificIds("");
+      setSpecificEmails("");
       router.refresh();
     } finally {
       setBusy(false);
@@ -113,6 +129,22 @@ export function BroadcastForm() {
             onChange={(e) => setSpecificIds(e.target.value)}
             placeholder="cuid1, cuid2, cuid3 (comma or whitespace separated)"
           />
+        </div>
+      )}
+
+      {audience === "EMAILS" && (
+        <div>
+          <label className="label">Email addresses</label>
+          <textarea
+            className="input min-h-[100px] font-mono text-xs"
+            value={specificEmails}
+            onChange={(e) => setSpecificEmails(e.target.value)}
+            placeholder={"jane@example.com\nalex@partner.co\n— comma, semicolon, or newline separated"}
+          />
+          <p className="mt-1 text-[11px] text-ink-500">
+            Addresses that match an existing user will be linked in the audit log.
+            Addresses that don&apos;t still receive the email.
+          </p>
         </div>
       )}
 

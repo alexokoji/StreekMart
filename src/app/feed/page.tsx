@@ -40,7 +40,7 @@ export default async function FeedPage({
     prisma.post.findMany({
       where: postWhere,
       include: {
-        author: { select: { id: true, name: true, exposureScore: true, designerVerified: true, bio: true } },
+        author: { select: { id: true, name: true, exposureScore: true, designerVerified: true, designerTier: true, bio: true } },
         promotions: { where: { active: true, endsAt: { gt: now } } },
         _count: { select: { comments: true, likes: true } },
       },
@@ -48,10 +48,12 @@ export default async function FeedPage({
       take: 60,
     }),
     prisma.user.findMany({
-      where: { isDesigner: true },
+      // Feed rail and home rail share the same rule now: only verified
+      // designers (Tier 2+) appear in the "Top designers" surfaces.
+      where: { isDesigner: true, designerTier: { gte: 2 } },
       orderBy: { exposureScore: "desc" },
       take: 6,
-      select: { id: true, name: true, bio: true, designerVerified: true },
+      select: { id: true, name: true, bio: true, designerVerified: true, designerTier: true },
     }),
     user
       ? prisma.favorite.findMany({
