@@ -21,7 +21,15 @@ export async function GET(req: Request) {
   }
 
   const user = await getCurrentUser();
-  const { items, hasMore } = await fetchRailPage(rail, { offset, limit });
+  // Forward filters from the query string so infinite-scroll load-more
+  // calls return the same scoped slice the SSR pass renders. Without this,
+  // page 1 is filtered but page 2+ leaks unfiltered products into the grid.
+  const filters = {
+    category: url.searchParams.get("category"),
+    country: url.searchParams.get("country"),
+    city: url.searchParams.get("city"),
+  };
+  const { items, hasMore } = await fetchRailPage(rail, { offset, limit, filters });
   const savedIds = await fetchSavedIdsFor(
     user?.id ?? null,
     items.map((i) => i.id),

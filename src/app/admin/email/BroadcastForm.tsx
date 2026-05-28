@@ -24,6 +24,7 @@ export function BroadcastForm() {
   const [specificEmails, setSpecificEmails] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [failures, setFailures] = useState<{ email: string; error: string }[]>([]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -59,16 +60,22 @@ export function BroadcastForm() {
       const data = await res.json();
       if (!res.ok) {
         setMsg({ kind: "err", text: data.error ?? "Couldn't send." });
+        setFailures([]);
         return;
       }
       setMsg({
-        kind: "ok",
+        kind: data.status === "SENT" ? "ok" : "err",
         text: `${data.status}: ${data.sentCount} / ${data.recipientCount} delivered.`,
       });
-      setSubject("");
-      setBody("");
-      setSpecificIds("");
-      setSpecificEmails("");
+      setFailures(Array.isArray(data.failures) ? data.failures : []);
+      // Only reset the form when every send succeeded — otherwise the
+      // admin probably wants to copy the failed addresses and retry.
+      if (data.status === "SENT") {
+        setSubject("");
+        setBody("");
+        setSpecificIds("");
+        setSpecificEmails("");
+      }
       router.refresh();
     } finally {
       setBusy(false);
@@ -156,6 +163,34 @@ export function BroadcastForm() {
         >
           {msg.text}
         </p>
+      )}
+
+      {failures.length > 0 && (
+        <details className="rounded-lg border border-burgundy-200 bg-burgundy-50/40 p-3 text-sm">
+          <summary className="cursor-pointer font-medium text-burgundy-700">
+            {failures.length} address{failures.length === 1 ? "" : "es"} failed — show details
+          </summary>
+          <ul className="mt-3 space-y-1.5 text-xs">
+            {failures.map((f, i) => (
+              <li key={`${f.email}-${i}`} className="break-all">
+                <span className="font-mono text-ink-700">{f.email}</span>
+                <span className="ml-2 text-burgundy-600">{f.error}</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            className="mt-3 text-xs text-violet-600 underline"
+            onClick={() => {
+              setAudience("EMAILS");
+              setSpecificEmails(failures.map((f) => f.email).join("\n"));
+              setFailures([]);
+              setMsg({ kind: "ok", text: "Failed addresses loaded — adjust subject/body if you like, then re-send." });
+            }}
+          >
+            Reload failed addresses into the form to retry
+          </button>
+        </details>
       )}
 
       <div className="flex justify-end">

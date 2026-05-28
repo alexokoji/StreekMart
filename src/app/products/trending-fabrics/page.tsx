@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import { fetchRailPage, fetchSavedIdsFor } from "@/lib/productRails";
+import { CATEGORIES } from "@/lib/enums";
+import { fetchRailPage, fetchSavedIdsFor, type RailFilters } from "@/lib/productRails";
 import { InfiniteProductGrid } from "@/components/storefront/InfiniteProductGrid";
+import { FilterableRailLayout } from "@/components/storefront/FilterableRailLayout";
 
 export const metadata = {
   title: "Trending fabrics | StreekMart",
@@ -9,30 +10,39 @@ export const metadata = {
 };
 
 const PAGE_SIZE = 24;
+const BASE_PATH = "/products/trending-fabrics";
 
-export default async function TrendingFabricsPage() {
+export default async function TrendingFabricsPage({
+  searchParams,
+}: {
+  searchParams: { category?: string; country?: string; city?: string };
+}) {
   const user = await getCurrentUser();
+  const filters: RailFilters = {
+    category: searchParams.category && CATEGORIES.includes(searchParams.category)
+      ? searchParams.category
+      : null,
+    country: searchParams.country ?? null,
+    city: searchParams.city ?? null,
+  };
   const { items, hasMore } = await fetchRailPage("trending-fabrics", {
     offset: 0,
     limit: PAGE_SIZE,
+    filters,
   });
   const savedIds = await fetchSavedIdsFor(user?.id, items.map((i) => i.id));
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="space-y-2">
-        <Link href="/" className="text-sm text-brand-700 hover:underline">
-          ← Back home
-        </Link>
-        <h1 className="font-display text-2xl font-bold sm:text-3xl">Trending fabrics</h1>
-        <p className="text-sm text-ink-500">
-          Yardage and rolls from independent sellers — ranked by buyer interest.
-        </p>
-      </div>
-
+    <FilterableRailLayout
+      title="Trending fabrics"
+      subtitle="Yardage and rolls from independent sellers — ranked by buyer interest."
+      basePath={BASE_PATH}
+      activeCategory={filters.category ?? null}
+      locationFilter={{ country: filters.country ?? undefined, city: filters.city ?? undefined }}
+    >
       {items.length === 0 ? (
         <p className="rounded-lg border border-ink-100 p-6 text-sm text-ink-500">
-          No fabrics listed yet.
+          No fabrics match the current filters.
         </p>
       ) : (
         <InfiniteProductGrid
@@ -42,8 +52,9 @@ export default async function TrendingFabricsPage() {
           rail="trending-fabrics"
           cols={6}
           pageSize={PAGE_SIZE}
+          filters={filters}
         />
       )}
-    </div>
+    </FilterableRailLayout>
   );
 }

@@ -5,7 +5,7 @@
 // page of a given rail.
 
 import { prisma } from "./db";
-import { ProductKind, ProductStatus, PromotionStatus } from "./enums";
+import { ProductKind, ProductStatus, PromotionStatus, CATEGORIES } from "./enums";
 import { shapeProductForCard, rankScore } from "./productShape";
 import type { ProductCardData } from "@/components/storefront/ProductCard";
 
@@ -26,6 +26,51 @@ export const VALID_RAILS: ReadonlyArray<RailKey> = [
 
 export function isValidRail(value: string | null | undefined): value is RailKey {
   return !!value && (VALID_RAILS as readonly string[]).includes(value);
+}
+
+// Optional URL-driven filters applied on every rail. `category` is validated
+// against the fashion allowlist; unknown values are silently dropped (so a
+// stale link doesn't render an empty page with no explanation). Location
+// fields filter on the seller side — country is exact, city is case-
+// insensitive equals (matches the LocationFilter UI's contract).
+export type RailFilters = {
+  category?: string | null;
+  country?: string | null;
+  city?: string | null;
+};
+
+function normalizeFilters(filters: RailFilters | undefined) {
+  if (!filters) return {};
+  const out: { category?: string; country?: string; city?: string } = {};
+  if (filters.category && CATEGORIES.includes(filters.category)) {
+    out.category = filters.category;
+  }
+  if (filters.country) {
+    const c = filters.country.trim().toUpperCase().slice(0, 2);
+    if (c.length === 2) out.country = c;
+  }
+  if (filters.city) {
+    const t = filters.city.trim();
+    if (t.length > 0) out.city = t;
+  }
+  return out;
+}
+
+// Convert normalised filters into a Prisma `where` fragment that can be
+// merged with each rail's base where clause. Returns an empty object when
+// no filters apply, so a spread merge is a no-op for unfiltered calls.
+function whereFragment(filters: RailFilters | undefined) {
+  const n = normalizeFilters(filters);
+  const sellerWhere: Record<string, unknown> = {};
+  // SQLite + Prisma doesn't accept `mode: "insensitive"` — equals only.
+  // Matches the convention used in src/app/feed/page.tsx so the same
+  // ?city= URL works on both surfaces.
+  if (n.country) sellerWhere.country = n.country;
+  if (n.city) sellerWhere.city = { equals: n.city };
+  const out: Record<string, unknown> = {};
+  if (n.category) out.category = n.category;
+  if (Object.keys(sellerWhere).length > 0) out.seller = sellerWhere;
+  return out;
 }
 
 // Seller include shape every rail needs. Kept as a const so it stays in
@@ -52,27 +97,32 @@ type RailResult = {
 
 export async function fetchRailPage(
   rail: RailKey,
-  opts: { offset: number; limit: number },
+  opts: { offset: number; limit: number; filters?: RailFilters },
 ): Promise<RailResult> {
   const offset = Math.max(0, opts.offset);
   const limit = Math.min(48, Math.max(1, opts.limit));
+  const filters = opts.filters;
 
   switch (rail) {
     case "new-arrivals":
-      return fetchNewArrivals(offset, limit);
+      return fetchNewArrivals(offset, limit, filters);
     case "trending-fabrics":
-      return fetchTrendingFabrics(offset, limit);
+      return fetchTrendingFabrics(offset, limit, filters);
     case "best-sellers":
-      return fetchBestSellers(offset, limit);
+      return fetchBestSellers(offset, limit, filters);
     case "flash-sales":
-      return fetchFlashSales(offset, limit);
+      return fetchFlashSales(offset, limit, filters);
     case "featured":
-      return fetchFeatured(offset, limit);
+      return fetchFeatured(offset, limit, filters);
   }
 }
 
-async function fetchNewArrivals(offset: number, limit: number): Promise<RailResult> {
-  const where = { status: ProductStatus.ACTIVE } as const;
+async function fetchNewArrivals(
+  offset: number,
+  limit: number,
+  filters?: RailFilters,
+): Promise<RailResult> {
+  const where = { status: ProductStatus.ACTIVE, ...whereFragment(filters) };
   const rows = await prisma.product.findMany({
     where,
     include: sellerInclude,
@@ -84,8 +134,18 @@ async function fetchNewArrivals(offset: number, limit: number): Promise<RailResu
   return { items: rows.slice(0, limit).map(shapeProductForCard), hasMore };
 }
 
-async function fetchTrendingFabrics(offset: number, limit: number): Promise<RailResult> {
-  const where = { status: ProductStatus.ACTIVE, kind: ProductKind.MATERIAL } as const;
+async function fetchTrendingFabrics(
+  offset: number,
+  limit: number,
+  filters?: RailFilters,
+): Promise<RailResult> {
+  // Trending fabrics is already category-locked to MATERIAL kind. A user-
+  // supplied `category` further narrows within fabrics (e.g. "Linen").
+  const where = {
+    status: ProductStatus.ACTIVE,
+    kind: ProductKind.MATERIAL,
+    ...whereFragment(filters),
+  };
   const rows = await prisma.product.findMany({
     where,
     include: sellerInclude,
@@ -97,8 +157,16 @@ async function fetchTrendingFabrics(offset: number, limit: number): Promise<Rail
   return { items: rows.slice(0, limit).map(shapeProductForCard), hasMore };
 }
 
-async function fetchBestSellers(offset: number, limit: number): Promise<RailResult> {
-  const where = { status: ProductStatus.ACTIVE, salesCount: { gt: 0 } } as const;
+async function fetchBestSellers(
+  offset: number,
+  limit: number,
+  filters?: RailFilters,
+): Promise<RailResult> {
+  const where = {
+    status: ProductStatus.ACTIVE,
+    salesCount: { gt: 0 },
+    ...whereFragment(filters),
+  };
   const rows = await prisma.product.findMany({
     where,
     include: sellerInclude,
@@ -114,9 +182,17 @@ async function fetchBestSellers(offset: number, limit: number): Promise<RailResu
 // product with a non-null salePrice, filter `salePrice < price` in JS, and
 // slice the page. The narrow predicate keeps the working set small even at
 // marketplace scale.
-async function fetchFlashSales(offset: number, limit: number): Promise<RailResult> {
+async function fetchFlashSales(
+  offset: number,
+  limit: number,
+  filters?: RailFilters,
+): Promise<RailResult> {
   const products = await prisma.product.findMany({
-    where: { status: ProductStatus.ACTIVE, salePrice: { not: null } },
+    where: {
+      status: ProductStatus.ACTIVE,
+      salePrice: { not: null },
+      ...whereFragment(filters),
+    },
     include: sellerInclude,
   });
   const onSale = products
@@ -136,10 +212,14 @@ async function fetchFlashSales(offset: number, limit: number): Promise<RailResul
 // Featured = the six-factor rank score. Can't be expressed in Prisma orderBy
 // so we fetch every active product (cap at 500 so a runaway catalogue can't
 // blow lambda memory), rank in memory, and slice.
-async function fetchFeatured(offset: number, limit: number): Promise<RailResult> {
+async function fetchFeatured(
+  offset: number,
+  limit: number,
+  filters?: RailFilters,
+): Promise<RailResult> {
   const now = new Date();
   const products = await prisma.product.findMany({
-    where: { status: ProductStatus.ACTIVE },
+    where: { status: ProductStatus.ACTIVE, ...whereFragment(filters) },
     include: {
       ...sellerInclude,
       promotions: {
@@ -162,9 +242,6 @@ async function fetchFeatured(offset: number, limit: number): Promise<RailResult>
         salesCount: b.salesCount,
         ownerExposureScore: b.seller.exposureScore,
         promotionBoost: b.promotions[0]?.boost ?? 1,
-        verified: (b.seller.sellerTier ?? 0) >= 2,
-        sellerRatingAvg: b.seller.sellerRatingAvg,
-        sellerRatingCount: b.seller.sellerRatingCount,
       }) -
       rankScore({
         createdAt: a.createdAt,
@@ -174,9 +251,6 @@ async function fetchFeatured(offset: number, limit: number): Promise<RailResult>
         salesCount: a.salesCount,
         ownerExposureScore: a.seller.exposureScore,
         promotionBoost: a.promotions[0]?.boost ?? 1,
-        verified: (a.seller.sellerTier ?? 0) >= 2,
-        sellerRatingAvg: a.seller.sellerRatingAvg,
-        sellerRatingCount: a.seller.sellerRatingCount,
       }),
   );
   const slice = ranked.slice(offset, offset + limit);

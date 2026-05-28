@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CardGrid } from "./CardGrid";
 import type { ProductCardData } from "./ProductCard";
-import type { RailKey } from "@/lib/productRails";
+import type { RailKey, RailFilters } from "@/lib/productRails";
 
 /**
  * Renders the initial server-fetched batch of products and lazy-loads more
@@ -20,6 +20,7 @@ export function InfiniteProductGrid({
   rail,
   cols,
   pageSize = 24,
+  filters,
 }: {
   initialItems: ProductCardData[];
   initialSavedIds: string[];
@@ -27,6 +28,11 @@ export function InfiniteProductGrid({
   rail: RailKey;
   cols: 4 | 6;
   pageSize?: number;
+  // When the page is filtered (?category=…&country=…&city=…), forward
+  // those onto the load-more API call so additional pages keep the same
+  // scope. Without this, the first batch is filtered but subsequent
+  // batches leak unfiltered products into the grid.
+  filters?: RailFilters;
 }) {
   const [items, setItems] = useState<ProductCardData[]>(initialItems);
   const [savedSet, setSavedSet] = useState<Set<string>>(
@@ -42,8 +48,15 @@ export function InfiniteProductGrid({
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/products/list?rail=${encodeURIComponent(rail)}&offset=${items.length}&limit=${pageSize}`;
-      const res = await fetch(url);
+      const params = new URLSearchParams({
+        rail,
+        offset: String(items.length),
+        limit: String(pageSize),
+      });
+      if (filters?.category) params.set("category", filters.category);
+      if (filters?.country) params.set("country", filters.country);
+      if (filters?.city) params.set("city", filters.city);
+      const res = await fetch(`/api/products/list?${params.toString()}`);
       if (!res.ok) {
         setError("Couldn't load more products. Try again.");
         return;
@@ -67,7 +80,7 @@ export function InfiniteProductGrid({
     } finally {
       setLoading(false);
     }
-  }, [items.length, hasMore, loading, rail, pageSize]);
+  }, [items.length, hasMore, loading, rail, pageSize, filters?.category, filters?.country, filters?.city]);
 
   // IntersectionObserver: fire loadMore when the sentinel becomes visible.
   // rootMargin pre-loads slightly before it's actually in view so the user

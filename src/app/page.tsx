@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  CATEGORIES,
   CATEGORY_GROUPS,
   ProductKind,
   ProductStatus,
@@ -26,22 +27,27 @@ export const dynamic = "force-dynamic";
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: { country?: string; city?: string };
+  searchParams: { country?: string; city?: string; category?: string };
 }) {
   const user = await getCurrentUser();
   const now = new Date();
 
-  // Optional URL-based location filter — applied to every product rail.
-  // Country is matched exactly (ISO-2). City is matched case-insensitively
-  // via Prisma's `equals` after trimming.
+  // Optional URL-based filters — applied to every product rail on the page
+  // so a click on the CategoryRail or LocationFilter narrows the home page
+  // in place rather than punting to the feed.
   const country = searchParams.country?.toUpperCase().slice(0, 2);
   const city = searchParams.city?.trim();
+  const activeCategory =
+    searchParams.category && CATEGORIES.includes(searchParams.category)
+      ? searchParams.category
+      : null;
   const sellerWhere: Record<string, unknown> = {};
   if (country) sellerWhere.country = country;
   if (city) sellerWhere.city = { equals: city };
-  const productWhere = {
+  const productWhere: Record<string, unknown> = {
     status: ProductStatus.ACTIVE,
     ...(Object.keys(sellerWhere).length > 0 ? { seller: sellerWhere } : {}),
+    ...(activeCategory ? { category: activeCategory } : {}),
   };
 
   const [products, designers, savedFavorites, perCategoryGrouped, activePromotions] = await Promise.all([
@@ -186,6 +192,17 @@ export default async function HomePage({
         }),
     );
 
+  // Carries the home page's active filters onto the landing-page "See all"
+  // links — clicking through a filtered home page lands on a filtered
+  // landing page rather than resetting the scope.
+  const seeAllParams = new URLSearchParams();
+  if (activeCategory) seeAllParams.set("category", activeCategory);
+  if (country) seeAllParams.set("country", country);
+  if (city) seeAllParams.set("city", city);
+  const seeAllQuery = seeAllParams.toString();
+  const seeAllHref = (railPath: string) =>
+    seeAllQuery ? `${railPath}?${seeAllQuery}` : railPath;
+
   const featured = ranked.slice(0, 8);
   const trendingFabrics = products
     .filter((p) => p.kind === ProductKind.MATERIAL)
@@ -221,7 +238,7 @@ export default async function HomePage({
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[14rem_1fr]">
-        <CategoryRail counts={categoryCounts} />
+        <CategoryRail counts={categoryCounts} basePath="/" activeCategory={activeCategory} />
 
         <div className="relative h-[300px] overflow-hidden rounded-2xl bg-g-aurora text-white shadow-soft sm:h-[360px] lg:h-[420px]">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold-300/30 blur-3xl" />
@@ -317,8 +334,8 @@ export default async function HomePage({
                 {items.map((c) => (
                   <Link
                     key={c}
-                    href={`/feed?category=${encodeURIComponent(c)}`}
-                    className="chip"
+                    href={`/?category=${encodeURIComponent(c)}`}
+                    className={activeCategory === c ? "chip bg-violet-50 text-violet-700" : "chip"}
                   >
                     {c}
                     <span className="ml-1.5 text-[11px] text-ink-400">{categoryCounts.get(c) ?? 0}</span>
@@ -332,31 +349,31 @@ export default async function HomePage({
 
       {/* Flash sales */}
       {flashSales.length > 0 && (
-        <Section title="🔥 Flash sales" subtitle="Limited-time discounts from sellers — grab before they're gone." href="/products/flash-sales">
+        <Section title="🔥 Flash sales" subtitle="Limited-time discounts from sellers — grab before they're gone." href={seeAllHref("/products/flash-sales")}>
           <CardGrid items={flashSales.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
 
       {/* Trending fabrics */}
       {trendingFabrics.length > 0 && (
-        <Section title="Trending fabrics" subtitle="Yardage and rolls from independent sellers." href="/products/trending-fabrics">
+        <Section title="Trending fabrics" subtitle="Yardage and rolls from independent sellers." href={seeAllHref("/products/trending-fabrics")}>
           <CardGrid items={trendingFabrics.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
 
       {/* Featured (ranked) */}
-      <Section title="Featured pieces" subtitle="Ranked by engagement, sales, and active promotions." href="/products/featured">
+      <Section title="Featured pieces" subtitle="Ranked by engagement, sales, and active promotions." href={seeAllHref("/products/featured")}>
         <CardGrid items={featured.map(shape)} savedSet={savedSet} cols={4} />
       </Section>
 
       {/* New arrivals */}
-      <Section title="New arrivals" subtitle="Fresh listings, just in." href="/products/new-arrivals">
+      <Section title="New arrivals" subtitle="Fresh listings, just in." href={seeAllHref("/products/new-arrivals")}>
         <CardGrid items={newArrivals.map(shape)} savedSet={savedSet} cols={6} />
       </Section>
 
       {/* Best sellers */}
       {bestSellers.length > 0 && bestSellers.some((p) => p.salesCount > 0) && (
-        <Section title="Best sellers" subtitle="What buyers keep coming back for." href="/products/best-sellers">
+        <Section title="Best sellers" subtitle="What buyers keep coming back for." href={seeAllHref("/products/best-sellers")}>
           <CardGrid items={bestSellers.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}

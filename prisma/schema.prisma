@@ -374,6 +374,10 @@ model EmailBroadcast {
   // STUB | SENT | PARTIAL | FAILED
   status      String   @default("STUB")
   errorNote   String?
+  // Per-recipient failures captured at send time. JSON array of
+  // { email, error } objects so the admin can see exactly which
+  // addresses failed and why (rate limit vs invalid vs bounce, etc.).
+  failuresJson String  @default("[]")
   createdAt   DateTime @default(now())
 
   @@index([createdAt])

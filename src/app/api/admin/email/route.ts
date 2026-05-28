@@ -27,7 +27,25 @@ const Body = z.object({
   specificEmails: z.array(z.string().email()).max(2000).optional(),
 });
 
-const SEND_CONCURRENCY = 4;
+// Resend's free tier rate-limits at 2 requests/second. We send sequentially
+// (1 in flight) with a 600ms gap → ~1.7/sec, safely under the ceiling.
+// Anything more aggressive triggers 429s mid-blast and silently fails
+// recipients. If you upgrade Resend's plan, lift these numbers in tandem.
+const SEND_GAP_MS = 600;
+const RATE_LIMIT_RETRY_WAIT_MS = 1500;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function looksRateLimited(error: string | undefined): boolean {
+  if (!error) return false;
+  const msg = error.toLowerCase();
+  return (
+    msg.includes("rate") ||
+    msg.includes("429") ||
+    msg.includes("too many") ||
+    msg.includes("throttl")
+  );
+}
 
 export async function POST(req: Request) {
   const guard = await requireApiAdmin();
@@ -78,29 +96,49 @@ export async function POST(req: Request) {
 
   let sent = 0;
   let firstError: string | null = null;
+  const failures: { email: string; error: string }[] = [];
 
-  // Small concurrency window — Resend's free tier rate-limits at 2 req/s.
-  // 4 concurrent calls × short body keeps us comfortably under that.
-  for (let i = 0; i < recipients.length; i += SEND_CONCURRENCY) {
-    const batch = recipients.slice(i, i + SEND_CONCURRENCY);
-    const results = await Promise.all(
-      batch.map((r) =>
-        sendEmail({ to: r.email, ...tpl }).catch((err) => ({
-          ok: false as const,
-          error: err instanceof Error ? err.message : "Unknown",
-        })),
-      ),
-    );
-    for (const res of results) {
-      if (res.ok) sent++;
-      else if (!firstError) firstError = res.error ?? "Unknown error";
+  // Sequential send loop with pacing. One send per ~600ms keeps us under
+  // Resend's free-tier 2 req/s. On a 429-shaped error we wait longer and
+  // retry once — captures the common transient-rate-limit case without
+  // looping forever.
+  for (let i = 0; i < recipients.length; i++) {
+    const r = recipients[i];
+    if (i > 0) await sleep(SEND_GAP_MS);
+
+    let res = await sendEmail({ to: r.email, ...tpl }).catch((err) => ({
+      ok: false as const,
+      error: err instanceof Error ? err.message : "Unknown",
+    }));
+
+    if (!res.ok && looksRateLimited(res.error)) {
+      // Single retry after a longer wait. Resend's 429s clear in well
+      // under a second; 1.5s is comfortable headroom.
+      await sleep(RATE_LIMIT_RETRY_WAIT_MS);
+      res = await sendEmail({ to: r.email, ...tpl }).catch((err) => ({
+        ok: false as const,
+        error: err instanceof Error ? err.message : "Unknown",
+      }));
+    }
+
+    if (res.ok) {
+      sent++;
+    } else {
+      const error = res.error ?? "Unknown error";
+      if (!firstError) firstError = error;
+      failures.push({ email: r.email, error });
     }
   }
 
   const status = sent === recipients.length ? "SENT" : sent === 0 ? "FAILED" : "PARTIAL";
   await prisma.emailBroadcast.update({
     where: { id: broadcast.id },
-    data: { status, sentCount: sent, errorNote: firstError ?? null },
+    data: {
+      status,
+      sentCount: sent,
+      errorNote: firstError ?? null,
+      failuresJson: JSON.stringify(failures),
+    },
   });
 
   return NextResponse.json({
@@ -109,5 +147,6 @@ export async function POST(req: Request) {
     recipientCount: recipients.length,
     sentCount: sent,
     status,
+    failures,
   });
 }
