@@ -31,6 +31,11 @@ const body = Manrope({
 export const metadata: Metadata = {
   title: "StreekMart — Fashion Marketplace",
   description: "Materials, ready-to-wear, and designer content — fashion only.",
+  icons: {
+    icon: "/logo.jpeg",
+    shortcut: "/logo.jpeg",
+    apple: "/logo.jpeg",
+  },
 };
 
 // Viewport is its own export in Next 14 (was in metadata previously).
