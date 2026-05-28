@@ -10,9 +10,31 @@
 //   node scripts/migrate-verified-to-tier.mjs            # dry-run
 //   node scripts/migrate-verified-to-tier.mjs --apply    # mutate
 
+import { readFileSync, existsSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+// Load .env so TURSO_* vars are available when run locally pointed at prod.
+if (existsSync(".env")) {
+  for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(?:"([^"]*)"|(.*))$/i);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2] ?? m[3] ?? "";
+  }
+}
+
+async function buildClient() {
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  const tursoToken = process.env.TURSO_AUTH_TOKEN;
+  if (tursoUrl) {
+    const { PrismaLibSQL } = await import("@prisma/adapter-libsql");
+    const adapter = new PrismaLibSQL({ url: tursoUrl, authToken: tursoToken });
+    console.log(`(using Turso adapter: ${tursoUrl})`);
+    return new PrismaClient({ adapter });
+  }
+  console.log("(using local sqlite via DATABASE_URL)");
+  return new PrismaClient();
+}
+
+const prisma = await buildClient();
 const MARKER_KEY = "tier_migration_applied_at";
 const apply = process.argv.includes("--apply");
 const force = process.argv.includes("--force");
