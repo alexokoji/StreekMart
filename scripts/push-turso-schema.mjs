@@ -29,8 +29,15 @@ if (existsSync(".env")) {
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 if (!url || !authToken) {
-  console.error("Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN.");
-  process.exit(1);
+  // Soft-skip so a build environment without prod credentials (e.g. a
+  // preview deploy, a dev machine without secrets) doesn't fail. Production
+  // deploys MUST have these env vars; if they're absent there, the missing
+  // columns error will surface at runtime and you'll know to fix the env.
+  console.warn(
+    "[push-turso-schema] Skipping — TURSO_DATABASE_URL / TURSO_AUTH_TOKEN not set. " +
+      "(Expected on local builds and preview deploys without prod secrets.)",
+  );
+  process.exit(0);
 }
 
 let sql = readFileSync(".turso/schema.sql", "utf8");

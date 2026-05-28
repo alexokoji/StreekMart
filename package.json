@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/regen-turso-schema.mjs && node scripts/push-turso-schema.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
