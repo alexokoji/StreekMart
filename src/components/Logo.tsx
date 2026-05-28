@@ -20,7 +20,7 @@ const CROP_FULL = {
   // backgroundSize / backgroundPosition pair achieves "render only that
   // box, scaled to fill the container".
   bgSize: "130% auto",
-  bgPosX: "52%",
+  bgPosX: "46%",
   bgPosY: "50%",
   // Aspect ratio of the cropped content area (~86% × ~52% of 1080×720).
   // 928/375 ≈ 2.48.
