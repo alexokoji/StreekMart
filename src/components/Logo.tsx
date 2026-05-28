@@ -19,8 +19,8 @@ const CROP_FULL = {
   // Cropped content occupies ~9–95% horizontally and ~24–76% vertically.
   // backgroundSize / backgroundPosition pair achieves "render only that
   // box, scaled to fill the container".
-  bgSize: "116% auto",
-  bgPosX: "47%",
+  bgSize: "130% auto",
+  bgPosX: "50%",
   bgPosY: "50%",
   // Aspect ratio of the cropped content area (~86% × ~52% of 1080×720).
   // 928/375 ≈ 2.48.
