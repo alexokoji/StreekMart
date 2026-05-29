@@ -154,13 +154,34 @@ export function CartClient({ items: initial }: { items: Item[] }) {
                 <span className="text-xs text-ink-500">
                   {formatQuantity(it.quantity, it.product.unit)}
                 </span>
+                {/* Trash-can icon button. Sized 40×40 to clear Apple's 44pt
+                    minimum tap target with chrome around it, and rendered
+                    as an icon-only so the tiny "Remove" text that the
+                    finger used to miss on mobile is gone. Still
+                    keyboard-accessible via aria-label. */}
                 <button
                   type="button"
-                  className="ml-auto -mr-2 px-2 py-1 text-xs text-gray-500 hover:text-red-600 active:text-red-600"
+                  aria-label="Remove item"
+                  className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100 active:text-red-700 disabled:opacity-40"
                   onClick={() => remove(it.id)}
                   disabled={busyId === it.id}
                 >
-                  Remove
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1.5 14a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                  </svg>
                 </button>
               </div>
             </div>
