@@ -38,11 +38,10 @@ export function DeliveryZonePicker({ current }: { current: "AUTO" | "WITHIN_CITY
           onClick={() => set("WITHIN_CITY")}
           label="Same city as seller"
         />
-        <Chip
-          active={current === "OUTSIDE_CITY"}
-          onClick={() => set("OUTSIDE_CITY")}
-          label="Outside seller's city"
-        />
+        {/* "Outside seller's city" chip removed — the courier rate engine
+            already detects an out-of-city route from the buyer's address vs.
+            the seller's city; surfacing an extra manual override here just
+            confused buyers into picking it unnecessarily. */}
       </div>
     </div>
   );

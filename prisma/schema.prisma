@@ -442,6 +442,13 @@ model Product {
   // the relevant scale on the listing form (XS-XXL, EU shoe sizes, etc.);
   // the buyer picks one at add-to-cart time.
   sizesJson   String   @default("[]")
+  // Seller-defined attribute groups (colors, finishes, fabrics, etc.). JSON
+  // array of `{ name: string, options: string[], required: boolean }`. The
+  // buyer picks one option per group when adding to cart and the choice
+  // flows through to the Order so the seller knows which variant to ship.
+  // Schema lives in src/lib/productAttributes.ts. Empty array means the
+  // product has no buyer-selectable variants.
+  attributesJson String @default("[]")
   // DRAFT | ACTIVE | SOLD_OUT | ARCHIVED
   status      String   @default("ACTIVE")
   // JSON-encoded array of image URLs (SQLite has no native string[]).
@@ -550,6 +557,12 @@ model CartItem {
   // cartId+productId, not size) — acceptable for V1, revisit if buyers
   // start asking for it.
   size      String?
+  // Buyer's pick from the product's attribute groups, e.g.
+  // `{"Color":"Blue","Size":"M"}`. JSON object, validated against the
+  // product's `attributesJson` at add-to-cart time. Empty object means
+  // the product had no attribute groups (or the buyer wasn't required
+  // to pick anything).
+  selectedAttributesJson String @default("{}")
   createdAt DateTime @default(now())
 
   @@unique([cartId, productId])
@@ -579,6 +592,11 @@ model Order {
   shippingLongitude        Float?
   shippingPlaceId          String?
   notes           String?
+  // Frozen copy of CartItem.selectedAttributesJson at checkout time. Sellers
+  // read this on the order page to know which colour / finish / variant to
+  // pack. Schema mirrors src/lib/productAttributes.ts. Empty object means
+  // the product had no buyer-selectable attribute groups.
+  selectedAttributesJson String @default("{}")
   // "DIRECT" (pay upfront via Monnify) | "ON_DELIVERY" (pay cash on arrival).
   // ON_DELIVERY is gated on User.trustedBuyer — see /api/cart/checkout.
   paymentMethod   String   @default("DIRECT")

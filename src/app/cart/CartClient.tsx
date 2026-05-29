@@ -10,6 +10,8 @@ import { formatQuantity, perUnitLabel, unitConfig } from "@/lib/units";
 type Item = {
   id: string;
   quantity: number;
+  /** Pre-formatted "Color: Blue · Size: M" string (empty when none). */
+  selectedAttributesSummary: string;
   product: {
     id: string;
     name: string;
@@ -100,6 +102,11 @@ export function CartClient({ items: initial }: { items: Item[] }) {
               <p className="break-words text-xs text-gray-500">
                 Sold by {displaySellerName(it.product.seller)}
               </p>
+              {it.selectedAttributesSummary && (
+                <p className="mt-0.5 break-words text-xs font-medium text-violet-700">
+                  {it.selectedAttributesSummary}
+                </p>
+              )}
               <p className="mt-1 text-sm">
                 <span className="font-semibold"><Price amount={it.product.effectivePrice} /></span>
                 {isMeasured && (

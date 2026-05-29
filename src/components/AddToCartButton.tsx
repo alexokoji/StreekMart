@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { unitConfig } from "@/lib/units";
+import type { AttributeGroup } from "@/lib/productAttributes";
 
 // Add-to-cart button + (optionally) a quantity stepper.
 //
@@ -19,6 +20,7 @@ export function AddToCartButton({
   unit = "piece",
   stock,
   sizes,
+  attributes,
   disabled,
   compact,
 }: {
@@ -28,6 +30,9 @@ export function AddToCartButton({
   /** Optional list of stocked sizes. When present the buyer must pick one
    *  before adding to cart. Pass `[]` (or omit) for unsized goods. */
   sizes?: string[];
+  /** Optional seller-defined attribute groups (Color, Finish, …). Each
+   *  required group must have a pick before the API call fires. */
+  attributes?: AttributeGroup[];
   disabled?: boolean;
   compact?: boolean;
 }) {
@@ -44,6 +49,20 @@ export function AddToCartButton({
   );
   const [sizeError, setSizeError] = useState(false);
 
+  // Buyer's attribute picks. Pre-seeded for single-option groups so the
+  // buyer doesn't have to "select" a forced choice. The error name tracks
+  // which group was missing so we can highlight it inline.
+  const attributeGroups = attributes ?? [];
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        attributeGroups
+          .filter((g) => g.options.length === 1)
+          .map((g) => [g.name, g.options[0]]),
+      ),
+  );
+  const [attributeError, setAttributeError] = useState<string | null>(null);
+
   // Stepper visibility: hide for "piece" (one-click is the right UX). For
   // anything else, show — buyers need to pick how many yards / meters / etc.
   const showStepper = unit !== "piece";
@@ -59,12 +78,30 @@ export function AddToCartButton({
       return;
     }
     setSizeError(false);
+
+    // Required attribute groups must have a pick. Same error pattern as
+    // the size guard — focus the offending group, don't silently submit.
+    const missing = attributeGroups.find(
+      (g) => g.required && !selectedAttributes[g.name],
+    );
+    if (missing) {
+      setAttributeError(missing.name);
+      return;
+    }
+    setAttributeError(null);
+
     setBusy(true);
     try {
       const res = await fetch("/api/cart", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId, quantity: qty, size: selectedSize ?? undefined }),
+        body: JSON.stringify({
+          productId,
+          quantity: qty,
+          size: selectedSize ?? undefined,
+          selectedAttributes:
+            Object.keys(selectedAttributes).length > 0 ? selectedAttributes : undefined,
+        }),
       });
       if (res.status === 401) {
         router.push("/login?redirect=" + encodeURIComponent(window.location.pathname));
@@ -127,6 +164,47 @@ export function AddToCartButton({
           )}
         </div>
       )}
+      {/* Seller-defined attribute groups (Color, Finish, …). One picker per
+          group, same chip style as the size picker so the affordance reads
+          consistently. Required groups surface an inline error when the
+          buyer tries to add without picking. */}
+      {attributeGroups.map((group) => (
+        <div key={group.name}>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-widest text-ink-500">
+            {group.name}
+            {!group.required && (
+              <span className="ml-1 text-[10px] font-medium text-ink-400">(optional)</span>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {group.options.map((opt) => {
+              const on = selectedAttributes[group.name] === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAttributes((prev) => ({ ...prev, [group.name]: opt }));
+                    if (attributeError === group.name) setAttributeError(null);
+                  }}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    on
+                      ? "border-violet-500 bg-violet-600 text-white"
+                      : "border-ink-200 bg-white text-ink-700 hover:border-violet-300"
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          {attributeError === group.name && (
+            <p className="mt-1.5 text-xs font-medium text-burgundy-700">
+              Pick a {group.name.toLowerCase()} to continue.
+            </p>
+          )}
+        </div>
+      ))}
       {showStepper && (
         <div className="flex items-center gap-2 text-sm">
           <div className="inline-flex items-center rounded-md border border-ink-200">

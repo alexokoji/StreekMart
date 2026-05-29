@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
 import { PRODUCT_UNITS } from "@/lib/units";
+import { AttributesSchema } from "@/lib/productAttributes";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const product = await prisma.product.findUnique({
@@ -50,6 +51,8 @@ const UpdateBody = z.object({
   // Stocked sizes — empty array clears the list. Omit the field to leave
   // it untouched.
   sizes: z.array(z.string().min(1).max(20)).max(40).optional(),
+  // Attribute groups — empty array clears them. Omit to leave untouched.
+  attributes: AttributesSchema.optional(),
   // ISO-4217 — currency the seller typed `price`/`salePrice` in. When
   // present and not USD, the values are converted to USD before storage.
   currency: z.string().length(3).optional(),
@@ -103,7 +106,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     );
   }
 
-  const { images, sizes, currency, price, salePrice, ...rest } = parsed.data;
+  const { images, sizes, attributes, currency, price, salePrice, ...rest } = parsed.data;
   // `currency` is accepted but ignored — NGN is the canonical storage
   // currency. Multi-currency entry is a future feature.
   void currency;
@@ -120,6 +123,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       ...(rest.category ? { kind: kindForCategory(rest.category) } : {}),
       ...(images ? { imagesJson: JSON.stringify(images) } : {}),
       ...(sizes !== undefined ? { sizesJson: JSON.stringify(sizes) } : {}),
+      ...(attributes !== undefined ? { attributesJson: JSON.stringify(attributes) } : {}),
     },
   });
   return NextResponse.json({ product: updated });

@@ -3,6 +3,10 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray } from "@/lib/utils";
+import {
+  formatAttributeSelection,
+  parseAttributeSelection,
+} from "@/lib/productAttributes";
 import { Price } from "@/components/Price";
 import {
   deliveryFeeCentsFor,
@@ -66,6 +70,11 @@ export default async function CartPage({
   const items = cart.items.map((it) => ({
     id: it.id,
     quantity: it.quantity,
+    // Pre-format the seller-selected variant tags here so the client
+    // component doesn't need to know the parse helpers.
+    selectedAttributesSummary: formatAttributeSelection(
+      parseAttributeSelection(it.selectedAttributesJson),
+    ),
     product: {
       id: it.product.id,
       name: it.product.name,

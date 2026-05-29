@@ -193,6 +193,10 @@ export async function POST(req: Request) {
           shippingLongitude: parsed.data.shippingLongitude,
           shippingPlaceId: parsed.data.shippingPlaceId,
           notes: parsed.data.notes,
+          // Freeze the buyer's variant pick onto the order so seller-side
+          // edits to the product's attribute spec later can't rewrite what
+          // the buyer actually ordered.
+          selectedAttributesJson: it.selectedAttributesJson ?? "{}",
           paymentMethod: parsed.data.paymentMethod,
           paymentReference,
         },

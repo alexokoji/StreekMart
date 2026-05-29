@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { resolveActingOwner } from "@/lib/managersServer";
 import { PRODUCT_UNITS } from "@/lib/units";
+import { AttributesSchema } from "@/lib/productAttributes";
 import { FASHION_VALIDATOR_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";
 
 // GET /api/products?mine=1&category=&q=&kind=MATERIAL|PRODUCT
@@ -76,6 +77,9 @@ const CreateBody = z.object({
   // Optional list of available sizes for clothing / shoes / bags. Empty
   // for materials and other unsized items. Stored as JSON on the row.
   sizes: z.array(z.string().min(1).max(20)).max(40).optional(),
+  // Seller-defined attribute groups (Color, Finish, etc.). Optional; the
+  // schema lives in @/lib/productAttributes and trims / dedupes options.
+  attributes: AttributesSchema.optional(),
   // ISO-4217 code for the currency the seller typed `price`/`salePrice` in.
   // Server converts to USD before storing so all downstream display/maths
   // stays in one canonical unit. Defaults to USD when absent (back-compat).
@@ -102,7 +106,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, description, price, salePrice, category, status, stock, images, unit, sizes, currency, actAsOwnerId } = parsed.data;
+  const { name, description, price, salePrice, category, status, stock, images, unit, sizes, attributes, currency, actAsOwnerId } = parsed.data;
 
   // Owner = the actor unless they're a manager acting on someone else's behalf.
   const ownerId = await resolveActingOwner(guard.session.sub, actAsOwnerId, "edit_products");
@@ -211,6 +215,7 @@ export async function POST(req: Request) {
       stock: stock ?? 99,
       unit: unit ?? "piece",
       sizesJson: JSON.stringify(sizes ?? []),
+      attributesJson: JSON.stringify(attributes ?? []),
       imagesJson: JSON.stringify(images),
     },
   });

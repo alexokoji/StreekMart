@@ -15,6 +15,10 @@ import { recordSale, recordTransaction } from "@/lib/wallet";
 import { generateDeliveryCode } from "@/lib/deliveryCode";
 import { orderPlacedEmail, sendEmail } from "@/lib/email";
 import { sendPush } from "@/lib/notifications";
+import {
+  formatAttributeSelection,
+  parseAttributeSelection,
+} from "@/lib/productAttributes";
 import { platformDeliveryCutBps } from "@/lib/locationServer";
 
 // How many days a buyer has to wait between payment and the option to
@@ -165,12 +169,16 @@ export async function finalizePaidOrders(args: {
       include: { product: { select: { name: true } } },
     });
     for (const o of fresh) {
+      const variantSummary = formatAttributeSelection(
+        parseAttributeSelection(o.selectedAttributesJson),
+      );
       const tpl = orderPlacedEmail({
         name: buyer.name,
         orderId: o.id,
         productName: o.product.name,
         deliveryCode: o.deliveryCode,
         totalDisplay: `₦${o.totalPrice.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        variantSummary: variantSummary || undefined,
       });
       void sendEmail({ to: buyer.email, ...tpl })
         .then((r) => {
@@ -184,7 +192,10 @@ export async function finalizePaidOrders(args: {
       void sendPush({
         userId: buyerId,
         title: "Order confirmed",
-        body: `${o.product.name} · code ${o.deliveryCode ?? "ready"}`,
+        body:
+          `${o.product.name}` +
+          (variantSummary ? ` · ${variantSummary}` : "") +
+          ` · code ${o.deliveryCode ?? "ready"}`,
         link: `/account/orders/${o.id}`,
         data: { type: "order-placed", orderId: o.id },
       }).catch((err) => console.error("[push:order-placed] threw", { orderId: o.id, err }));

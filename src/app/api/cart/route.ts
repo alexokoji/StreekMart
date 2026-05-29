@@ -5,6 +5,11 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
 import { unitConfig, validateQuantity } from "@/lib/units";
+import {
+  SelectionSchema,
+  parseProductAttributes,
+  validateAttributeSelection,
+} from "@/lib/productAttributes";
 
 // Get-or-create the current user's cart (lazy provisioning).
 async function getOrCreateCart(userId: string) {
@@ -69,6 +74,10 @@ const AddBody = z.object({
   // Required when the product has stocked sizes; ignored otherwise. We
   // validate against the product's actual size list below.
   size: z.string().min(1).max(20).optional(),
+  // Buyer's pick from the product's attribute groups (Color, Finish, …).
+  // Schema is validated against the product's actual groups below; this
+  // outer schema only catches the wrong shape.
+  selectedAttributes: SelectionSchema.optional(),
 });
 
 export async function POST(req: Request) {
@@ -116,9 +125,25 @@ export async function POST(req: Request) {
     size = parsed.data.size;
   }
 
+  // Attribute-group selection. Defined groups gate the add; the helper
+  // normalises casing back to the canonical option string and rejects
+  // unknown picks. Empty-spec products accept anything (which our schema
+  // already collapses to {}).
+  const attributeGroups = parseProductAttributes(product.attributesJson);
+  const attrCheck = validateAttributeSelection(
+    attributeGroups,
+    parsed.data.selectedAttributes ?? {},
+  );
+  if (!attrCheck.ok) {
+    return NextResponse.json({ error: attrCheck.error }, { status: 400 });
+  }
+  const selectedAttributesJson = JSON.stringify(attrCheck.normalized);
+
   // Upsert keeps add-twice from creating duplicate rows; existing rows get the
-  // requested quantity added on top. Changing the size on an existing row
-  // overwrites — the buyer ends up with the most recently picked size.
+  // requested quantity added on top. Changing the size or attribute selection
+  // on an existing row overwrites — the buyer ends up with the most recently
+  // picked variant. (V1 trade-off — same product in two variants overwrites
+  // rather than splits into two cart lines.)
   const existing = await prisma.cartItem.findUnique({
     where: { cartId_productId: { cartId: cart.id, productId: product.id } },
   });
@@ -127,8 +152,18 @@ export async function POST(req: Request) {
 
   const item = await prisma.cartItem.upsert({
     where: { cartId_productId: { cartId: cart.id, productId: product.id } },
-    create: { cartId: cart.id, productId: product.id, quantity: newQty, size },
-    update: { quantity: newQty, size: size ?? existing?.size ?? null },
+    create: {
+      cartId: cart.id,
+      productId: product.id,
+      quantity: newQty,
+      size,
+      selectedAttributesJson,
+    },
+    update: {
+      quantity: newQty,
+      size: size ?? existing?.size ?? null,
+      selectedAttributesJson,
+    },
   });
 
   return NextResponse.json({ item, addedQuantity: newQty - (existing?.quantity ?? 0) });

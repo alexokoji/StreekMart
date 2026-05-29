@@ -4,6 +4,10 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
+import {
+  formatAttributeSelection,
+  parseAttributeSelection,
+} from "@/lib/productAttributes";
 import { Price } from "@/components/Price";
 import { deliveryZoneLabel, type DeliveryZone } from "@/lib/location";
 import { SellerRatingForm } from "@/components/orders/SellerRatingForm";
@@ -80,6 +84,14 @@ export default async function BuyerOrderDetailPage({
               <p className="text-sm font-medium">
                 {order.quantity} × <Price amount={order.totalPrice - order.deliveryFeeCents / 100} />
               </p>
+              {(() => {
+                const summary = formatAttributeSelection(
+                  parseAttributeSelection(order.selectedAttributesJson),
+                );
+                return summary ? (
+                  <p className="mt-0.5 text-xs font-medium text-violet-700">{summary}</p>
+                ) : null;
+              })()}
               <p className="mt-0.5 text-xs text-ink-500">
                 Delivery ({deliveryZoneLabel(order.deliveryZone as DeliveryZone)}):{" "}
                 <Price amount={order.deliveryFeeCents / 100} />

@@ -3,6 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
+import {
+  formatAttributeSelection,
+  parseAttributeSelection,
+} from "@/lib/productAttributes";
 import { Price } from "@/components/Price";
 import { OrderStatusActions } from "./OrderStatusActions";
 import { TrackingUpdater } from "./TrackingUpdater";
@@ -61,6 +65,25 @@ export default async function ViewOrderPage({ params }: { params: { id: string }
               <dd className="font-medium"><Price amount={order.totalPrice} /></dd>
             </div>
           </dl>
+
+          {/* Variant selection — what the buyer actually picked (Color, Size,
+              Finish, …). Surfaced prominently so the seller doesn't pack
+              the wrong colour by accident. */}
+          {(() => {
+            const summary = formatAttributeSelection(
+              parseAttributeSelection(order.selectedAttributesJson),
+            );
+            return summary ? (
+              <div className="mt-4 rounded-lg border border-violet-200 bg-violet-50/60 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-violet-700">
+                  Variant to ship
+                </p>
+                <p className="mt-0.5 text-sm font-semibold text-violet-900">
+                  {summary}
+                </p>
+              </div>
+            ) : null;
+          })()}
 
           {order.shippingAddress && (
             <div className="mt-6">

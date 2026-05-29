@@ -214,6 +214,9 @@ export function orderPlacedEmail(opts: {
   productName: string;
   deliveryCode: string | null;
   totalDisplay: string;
+  /** Pre-formatted "Color: Blue · Size: M" string. Empty when the
+   *  product had no buyer-selectable variants. */
+  variantSummary?: string;
 }): { subject: string; html: string; text: string } {
   const codeBlock = opts.deliveryCode
     ? `<div style="margin-top:24px; padding:16px; background:#f5f3ff; border-radius:12px; text-align:center;">
@@ -222,15 +225,28 @@ export function orderPlacedEmail(opts: {
          <div style="margin-top:8px; font-size:11px; color:#737378;">Share with the dispatch rider on arrival.</div>
        </div>`
     : "";
+  // Variant subline — only renders when the buyer made a real pick.
+  // Surfaced as a styled <p> so it reads as a distinct fact rather than
+  // floating after the product name.
+  const variantBlock = opts.variantSummary
+    ? `<p style="margin-top:12px; padding:10px 14px; background:#f5f3ff; border-radius:10px; font-size:13px; color:#5b21b6;">
+         <strong>You ordered:</strong> ${escapeHtml(opts.variantSummary)}
+       </p>`
+    : "";
   return {
     subject: `Order placed — ${opts.productName}`,
     html: wrap(`
       <p>Hi ${escapeHtml(opts.name)},</p>
       <p>Your order for <strong>${escapeHtml(opts.productName)}</strong> is confirmed. Total: <strong>${escapeHtml(opts.totalDisplay)}</strong>.</p>
+      ${variantBlock}
       ${codeBlock}
       <p style="margin-top:24px;"><a href="${appUrl()}/account/orders/${opts.orderId}" style="color:#7c3aed; font-weight:600;">Track this order →</a></p>
     `),
-    text: `Order confirmed: ${opts.productName} · ${opts.totalDisplay}. Delivery code: ${opts.deliveryCode ?? "n/a"}. Track at ${appUrl()}/account/orders/${opts.orderId}`,
+    text:
+      `Order confirmed: ${opts.productName} · ${opts.totalDisplay}.` +
+      (opts.variantSummary ? ` Variant: ${opts.variantSummary}.` : "") +
+      ` Delivery code: ${opts.deliveryCode ?? "n/a"}. ` +
+      `Track at ${appUrl()}/account/orders/${opts.orderId}`,
   };
 }
 

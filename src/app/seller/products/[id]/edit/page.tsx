@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
+import { parseProductAttributes } from "@/lib/productAttributes";
 import { ProductForm } from "@/components/forms/ProductForm";
 
 export default async function EditProductPage({ params }: { params: { id: string } }) {
@@ -24,6 +25,7 @@ export default async function EditProductPage({ params }: { params: { id: string
             stock: product.stock,
             unit: product.unit,
             sizes: parseJsonArray(product.sizesJson),
+            attributes: parseProductAttributes(product.attributesJson),
             category: product.category,
             status: product.status,
             images: parseJsonArray(product.imagesJson),

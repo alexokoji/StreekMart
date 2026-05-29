@@ -4,11 +4,11 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
+import { parseProductAttributes } from "@/lib/productAttributes";
 import { Price } from "@/components/Price";
 import { isAiEnabled } from "@/lib/ai";
 import { AddToCartButton } from "@/components/AddToCartButton";
 import { OutfitPairings } from "@/components/OutfitPairings";
-import { SameCitySuggestions } from "@/components/SameCitySuggestions";
 import { ProductImageSlider } from "@/components/storefront/ProductImageSlider";
 import { TierBadge } from "@/components/TierBadge";
 import { perUnitLabel } from "@/lib/units";
@@ -141,6 +141,7 @@ export default async function PublicProductPage({ params }: { params: { id: stri
               unit={product.unit}
               stock={product.stock}
               sizes={parseJsonArray(product.sizesJson)}
+              attributes={parseProductAttributes(product.attributesJson)}
               disabled={isOwnListing}
             />
           )}
@@ -158,15 +159,6 @@ export default async function PublicProductPage({ params }: { params: { id: stri
         )}
       </div>
 
-      {/* Same-city alternatives — only renders when the viewer is in a
-          different city / country from the seller. Helps buyers find a
-          local match instead of getting blocked at checkout. */}
-      <div className="min-w-0 lg:col-span-2">
-        <SameCitySuggestions
-          buyer={user ? { country: user.country, city: user.city } : null}
-          product={product}
-        />
-      </div>
     </div>
   );
 }

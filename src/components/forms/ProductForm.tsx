@@ -12,6 +12,11 @@ import {
   isSizedCategory,
   scaleByValue,
 } from "@/lib/sizes";
+import {
+  type AttributeGroup,
+  MAX_GROUPS,
+  MAX_OPTIONS_PER_GROUP,
+} from "@/lib/productAttributes";
 
 type ProductStatusValue = "DRAFT" | "ACTIVE" | "SOLD_OUT" | "ARCHIVED";
 
@@ -26,6 +31,7 @@ type ProductFormInitial = {
   stock?: number;
   unit?: string;
   sizes?: string[];
+  attributes?: AttributeGroup[];
   images?: string[];
 };
 
@@ -68,6 +74,12 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
     defaultScaleFor(initial?.category ?? "") ?? "alpha",
   );
   const [sizes, setSizes] = useState<string[]>(initial?.sizes ?? []);
+  // Buyer-selectable variant groups (Color, Finish, etc.). Independent of
+  // `sizes` because size has its own dedicated scale-aware picker; this
+  // editor is the free-form catch-all.
+  const [attributes, setAttributes] = useState<AttributeGroup[]>(
+    initial?.attributes ?? [],
+  );
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
 
   // When the seller picks a different category, switch to the recommended
@@ -112,6 +124,16 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
         // Only send sizes when the category is sized. Avoids unsized rows
         // accidentally carrying stale alpha sizes from a previous edit.
         sizes: isSizedCategory(category) ? sizes : [],
+        // Filter groups whose option list ended up empty after trim/dedupe
+        // — they'd just confuse the buyer. The API also drops empty groups
+        // but doing it client-side keeps the payload clean.
+        attributes: attributes
+          .map((g) => ({
+            ...g,
+            name: g.name.trim(),
+            options: g.options.map((o) => o.trim()).filter(Boolean),
+          }))
+          .filter((g) => g.name && g.options.length > 0),
         images,
       };
 
@@ -401,6 +423,8 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
         </div>
       )}
 
+      <AttributeEditor value={attributes} onChange={setAttributes} />
+
       <div>
         <label className="label">Images</label>
         <ImageUploader
@@ -438,4 +462,181 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
 // FX-rate noise like 749.999999 right after a USD → local conversion.
 function roundCents(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// Attribute editor — buyer-selectable variant groups beyond size.
+//
+// Each group has a name (Color, Finish, …) and an option list. Sellers can
+// add up to MAX_GROUPS groups and MAX_OPTIONS_PER_GROUP options each.
+// `required` defaults to true; toggling it off lets the buyer skip the
+// group at checkout (rare — most fashion-marketplace groups should be
+// required so the seller knows what to pack).
+//
+// Storage shape mirrors the server-side schema in @/lib/productAttributes;
+// the parent passes the array through to the API on save.
+function AttributeEditor({
+  value,
+  onChange,
+}: {
+  value: AttributeGroup[];
+  onChange: (next: AttributeGroup[]) => void;
+}) {
+  const [draftOptions, setDraftOptions] = useState<Record<number, string>>({});
+
+  function updateGroup(idx: number, patch: Partial<AttributeGroup>) {
+    onChange(value.map((g, i) => (i === idx ? { ...g, ...patch } : g)));
+  }
+
+  function addGroup() {
+    if (value.length >= MAX_GROUPS) return;
+    onChange([...value, { name: "", options: [], required: true }]);
+  }
+
+  function removeGroup(idx: number) {
+    onChange(value.filter((_, i) => i !== idx));
+    setDraftOptions((d) => {
+      const { [idx]: _drop, ...rest } = d;
+      return rest;
+    });
+  }
+
+  function addOption(idx: number) {
+    const draft = (draftOptions[idx] ?? "").trim();
+    if (!draft) return;
+    const group = value[idx];
+    if (!group) return;
+    if (group.options.length >= MAX_OPTIONS_PER_GROUP) return;
+    if (group.options.some((o) => o.toLowerCase() === draft.toLowerCase())) {
+      setDraftOptions((d) => ({ ...d, [idx]: "" }));
+      return;
+    }
+    updateGroup(idx, { options: [...group.options, draft] });
+    setDraftOptions((d) => ({ ...d, [idx]: "" }));
+  }
+
+  function removeOption(idx: number, option: string) {
+    updateGroup(idx, {
+      options: (value[idx]?.options ?? []).filter((o) => o !== option),
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <label className="label mb-0">Variants</label>
+          <p className="text-xs text-ink-500">
+            Add picker groups buyers choose from (e.g. Color, Finish, Fabric).
+            Each group becomes a required dropdown on the product page.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn-secondary text-xs"
+          onClick={addGroup}
+          disabled={value.length >= MAX_GROUPS}
+        >
+          + Add group
+        </button>
+      </div>
+
+      {value.length === 0 && (
+        <p className="mt-3 text-[11px] italic text-ink-500">
+          No variants yet — leave empty for products with a single version.
+        </p>
+      )}
+
+      <div className="mt-3 space-y-3">
+        {value.map((group, idx) => (
+          <div key={idx} className="rounded-lg border border-ink-200 bg-white p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={group.name}
+                onChange={(e) => updateGroup(idx, { name: e.target.value })}
+                placeholder="Group name (e.g. Color)"
+                className="input flex-1 min-w-[160px] text-sm"
+                maxLength={40}
+              />
+              <label className="flex items-center gap-1.5 text-xs text-ink-600">
+                <input
+                  type="checkbox"
+                  checked={group.required}
+                  onChange={(e) => updateGroup(idx, { required: e.target.checked })}
+                  className="h-3.5 w-3.5"
+                />
+                Required
+              </label>
+              <button
+                type="button"
+                className="text-xs font-medium text-red-600 hover:underline"
+                onClick={() => removeGroup(idx)}
+              >
+                Remove
+              </button>
+            </div>
+
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {group.options.map((opt) => (
+                <span
+                  key={opt}
+                  className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800"
+                >
+                  {opt}
+                  <button
+                    type="button"
+                    onClick={() => removeOption(idx, opt)}
+                    className="ml-0.5 leading-none text-violet-500 hover:text-violet-800"
+                    aria-label={`Remove ${opt}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-2 flex gap-1.5">
+              <input
+                type="text"
+                value={draftOptions[idx] ?? ""}
+                onChange={(e) =>
+                  setDraftOptions((d) => ({ ...d, [idx]: e.target.value }))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addOption(idx);
+                  }
+                }}
+                placeholder={
+                  group.options.length === 0
+                    ? "Add an option, e.g. Red"
+                    : "Add another option"
+                }
+                className="input flex-1 text-sm"
+                maxLength={40}
+                disabled={group.options.length >= MAX_OPTIONS_PER_GROUP}
+              />
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                onClick={() => addOption(idx)}
+                disabled={
+                  !(draftOptions[idx] ?? "").trim() ||
+                  group.options.length >= MAX_OPTIONS_PER_GROUP
+                }
+              >
+                Add
+              </button>
+            </div>
+            {group.options.length >= MAX_OPTIONS_PER_GROUP && (
+              <p className="mt-1 text-[10px] italic text-ink-500">
+                Cap reached — remove an option to add more.
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
