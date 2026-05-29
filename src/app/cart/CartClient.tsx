@@ -116,7 +116,7 @@ export function CartClient({ items: initial }: { items: Item[] }) {
                   <span className="ml-2 text-xs text-gray-400 line-through"><Price amount={it.product.price} /></span>
                 )}
               </p>
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <div className="inline-flex items-center rounded-md border border-gray-300">
                   <button
                     type="button"
@@ -151,43 +151,53 @@ export function CartClient({ items: initial }: { items: Item[] }) {
                     +
                   </button>
                 </div>
-                <span className="text-xs text-ink-500">
+                {/* Hidden on phones — the stepper number already shows the
+                    quantity. The "2 pieces / yards / etc." annotation was
+                    eating row width on small screens and pushing the trash
+                    button off into the price column. Keep it on ≥sm where
+                    space is plentiful. */}
+                <span className="hidden text-xs text-ink-500 sm:inline">
                   {formatQuantity(it.quantity, it.product.unit)}
                 </span>
-                {/* Trash-can icon button. Sized 40×40 to clear Apple's 44pt
-                    minimum tap target with chrome around it, and rendered
-                    as an icon-only so the tiny "Remove" text that the
-                    finger used to miss on mobile is gone. Still
-                    keyboard-accessible via aria-label. */}
-                <button
-                  type="button"
-                  aria-label="Remove item"
-                  className="ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100 active:text-red-700 disabled:opacity-40"
-                  onClick={() => remove(it.id)}
-                  disabled={busyId === it.id}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1.5 14a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6" />
-                    <path d="M10 11v6M14 11v6" />
-                    <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
-                  </svg>
-                </button>
               </div>
             </div>
-            <p className="shrink-0 text-right text-sm font-semibold">
-              <Price amount={it.product.effectivePrice * it.quantity} />
-            </p>
+            {/* Right column: trash icon on top, total below. Pulled out of
+                the middle column's inner flex row so the icon's 48×48 tap
+                target always lands in clear space — previous layout had it
+                crammed at the right edge of the middle column, where on
+                narrow phones it ran out of room and either overflowed or
+                slid under the price text and stopped registering taps.
+                `touch-manipulation` removes iOS's 300ms tap delay so the
+                press feels immediate. */}
+            <div className="flex shrink-0 flex-col items-end justify-between gap-2">
+              <button
+                type="button"
+                aria-label="Remove item"
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full text-gray-500 hover:bg-red-50 hover:text-red-600 active:bg-red-100 active:text-red-700 disabled:opacity-40 [touch-action:manipulation]"
+                onClick={() => remove(it.id)}
+                disabled={busyId === it.id}
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1.5 14a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+              <p className="text-right text-sm font-semibold">
+                <Price amount={it.product.effectivePrice * it.quantity} />
+              </p>
+            </div>
           </li>
         );
       })}
