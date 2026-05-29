@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { sendPush } from "@/lib/notifications";
 
 async function assertParticipant(chatId: string, userId: string) {
   const member = await prisma.chatParticipant.findUnique({
@@ -220,6 +221,48 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       data: { lastTypingAt: null },
     }),
   ]);
+
+  // Push every other participant in the chat. Fire-and-forget — message
+  // already saved, so a push failure can't make the send appear to fail.
+  // We skip the sender (obvious) and rely on Expo's foreground handler in
+  // the mobile shell to suppress the banner if the user is already on the
+  // chat screen.
+  void (async () => {
+    try {
+      const others = await prisma.chatParticipant.findMany({
+        where: { chatId, userId: { not: senderId } },
+        select: { userId: true },
+      });
+      // Show the message text in the body if there is one; otherwise hint
+      // at the attachment kind so the recipient sees something useful
+      // instead of an empty notification.
+      const senderName = message.sender?.name ?? "Someone";
+      const preview = text.trim()
+        ? text.length > 120
+          ? text.slice(0, 117) + "…"
+          : text
+        : attachmentMime?.startsWith("image/")
+          ? "📷 Photo"
+          : attachmentMime?.startsWith("audio/")
+            ? "🎤 Voice note"
+            : attachmentMime
+              ? "📎 Attachment"
+              : "New message";
+      await Promise.all(
+        others.map((p) =>
+          sendPush({
+            userId: p.userId,
+            title: senderName,
+            body: preview,
+            link: `/messages/${chatId}`,
+            data: { type: "new-message", chatId },
+          }).catch((err) => console.error("[push:new-message] threw", { chatId, err })),
+        ),
+      );
+    } catch (err) {
+      console.error("[push:new-message] outer threw", { chatId, err });
+    }
+  })();
 
   return NextResponse.json({ message });
 }

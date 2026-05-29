@@ -84,8 +84,22 @@ body { overscroll-behavior-y: none; }
     @apply font-display font-bold tracking-tight;
   }
   .h-italic-gold {
-    @apply font-display italic text-transparent bg-clip-text;
+    /* `bg-clip-text` is Tailwind's `background-clip: text`. Safari needs the
+       `-webkit-background-clip: text` partner declaration or the text renders
+       as transparent on a transparent background (i.e. invisible). The
+       fallback `color: #d946ef` is what shows up if either declaration is
+       dropped — without it the heading literally disappears on Safari. */
+    @apply font-display italic;
+    color: #d946ef;
     background-image: linear-gradient(135deg, #cf9f32 0%, #d946ef 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+    /* Old Safari without bg-clip support — keep the solid color, drop the
+       gradient image so the text stays readable. */
+    .h-italic-gold { background-image: none; -webkit-text-fill-color: currentColor; }
   }
   /* Glassy surface for floating UI */
   .glass {
@@ -97,12 +111,18 @@ body { overscroll-behavior-y: none; }
   }
 }
 
-/* Aurora text — the wordmark on the hero */
+/* Aurora text — the wordmark on the hero. The `color` fallback shows up
+   if either bg-clip declaration is dropped (old Safari, print stylesheet,
+   reader mode) so the wordmark never disappears entirely. */
 .aurora-text {
+  color: #7c3aed;
   background-image: linear-gradient(120deg, #4c1d95, #7c3aed 30%, #d946ef 60%, #cf9f32);
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .aurora-text { background-image: none; -webkit-text-fill-color: currentColor; }
 }
 
 /* Subtle ambient glow used behind hero badges */

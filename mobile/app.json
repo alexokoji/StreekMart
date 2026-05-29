@@ -1,0 +1,110 @@
+{
+  "expo": {
+    "name": "StreekMart",
+    "slug": "streekmart",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "streekmart",
+    "userInterfaceStyle": "automatic",
+    "primaryColor": "#7c3aed",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#7c3aed"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.streekmart.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow StreekMart to upload photos for product listings and image search.",
+        "NSCameraUsageDescription": "Allow StreekMart to take photos for product listings.",
+        "NSMicrophoneUsageDescription": "Allow StreekMart to record voice notes in chats.",
+        "NSUserNotificationsUsageDescription": "Allow StreekMart to send order updates, chat replies, and verification decisions.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      },
+      "entitlements": {
+        "aps-environment": "production"
+      },
+      "associatedDomains": [
+        "applinks:streekmart.online"
+      ]
+    },
+    "android": {
+      "package": "com.streekmart.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#7c3aed"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "streekmart.online"
+            },
+            {
+              "scheme": "https",
+              "host": "www.streekmart.online"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "extra": {
+      "siteUrl": "https://streekmart.online",
+      "eas": {
+        "projectId": "97a68bcd-daf5-4f86-9600-5b682e28f1e1"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/97a68bcd-daf5-4f86-9600-5b682e28f1e1",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#7c3aed",
+          "image": "./assets/splash.png",
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#7c3aed",
+          "sounds": []
+        }
+      ]
+    ],
+    "owner": "alecblaq"
+  }
+}

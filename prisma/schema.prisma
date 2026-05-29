@@ -149,6 +149,25 @@ model User {
   sellerReviewsReceived SellerReview[] @relation("SellerReviewsReceived")
   sellerReviewsWritten  SellerReview[] @relation("SellerReviewsWritten")
   messageReactions      MessageReaction[]
+  pushTokens            PushToken[]
+}
+
+// Expo push tokens. One row per device — the same user may install on
+// iOS + Android, so we don't UNIQUE on (userId). Token itself is unique
+// to allow upsert-by-token (a device re-registering with a new install
+// overwrites the old row instead of duplicating it). Rows are removed
+// when Expo returns a DeviceNotRegistered receipt — see sendPush in
+// src/lib/notifications.ts.
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String?  // "ios" | "android" — best-effort, used for analytics only
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 // Saved addresses (address book).

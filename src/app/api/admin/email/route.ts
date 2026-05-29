@@ -8,6 +8,7 @@ import {
   sendEmail,
   type BroadcastAudience,
 } from "@/lib/email";
+import { sendPushBulk } from "@/lib/notifications";
 
 // POST /api/admin/email — broadcast email to a chosen audience.
 //
@@ -128,6 +129,25 @@ export async function POST(req: Request) {
       if (!firstError) firstError = error;
       failures.push({ email: r.email, error });
     }
+  }
+
+  // Fire a parallel push broadcast to recipients that have a user id
+  // (non-user EMAILS-audience entries are skipped — there's nothing to
+  // route a push to). Body is the plain-text version of the email body
+  // truncated to ~140 chars so the system banner doesn't wrap awkwardly.
+  // Fire-and-forget — email is the authoritative channel for this audit
+  // log; the push is a courtesy.
+  const userIds = recipients.map((r) => r.id).filter(Boolean);
+  if (userIds.length > 0) {
+    const previewBody = parsed.data.body
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    void sendPushBulk(userIds, {
+      title: parsed.data.subject,
+      body: previewBody.length > 140 ? previewBody.slice(0, 137) + "…" : previewBody,
+      data: { type: "admin-broadcast", broadcastId: broadcast.id },
+    }).catch((err) => console.error("[push:broadcast] threw", { broadcastId: broadcast.id, err }));
   }
 
   const status = sent === recipients.length ? "SENT" : sent === 0 ? "FAILED" : "PARTIAL";

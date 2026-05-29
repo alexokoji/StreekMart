@@ -418,8 +418,15 @@ export default async function HomePage({
       </section>
       )}
 
-      {/* CTA — become a seller/designer */}
-      <section className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-10 text-center">
+      {/* CTA — become a seller/designer. The mobile shell hides this whole
+          block via [data-app-hide] because (a) the inner "Manage permissions"
+          / "Get started" links are already reachable from the bottom-nav
+          avatar inside the app, and (b) the "Download the app" buttons are
+          obviously pointless once the user IS in the app. */}
+      <section
+        data-app-hide
+        className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-10 text-center"
+      >
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-fuchsia-200/40 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-violet-300/30 blur-3xl" />
         <div className="relative">
@@ -435,6 +442,57 @@ export default async function HomePage({
             ) : (
               <Link href="/register" className="btn-primary">Get started</Link>
             )}
+          </div>
+
+          {/* App download row. Three buttons:
+              1. Direct APK — points at /streekmart.apk (host the EAS build
+                 output there). The only one that's actually clickable at
+                 launch — Play Store + App Store are gated behind submissions
+                 in flight.
+              2. Google Play — "Coming soon" while the listing is in review.
+              3. App Store — "Coming soon" while the iOS build is in review.
+              Coming-soon buttons render as disabled-looking pills that
+              still acknowledge a tap with a tiny aria-hint, so users can
+              tell something will happen later. */}
+          <div className="mt-10">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500">
+              Or get the app
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <a
+                href="/streekmart.apk"
+                download
+                className="inline-flex items-center gap-2.5 rounded-2xl bg-ink-900 px-5 py-3 text-left text-white shadow-sm transition hover:bg-ink-800"
+              >
+                <AndroidGlyph />
+                <span className="flex flex-col leading-tight">
+                  <span className="text-[10px] uppercase tracking-wider text-ink-300">Download</span>
+                  <span className="text-sm font-semibold">Android APK</span>
+                </span>
+              </a>
+              <span
+                aria-disabled="true"
+                title="Listing in review — launching soon"
+                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm"
+              >
+                <GooglePlayGlyph />
+                <span className="flex flex-col leading-tight">
+                  <span className="text-[10px] uppercase tracking-wider text-ink-400">Coming soon</span>
+                  <span className="text-sm font-semibold">Google Play</span>
+                </span>
+              </span>
+              <span
+                aria-disabled="true"
+                title="Listing in review — launching soon"
+                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm"
+              >
+                <AppStoreGlyph />
+                <span className="flex flex-col leading-tight">
+                  <span className="text-[10px] uppercase tracking-wider text-ink-400">Coming soon</span>
+                  <span className="text-sm font-semibold">App Store</span>
+                </span>
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -471,6 +529,39 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+// App-store glyphs used in the homepage CTA. Inline so we don't pull in an
+// icon library for three logos used in one place. Drawn at 24x24 in a 1.6
+// stroke / filled style that matches the rest of the storefront chrome.
+function AndroidGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6 text-emerald-400" fill="currentColor">
+      <path d="M17.5 9.4l1.4-2.4a.4.4 0 10-.7-.4l-1.4 2.4A8 8 0 0012 8c-1.7 0-3.3.5-4.8 1l-1.4-2.4a.4.4 0 10-.7.4l1.4 2.4A6.9 6.9 0 003.5 15h17a6.9 6.9 0 00-3-5.6zM8 13a.9.9 0 110-1.8.9.9 0 010 1.8zm8 0a.9.9 0 110-1.8.9.9 0 010 1.8z" />
+    </svg>
+  );
+}
+
+function GooglePlayGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+      <defs>
+        <linearGradient id="gp-a" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#34d399" />
+          <stop offset="1" stopColor="#0ea5e9" />
+        </linearGradient>
+      </defs>
+      <path d="M4 3.2v17.6c0 .6.6 1 1.2.7l13.5-8.8a.9.9 0 000-1.5L5.2 2.5C4.6 2.1 4 2.5 4 3.2z" fill="url(#gp-a)" opacity="0.85" />
+    </svg>
+  );
+}
+
+function AppStoreGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-6 w-6 text-ink-700" fill="currentColor">
+      <path d="M16.4 12.6c0-2.4 2-3.5 2-3.5a4 4 0 00-3.2-1.7c-1.4 0-2.7.8-3.4.8-.7 0-1.8-.8-3-.8a4.2 4.2 0 00-3.6 2.2c-1.5 2.7-.4 6.6 1.1 8.8.7 1 1.6 2.2 2.8 2.2 1.1 0 1.5-.7 2.8-.7s1.7.7 2.8.7c1.2 0 2-1.1 2.7-2.2.9-1.3 1.3-2.5 1.3-2.6-.1 0-2.3-.9-2.3-3.2zM14.1 5.3a3.5 3.5 0 00.9-2.6 3.6 3.6 0 00-2.4 1.2 3.4 3.4 0 00-.9 2.5c1 .1 1.9-.4 2.4-1.1z" />
+    </svg>
   );
 }
 

@@ -176,11 +176,15 @@ function wrap(content: string): string {
   // resolve relative paths. Height locks the visual size; max-width keeps it
   // from blowing up if a client ignores height. alt text falls back to the
   // brand name when images are blocked (common default in Outlook / Gmail).
-  const logoSrc = `${appUrl()}/logo.jpeg`;
+  // Square icon (the bag mark) reads better in email clients than the wide
+  // wordmark — Gmail/Outlook clamp wide images at narrow widths and the
+  // wordmark would end up unreadable. The brand name is in the subject
+  // line and the footer, so we don't lose recognition.
+  const logoSrc = `${appUrl()}/icon.png`;
   return `<!doctype html>
 <html><body style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; background:#f7f7f8; margin:0; padding:24px;">
   <div style="max-width:560px; margin:0 auto; background:#ffffff; border-radius:16px; padding:32px; box-shadow:0 4px 24px rgba(0,0,0,0.04);">
-    <img src="${logoSrc}" alt="${SITE}" height="40" style="display:block; height:40px; width:auto; max-width:200px;" />
+    <img src="${logoSrc}" alt="${SITE}" width="48" height="48" style="display:block; height:48px; width:48px;" />
     <div style="margin-top:16px; color:#262630; line-height:1.55; font-size:15px;">${content}</div>
     <hr style="margin:24px 0; border:none; border-top:1px solid #e4e4e8;" />
     <p style="color:#737378; font-size:11px; line-height:1.4;">

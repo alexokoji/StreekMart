@@ -14,6 +14,7 @@ import { exposureDelta } from "@/lib/ranking";
 import { recordSale, recordTransaction } from "@/lib/wallet";
 import { generateDeliveryCode } from "@/lib/deliveryCode";
 import { orderPlacedEmail, sendEmail } from "@/lib/email";
+import { sendPush } from "@/lib/notifications";
 import { platformDeliveryCutBps } from "@/lib/locationServer";
 
 // How many days a buyer has to wait between payment and the option to
@@ -176,6 +177,17 @@ export async function finalizePaidOrders(args: {
           if (!r.ok) console.error("[email:order-placed] failed", { orderId: o.id, to: buyer.email, error: r.error });
         })
         .catch((err) => console.error("[email:order-placed] threw", { orderId: o.id, to: buyer.email, err }));
+
+      // Native push alongside the email — taps deep-link straight to the
+      // order tracking page so the buyer can see the delivery code without
+      // hunting through the app.
+      void sendPush({
+        userId: buyerId,
+        title: "Order confirmed",
+        body: `${o.product.name} · code ${o.deliveryCode ?? "ready"}`,
+        link: `/account/orders/${o.id}`,
+        data: { type: "order-placed", orderId: o.id },
+      }).catch((err) => console.error("[push:order-placed] threw", { orderId: o.id, err }));
     }
   }
 

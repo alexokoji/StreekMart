@@ -1,38 +1,26 @@
 // StreekMart logo.
 //
-// Renders /public/logo.jpeg via CSS background-image with a tight inset so
-// the wide white margins in the source image are clipped away — the logo
-// reads bolder without needing to re-export the asset. Two shapes:
+// Two shapes:
+//   <Logo />     — full logo (icon + wordmark "StreekMart.online"), backed by
+//                  /public/logo_new.png. The PNG has generous white margins so
+//                  we CSS-crop them away via background-size/position.
+//   <LogoMark /> — just the bag icon, backed by /public/icon.png — a clean
+//                  1024×1024 square crop with no surrounding margin, so we
+//                  render it edge-to-edge with no crop math.
 //
-//   <Logo />     — full logo (icon + wordmark "StreekMart.online").
-//   <LogoMark /> — just the bag icon on the left side of the source image.
-//                 Used where the wordmark would compete with surrounding
-//                 text (e.g. condensed nav bars).
-//
-// `size` is the rendered HEIGHT in pixels. The width is derived from the
-// cropped aspect ratio so the visible logo always stays proportional.
+// `size` is the rendered HEIGHT in pixels. The full logo's width is derived
+// from the cropped aspect ratio so the visible logo always stays proportional.
 
-// Source image is roughly 1080×720 with generous white space. These insets
-// are tuned visually to the actual logo bounds — adjust here once if the
-// asset is ever re-exported tighter.
+// Source logo_new.png is 1536×1024 with margins. Insets are tuned visually to
+// the actual logo bounds — adjust here once if the asset is ever re-exported
+// tighter. Bumping `bgSize` zooms in further (crops more); shifting `bgPosX`
+// re-centers horizontally.
 const CROP_FULL = {
-  // Cropped content occupies ~9–95% horizontally and ~24–76% vertically.
-  // backgroundSize / backgroundPosition pair achieves "render only that
-  // box, scaled to fill the container".
-  bgSize: "130% auto",
-  bgPosX: "48%",
+  bgSize: "118% auto",
+  bgPosX: "47%",
   bgPosY: "50%",
-  // Aspect ratio of the cropped content area (~86% × ~52% of 1080×720).
-  // 928/375 ≈ 2.48.
-  aspect: 2.48,
-};
-
-// Bag icon alone — roughly the leftmost 33% of the cropped box.
-const CROP_MARK = {
-  bgSize: "330% auto",
-  bgPosX: "8%",
-  bgPosY: "52%",
-  aspect: 1, // square crop on the icon
+  // Aspect ratio of the visible cropped content (icon + wordmark) ≈ 2.4.
+  aspect: 2.4,
 };
 
 export function Logo({
@@ -57,7 +45,7 @@ export function Logo({
       aria-label="StreekMart"
       className={`inline-block align-middle bg-no-repeat ${className}`}
       style={{
-        backgroundImage: "url(/logo.jpeg)",
+        backgroundImage: "url(/logo_new.png)",
         backgroundSize: CROP_FULL.bgSize,
         backgroundPosition: `${CROP_FULL.bgPosX} ${CROP_FULL.bgPosY}`,
         height: size,
@@ -74,18 +62,17 @@ export function LogoMark({
   size?: number;
   className?: string;
 }) {
+  // icon.png is the bag isolated on transparent background, already trimmed
+  // to its bounds. Rendered as a plain <img> so it scales crisply at any
+  // size and inherits no CSS cropping math.
   return (
-    <span
-      role="img"
-      aria-label="StreekMart"
-      className={`inline-block align-middle bg-no-repeat ${className}`}
-      style={{
-        backgroundImage: "url(/logo.jpeg)",
-        backgroundSize: CROP_MARK.bgSize,
-        backgroundPosition: `${CROP_MARK.bgPosX} ${CROP_MARK.bgPosY}`,
-        height: size,
-        width: Math.round(size * CROP_MARK.aspect),
-      }}
+    <img
+      src="/icon.png"
+      alt="StreekMart"
+      width={size}
+      height={size}
+      className={`inline-block align-middle ${className}`}
+      style={{ height: size, width: size }}
     />
   );
 }

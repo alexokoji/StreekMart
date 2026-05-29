@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
 import { sendEmail, tierChangeEmail } from "@/lib/email";
+import { sendPush } from "@/lib/notifications";
 
 // PATCH /api/admin/users/[id]/tier { kind, tier }
 //
@@ -85,6 +86,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       if (!r.ok) console.error("[email:tier-change] failed", { to: target.email, error: r.error });
     })
     .catch((err) => console.error("[email:tier-change] threw", { to: target.email, err }));
+
+  const role: "seller" | "designer" = kind === "SELLER" ? "seller" : "designer";
+  const tierLabel = tier === 3 ? "Gold ★" : tier === 2 ? "Blue ✓" : "Tier 1";
+  void sendPush({
+    userId: target.id,
+    title: tier > (previousTier ?? 1) ? `Upgraded to ${tierLabel}` : "Tier changed",
+    body: `Your ${role} account is now ${tierLabel}. Tap to open the dashboard.`,
+    link: `/${role}`,
+    data: { type: "tier-change", kind, tier },
+  }).catch((err) => console.error("[push:tier-change] threw", { userId: target.id, err }));
 
   return NextResponse.json({ ok: true, user: updated });
 }

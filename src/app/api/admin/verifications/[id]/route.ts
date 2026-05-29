@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
 import { sendEmail, verificationDecisionEmail } from "@/lib/email";
+import { sendPush } from "@/lib/notifications";
 import { recomputeSellerTier, recomputeDesignerTier } from "@/lib/tiers";
 
 // PATCH /api/admin/verifications/[id] { decision, note? }
@@ -91,6 +92,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         if (!r.ok) console.error("[email:verification-decision] failed", { to: requester.email, error: r.error });
       })
       .catch((err) => console.error("[email:verification-decision] threw", { to: requester.email, err }));
+
+    // Mirror the decision as a push — taps deep-link into the role
+    // dashboard so the user can immediately see their new badge state.
+    const role: "seller" | "designer" = reqRow.kind === "SELLER" ? "seller" : "designer";
+    void sendPush({
+      userId: reqRow.userId,
+      title: decided === "APPROVED"
+        ? `You're a verified ${role} ✓`
+        : `${role} verification update`,
+      body: decided === "APPROVED"
+        ? "Tap to open your dashboard — your badge is live."
+        : parsed.data.note ?? "Tap to resubmit with updated info.",
+      link: `/${role}`,
+      data: { type: "verification-decision", kind: reqRow.kind, decided },
+    }).catch((err) => console.error("[push:verification-decision] threw", { userId: reqRow.userId, err }));
   }
 
   return NextResponse.json({ ok: true, status: decided });

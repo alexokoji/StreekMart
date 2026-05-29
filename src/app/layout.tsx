@@ -31,10 +31,14 @@ const body = Manrope({
 export const metadata: Metadata = {
   title: "StreekMart — Fashion Marketplace",
   description: "Materials, ready-to-wear, and designer content — fashion only.",
+  // Favicons / home-screen icons use the square /public/icon.png — same
+  // asset the mobile app uses for its launcher icon so brand recognition
+  // stays consistent across the web tab, the iOS home screen, and the app
+  // store listings.
   icons: {
-    icon: "/logo.jpeg",
-    shortcut: "/logo.jpeg",
-    apple: "/logo.jpeg",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
   },
 };
 
