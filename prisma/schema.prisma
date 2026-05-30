@@ -342,6 +342,10 @@ model VerificationRequest {
   // Tier 2 identity fields. idType: "NIN" | "PASSPORT" | "DRIVERS_LICENSE".
   idType        String?
   idNumber      String?
+  // CDN URL for the photo / scan of the actual ID document. The number
+  // alone is too easy to fabricate — having a legible image of the card
+  // lets admins eyeball it for tampering, name match, and expiry.
+  idDocumentUrl String?
   // PENDING | APPROVED | REJECTED
   status        String    @default("PENDING")
   // Business fields — replace the old free-text "tell us about yourself" with

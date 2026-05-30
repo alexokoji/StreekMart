@@ -138,6 +138,10 @@ function Tier2Card({
 }) {
   const [idType, setIdType] = useState<IdType>("NIN");
   const [idNumber, setIdNumber] = useState("");
+  // CDN URL of the uploaded ID document. Required — the number alone is
+  // easy to fabricate; the image is the actual evidence the reviewer
+  // judges against. Empty until upload completes.
+  const [idDocumentUrl, setIdDocumentUrl] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -170,13 +174,24 @@ function Tier2Card({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!idDocumentUrl) {
+      setErr("Please upload a photo of your ID before submitting.");
+      return;
+    }
     setErr(null);
     setBusy(true);
     try {
       const res = await fetch("/api/verifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, tier: 2, idType, idNumber, notes: notes || undefined }),
+        body: JSON.stringify({
+          kind,
+          tier: 2,
+          idType,
+          idNumber,
+          idDocumentUrl,
+          notes: notes || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -184,6 +199,7 @@ function Tier2Card({
         return;
       }
       setIdNumber("");
+      setIdDocumentUrl("");
       setNotes("");
       onSubmitted();
     } finally {
@@ -247,6 +263,26 @@ function Tier2Card({
       </div>
 
       <div>
+        <label className="label">ID document photo</label>
+        <ImageUploader
+          value={idDocumentUrl ? [idDocumentUrl] : []}
+          onChange={(arr) => setIdDocumentUrl(arr[0] ?? "")}
+          multi={false}
+          label={
+            idType === "NIN"
+              ? "Clear photo of your NIN card or slip — both sides if double-sided."
+              : idType === "PASSPORT"
+              ? "Clear photo of the passport bio page (name + photo visible)."
+              : "Clear photo of the front of your driver's licence."
+          }
+        />
+        <p className="mt-1 text-[11px] text-ink-500">
+          Required. Reviewers compare the name on the document against your
+          StreekMart name; blurry or partial shots get rejected.
+        </p>
+      </div>
+
+      <div>
         <label className="label">
           Anything else <span className="text-xs text-ink-400">(optional)</span>
         </label>
@@ -260,7 +296,11 @@ function Tier2Card({
       </div>
 
       {err && <p className="text-sm text-burgundy-700">{err}</p>}
-      <button type="submit" className="btn-primary w-full" disabled={busy}>
+      <button
+        type="submit"
+        className="btn-primary w-full"
+        disabled={busy || !idDocumentUrl}
+      >
         {busy ? "Submitting…" : "Submit Tier 2 verification"}
       </button>
     </form>

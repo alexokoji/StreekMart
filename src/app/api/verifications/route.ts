@@ -19,6 +19,10 @@ const Tier2Body = z.object({
   tier: z.literal(2),
   idType: z.enum(["NIN", "PASSPORT", "DRIVERS_LICENSE"]),
   idNumber: z.string().min(4).max(50),
+  // CDN URL of the photographed / scanned ID. Required at the schema
+  // level so a request can't reach the admin queue without something to
+  // actually verify against.
+  idDocumentUrl: z.string().url(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -106,6 +110,7 @@ export async function POST(req: Request) {
           tier: 2,
           idType: parsed.data.idType,
           idNumber: parsed.data.idNumber,
+          idDocumentUrl: parsed.data.idDocumentUrl,
           notes: parsed.data.notes,
         }
       : {
