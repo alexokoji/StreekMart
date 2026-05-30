@@ -89,7 +89,7 @@ export default async function HomePage({
       where: { isDesigner: true, designerTier: { gte: 2 } },
       orderBy: { exposureScore: "desc" },
       take: 8,
-      select: { id: true, name: true, bio: true, exposureScore: true, designerVerified: true, designerTier: true },
+      select: { id: true, slug: true, name: true, bio: true, exposureScore: true, designerVerified: true, designerTier: true },
     }),
     user
       ? prisma.favorite.findMany({
@@ -398,7 +398,7 @@ export default async function HomePage({
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {designers.map((d) => (
-            <Link key={d.id} href={`/messages?with=${d.id}`} className="card flex items-center gap-3 p-4 hover:border-gold-500">
+            <Link key={d.id} href={`/u/${d.slug ?? d.id}`} className="card flex items-center gap-3 p-4 hover:border-gold-500">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ink-900 text-base font-bold text-gold-300">
                 {d.name.slice(0, 1)}
               </div>
