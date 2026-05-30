@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { PromotionStatus } from "@/lib/enums";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders, cancelPendingOrders } from "@/lib/orders";
+import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
 
 // POST /api/monnify/stub-confirm { paymentReference, outcome }
 //
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
         paidAt: new Date(),
       },
     });
+    if (updated.count > 0) void notifyAdminsOfPromotionReview(ref);
     return NextResponse.json({ ok: true, promotion: updated.count });
   }
 

@@ -72,6 +72,9 @@ export async function getCurrentUser() {
       deliveryWithinCityCents: true,
       deliveryOutsideCityCents: true,
       deliveryOutsideCountryCents: true,
+      // Email verification — null means the layout shows the
+      // EmailVerificationBanner across the top of every page.
+      emailVerifiedAt: true,
     },
   });
   if (!user) return null;

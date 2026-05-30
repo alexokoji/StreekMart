@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
+import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
 
 // POST /api/promotions { kind, id }
 //
@@ -141,6 +142,9 @@ export async function POST(req: Request) {
             paymentTxnRef: `STUB_${reference}`,
           },
         });
+        // Stub-mode flip lands directly in the admin queue — ping admins
+        // so they see it without having to refresh /admin/promotions.
+        void notifyAdminsOfPromotionReview(reference);
         return NextResponse.json({
           promotion,
           checkoutUrl: buildRedirectUrl(req, product.id),

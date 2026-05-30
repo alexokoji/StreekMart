@@ -9,6 +9,8 @@ import {
   verifyState,
 } from "@/lib/google";
 import { uniqueSlugFrom } from "@/lib/slug";
+import { sendEmail, welcomeEmail, emailVerificationEmail } from "@/lib/email";
+import { generateEmailVerificationToken } from "@/lib/emailVerification";
 
 export const runtime = "nodejs";
 
@@ -73,9 +75,21 @@ export async function GET(req: Request) {
     }
   }
 
+  // Track whether THIS callback created the account so we can fire the
+  // welcome + verification emails exactly once per signup. An existing
+  // Google account signing in again doesn't get pinged.
+  let isNewSignup = false;
+
   // 3) Create a fresh user with the roles selected on /register.
   if (!user) {
     const slug = await uniqueSlugFrom(profile.name || profile.email.split("@")[0]);
+    // Generate the verification token alongside the account. Google has
+    // already vetted the email so we COULD pre-verify (set
+    // `emailVerifiedAt: new Date()`), but the explicit ask is for Google
+    // sign-ups to receive the verification email too — so we leave it
+    // unverified until the user clicks the link, matching the password
+    // flow exactly.
+    const verification = generateEmailVerificationToken();
     user = await prisma.user.create({
       data: {
         email: profile.email,
@@ -87,9 +101,12 @@ export async function GET(req: Request) {
         avatarUrl: profile.picture ?? null,
         isSeller: state.intent === "signup" ? state.isSeller : false,
         isDesigner: state.intent === "signup" ? state.isDesigner : false,
+        emailVerificationToken: verification.token,
+        emailVerificationTokenExpiresAt: verification.expiresAt,
         cart: { create: {} },
       },
     });
+    isNewSignup = true;
   } else {
     // Lazy-provision a cart for older accounts.
     await prisma.cart.upsert({
@@ -115,6 +132,29 @@ export async function GET(req: Request) {
     isSeller: user.isSeller,
     isDesigner: user.isDesigner,
   });
+
+  // New Google signups get the same welcome + verification pair as a
+  // password signup. Fire-and-forget so a Resend hiccup doesn't trap the
+  // user mid-redirect; the banner UI gives them a "resend" path if the
+  // email never arrives.
+  if (isNewSignup && user.emailVerificationToken) {
+    const welcome = welcomeEmail(user.name);
+    void sendEmail({ to: user.email, ...welcome })
+      .then((r) => {
+        if (!r.ok) console.error("[email:welcome] failed", { to: user.email, error: r.error });
+      })
+      .catch((err) => console.error("[email:welcome] threw", { to: user.email, err }));
+
+    const verifyTpl = emailVerificationEmail({
+      name: user.name,
+      verificationLink: `${origin}/verify-email?token=${user.emailVerificationToken}`,
+    });
+    void sendEmail({ to: user.email, ...verifyTpl })
+      .then((r) => {
+        if (!r.ok) console.error("[email:verify] failed", { to: user.email, error: r.error });
+      })
+      .catch((err) => console.error("[email:verify] threw", { to: user.email, err }));
+  }
 
   // Land the user where they came from, falling back to home.
   const target = state.redirect && state.redirect.startsWith("/") ? state.redirect : "/";

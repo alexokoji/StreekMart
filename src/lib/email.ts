@@ -208,6 +208,37 @@ export function welcomeEmail(name: string): { subject: string; html: string; tex
   };
 }
 
+// Confirm-your-email message. Sent on signup for both password and Google
+// sign-ups. The link routes to /verify-email?token=… which marks the User
+// row's `emailVerifiedAt`. We send to Google users too — even though Google
+// has already vetted the address, having the user click confirms they
+// actually received the email and that delivery channel works for future
+// transactional messages (order codes, etc.).
+export function emailVerificationEmail(opts: {
+  name: string;
+  verificationLink: string;
+}): { subject: string; html: string; text: string } {
+  return {
+    subject: `Verify your email — ${SITE}`,
+    html: wrap(`
+      <p>Hey ${escapeHtml(opts.name)},</p>
+      <p>One quick step before you're all set: confirm this is your email
+        so we can send you order updates, delivery codes, and chat replies.</p>
+      <p style="margin-top:24px;">
+        <a href="${opts.verificationLink}" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">Verify my email</a>
+      </p>
+      <p style="margin-top:16px; font-size:12px; color:#737378;">
+        Or paste this URL into your browser:<br/>
+        <span style="word-break:break-all;">${escapeHtml(opts.verificationLink)}</span>
+      </p>
+      <p style="margin-top:24px; color:#525258;">The link expires in 7 days.
+        If you didn&rsquo;t sign up for ${SITE}, you can safely ignore this
+        email.</p>
+    `),
+    text: `Verify your email for ${SITE} by visiting: ${opts.verificationLink} (expires in 7 days).`,
+  };
+}
+
 export function orderPlacedEmail(opts: {
   name: string;
   orderId: string;
@@ -274,6 +305,39 @@ export function verificationDecisionEmail(opts: {
     text: opts.approved
       ? `You're a verified ${role} on ${SITE}.`
       : `Your ${role} verification needs another look.${opts.note ? " " + opts.note : ""}`,
+  };
+}
+
+// Admin-attention email. Sent to every admin when something lands in a
+// queue that needs human action: verifications, business-name changes,
+// promotion approvals, etc. Keep the format compact — the subject line
+// alone is usually enough for triage.
+export function adminAttentionEmail(opts: {
+  kind: string;             // e.g. "Verification request"
+  summary: string;          // 1-2 line description, plain text
+  link: string;             // /admin/... path to deep-link into
+  meta?: Array<{ label: string; value: string }>; // optional key-value table
+}): { subject: string; html: string; text: string } {
+  const metaRows = (opts.meta ?? [])
+    .map(
+      (m) => `
+        <tr>
+          <td style="padding:4px 12px 4px 0; color:#737378; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; vertical-align:top;">${escapeHtml(m.label)}</td>
+          <td style="padding:4px 0; color:#262630; font-size:13px;">${escapeHtml(m.value)}</td>
+        </tr>`,
+    )
+    .join("");
+  return {
+    subject: `[Admin] ${opts.kind} — ${opts.summary}`,
+    html: wrap(`
+      <p style="margin:0; color:#737378; font-size:11px; text-transform:uppercase; letter-spacing:0.18em;">New ${escapeHtml(opts.kind.toLowerCase())}</p>
+      <p style="margin:6px 0 14px; font-size:16px; font-weight:600;">${escapeHtml(opts.summary)}</p>
+      ${metaRows ? `<table style="border-collapse:collapse; margin-bottom:18px;">${metaRows}</table>` : ""}
+      <p style="margin-top:18px;">
+        <a href="${appUrl()}${opts.link}" style="display:inline-block; padding:9px 16px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600; font-size:13px;">Review in admin</a>
+      </p>
+    `),
+    text: `[Admin] ${opts.kind} — ${opts.summary}. Review: ${appUrl()}${opts.link}`,
   };
 }
 

@@ -10,7 +10,14 @@ import {
 import { isBusinessNameTaken } from "@/lib/businessNameServer";
 import { uniqueSlugFrom } from "@/lib/slug";
 import { isValidCountryCode } from "@/lib/location";
-import { sendEmail, welcomeEmail } from "@/lib/email";
+import { sendEmail, welcomeEmail, emailVerificationEmail } from "@/lib/email";
+import { generateEmailVerificationToken } from "@/lib/emailVerification";
+
+// Build the absolute URL we drop into the verification email so the click
+// path stays correct in dev (localhost), preview (vercel.app), and prod.
+function siteOrigin(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+}
 
 // Every account starts with implicit Buyer permission.
 // Sellers and Designers are opt-in flags that can be enabled at signup or
@@ -91,6 +98,12 @@ export async function POST(req: Request) {
   // — uniqueSlugFrom appends -2, -3, etc. as needed.
   const slug = await uniqueSlugFrom(name);
 
+  // Generate the email-verification token alongside the account itself so
+  // the welcome and verification emails can fire in the same async block.
+  // Wiping the token + expiry on successful verification lives in the
+  // /api/auth/verify-email route.
+  const verification = generateEmailVerificationToken();
+
   const user = await prisma.user.create({
     data: {
       email,
@@ -107,11 +120,16 @@ export async function POST(req: Request) {
       interestsJson: JSON.stringify(interests ?? []),
       isSeller,
       isDesigner,
+      emailVerificationToken: verification.token,
+      emailVerificationTokenExpiresAt: verification.expiresAt,
       // Provision an empty cart up front — every account is a buyer.
       cart: { create: {} },
     },
   });
 
+  // Sign the user in immediately so they can browse the site / cart while
+  // checking their email. Unverified accounts surface a "please verify"
+  // banner from the layout but aren't otherwise restricted.
   await setSessionCookie({
     sub: user.id,
     email: user.email,
@@ -120,15 +138,26 @@ export async function POST(req: Request) {
     isDesigner: user.isDesigner,
   });
 
-  // Welcome email — fire-and-forget. Stub mode (no RESEND_API_KEY) just
-  // logs to stdout, so dev signups never fail because email isn't wired.
-  // Log failures so prod incidents are debuggable; signup still succeeds.
-  const tpl = welcomeEmail(user.name);
-  void sendEmail({ to: user.email, ...tpl })
+  // Welcome email + verification email — fire-and-forget. Stub mode (no
+  // RESEND_API_KEY) just logs to stdout, so dev signups never fail because
+  // email isn't wired. Log failures so prod incidents are debuggable;
+  // signup still succeeds.
+  const welcome = welcomeEmail(user.name);
+  void sendEmail({ to: user.email, ...welcome })
     .then((r) => {
       if (!r.ok) console.error("[email:welcome] failed", { to: user.email, error: r.error });
     })
     .catch((err) => console.error("[email:welcome] threw", { to: user.email, err }));
+
+  const verifyTpl = emailVerificationEmail({
+    name: user.name,
+    verificationLink: `${siteOrigin()}/verify-email?token=${verification.token}`,
+  });
+  void sendEmail({ to: user.email, ...verifyTpl })
+    .then((r) => {
+      if (!r.ok) console.error("[email:verify] failed", { to: user.email, error: r.error });
+    })
+    .catch((err) => console.error("[email:verify] threw", { to: user.email, err }));
 
   return NextResponse.json({
     id: user.id,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Permission } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { notifyAdmins } from "@/lib/adminNotifications";
 
 // POST /api/verifications  — file a verification request.
 // GET  /api/verifications  — list the requesting user's own requests.
@@ -123,6 +124,24 @@ export async function POST(req: Request) {
         };
 
   const created = await prisma.verificationRequest.create({ data });
+
+  // Ping every admin — verification requests are the highest-priority
+  // queue (gates listing for sellers and the blue/gold check for designers).
+  // Fire-and-forget; the user's submission has already landed.
+  void notifyAdmins({
+    kind: "Verification request",
+    summary: `${me.name} (${parsed.data.kind}) requested Tier ${parsed.data.tier}`,
+    link: "/admin/verifications",
+    meta: [
+      { label: "Requester", value: `${me.name} · ${me.email}` },
+      { label: "Kind", value: parsed.data.kind },
+      { label: "Tier", value: String(parsed.data.tier) },
+      ...(parsed.data.tier === 2
+        ? [{ label: "ID type", value: parsed.data.idType }]
+        : []),
+    ],
+  });
+
   return NextResponse.json({ request: created });
 }
 

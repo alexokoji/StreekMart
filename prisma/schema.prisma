@@ -94,6 +94,15 @@ model User {
   // for the peer. We deliberately don't show a "last seen X minutes ago"
   // anywhere — only the live online flag, derived as `now - lastSeenAt < 90s`.
   lastSeenAt   DateTime?
+  // Email verification. NULL until the user clicks the link in the
+  // verification email; set to the timestamp of the successful click.
+  // Google sign-ups land verified because Google has already vetted the
+  // address, but we still send them a confirmation email for parity.
+  // The token + expiry are wiped on successful verification so a stale
+  // link can't be replayed.
+  emailVerifiedAt                  DateTime?
+  emailVerificationToken           String?   @unique
+  emailVerificationTokenExpiresAt  DateTime?
   // Trusted-buyer flag — set by an admin once a buyer has completed enough
   // delivery-confirmed orders. Required to use Pay-on-Delivery at checkout.
   trustedBuyer Boolean  @default(false)

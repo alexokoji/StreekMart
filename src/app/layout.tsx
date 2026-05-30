@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { Footer } from "@/components/layout/Footer";
 import { SmartSearch } from "@/components/SmartSearch";
 import { FloatingSupport } from "@/components/FloatingSupport";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { getCurrentUser } from "@/lib/auth";
 import { getServerCurrencyContext } from "@/lib/currencyServer";
@@ -76,6 +77,9 @@ export default async function RootLayout({
           re-renders everything with the new context.
         */}
         <CurrencyProvider ctx={currencyCtx}>
+          {user && !user.emailVerifiedAt && (
+            <EmailVerificationBanner email={user.email} />
+          )}
           <TopNav user={user} />
           {/*
             Full-bleed layout. We add only minimal side padding and cap content

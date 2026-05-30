@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { PromotionStatus } from "@/lib/enums";
 import { verifyWebhookHash } from "@/lib/monnify";
 import { cancelPendingOrders, finalizePaidOrders } from "@/lib/orders";
+import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
 
 // `node:crypto` (used by verifyWebhookHash) is unavailable on the Edge
 // runtime, so pin this route to Node.
@@ -61,6 +62,10 @@ export async function POST(req: Request) {
             paidAt: new Date(),
           },
         });
+        // Ping admins only when the update actually flipped a row — the
+        // webhook can fire multiple times for the same reference (Monnify
+        // retries on non-2xx) and we don't want a duplicate alert per hit.
+        if (updated.count > 0) void notifyAdminsOfPromotionReview(ref);
         return NextResponse.json({ ok: true, promotion: updated.count });
       }
       const result = await finalizePaidOrders({

@@ -7,6 +7,7 @@ import {
   normaliseBusinessName,
 } from "@/lib/businessName";
 import { isBusinessNameTaken } from "@/lib/businessNameServer";
+import { notifyAdmins } from "@/lib/adminNotifications";
 
 // POST /api/account/business-name-change { requestedName, note? }
 //
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
 
   const me = await prisma.user.findUnique({
     where: { id: session.sub },
-    select: { businessName: true },
+    select: { name: true, email: true, businessName: true },
   });
 
   const created = await prisma.businessNameChangeRequest.create({
@@ -76,6 +77,19 @@ export async function POST(req: Request) {
       decisionNote: parsed.data.note,
       status: "PENDING",
     },
+  });
+
+  // Ping every admin. Same fire-and-forget pattern as the verification
+  // queue — submission has already landed.
+  void notifyAdmins({
+    kind: "Business name change",
+    summary: `${me?.name ?? "A user"} wants "${display}"`,
+    link: "/admin/business-names",
+    meta: [
+      { label: "Requester", value: `${me?.name ?? "—"} · ${me?.email ?? ""}` },
+      { label: "Current name", value: me?.businessName ?? "(none)" },
+      { label: "Requested name", value: display },
+    ],
   });
 
   return NextResponse.json({ ok: true, request: created });
