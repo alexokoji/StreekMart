@@ -454,13 +454,11 @@ export default async function HomePage({
               Coming-soon buttons render as disabled-looking pills that
               still acknowledge a tap with a tiny aria-hint, so users can
               tell something will happen later.
-              `hidden md:block` keeps this off phone viewports — phone users
-              browsing the site don't need a row of app-store badges next to
-              the page they're already reading; they're served the standard
-              in-app banner pattern instead. Desktop visitors still see it.
-              In the mobile app shell, the whole CTA section is hidden via
-              the [data-app-hide] attribute on the parent <section>. */}
-          <div className="mt-10 hidden md:block">
+              Visible on every web viewport — phone visitors are the prime
+              audience for the app download. Inside the StreekMart mobile
+              app the entire CTA section is hidden via the [data-app-hide]
+              attribute on the parent <section>. */}
+          <div className="mt-10">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500">
               Or get the app
             </p>
