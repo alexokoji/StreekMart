@@ -150,6 +150,9 @@ model User {
   sellerReviewsWritten  SellerReview[] @relation("SellerReviewsWritten")
   messageReactions      MessageReaction[]
   pushTokens            PushToken[]
+  commissionsAsBuyer    CommissionRequest[] @relation("BuyerCommissions")
+  commissionsAsDesigner CommissionRequest[] @relation("DesignerCommissions")
+  collections           Collection[]
 }
 
 // Expo push tokens. One row per device — the same user may install on
@@ -480,6 +483,7 @@ model Product {
   sketches   Sketch[]
   cartItems  CartItem[]
   reviews    Review[]
+  collectionItems CollectionItem[]
 }
 
 // -------------------- Posts (Designers) --------------------
@@ -503,6 +507,7 @@ model Post {
   promotions Promotion[]
   sketches   Sketch[]
   comments   Comment[]
+  collectionItems CollectionItem[]
 }
 
 // -------------------- Comments on posts --------------------
@@ -1038,4 +1043,109 @@ model ShipbubbleAddressCode {
   addressCode String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// -------------------- Commission Requests --------------------
+// Custom-design requests from buyers to designers. Replaces the informal
+// chat-based commission flow with a structured brief → quote → accept →
+// deliver pipeline that's auditable and notifies both sides at every step.
+//
+// Status machine (see src/lib/commissions.ts for transitions):
+//   REQUESTED  → designer hasn't responded yet
+//   QUOTED     → designer named a price + estimated days
+//   ACCEPTED   → buyer accepted the quote (payment happens off-platform
+//                in V1 — a "Mark as paid" admin action wires real
+//                payments later)
+//   DECLINED   → designer or buyer walked away during negotiation
+//   IN_PROGRESS → designer started work
+//   DELIVERED  → designer marked delivery + supplied a code
+//   COMPLETED  → buyer confirmed delivery with the code (releases payout)
+//   CANCELLED  → either party cancelled after accept
+model CommissionRequest {
+  id          String   @id @default(cuid())
+  buyerId     String
+  buyer       User     @relation("BuyerCommissions", fields: [buyerId], references: [id], onDelete: Cascade)
+  designerId  String
+  designer    User     @relation("DesignerCommissions", fields: [designerId], references: [id], onDelete: Cascade)
+
+  // Brief — what the buyer wants
+  title       String
+  occasion    String?    // "Wedding", "Aso Ebi", "Birthday", free-form
+  description String
+  budgetCents Int?       // buyer's max budget in NGN cents (₦ * 100), optional
+  deadlineAt  DateTime?  // when the buyer needs it
+  // JSON array of image URLs the buyer attached as visual references.
+  referencesJson String  @default("[]")
+
+  // Quote — what the designer responds with
+  quoteCents     Int?
+  quoteNote      String?
+  quotedAt       DateTime?
+  estimatedDays  Int?
+
+  // Fulfillment — same delivery-code pattern as the regular Order flow so
+  // a buyer hands over the code on receipt and the designer's wallet is
+  // credited.
+  deliveryCode   String?
+  deliveredAt    DateTime?
+  completedAt    DateTime?
+
+  // Free-text note appended on cancel / decline, surfaced in the timeline.
+  cancellationReason String?
+
+  status      String   @default("REQUESTED")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([designerId])
+  @@index([status])
+}
+
+// -------------------- Collections (look-books) --------------------
+// Designer-curated bundles of posts (and optionally products) that present
+// a body of work as a single shareable URL — e.g. "Aso Ebi Spring 2026".
+// Public via /lookbook/[slug]. A collection is owned by exactly one user;
+// posts/products on the join tables stay independently owned by their
+// creators.
+model Collection {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title       String
+  // URL slug, lowercased + kebab-cased. Unique per owner so the same
+  // designer can't have two "/lookbook/spring-2026" routes that conflict.
+  slug        String
+  description String?
+  // Optional cover image URL. When null the public page falls back to the
+  // first post/product image in the collection.
+  coverUrl    String?
+  // PUBLIC = visible at /lookbook/[slug], DRAFT = owner-only preview.
+  status      String   @default("DRAFT")
+  items       CollectionItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([ownerId, slug])
+  @@index([status])
+}
+
+model CollectionItem {
+  id            String     @id @default(cuid())
+  collectionId  String
+  collection    Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  // Exactly one of postId / productId is set per row. Discriminator pattern
+  // rather than two tables keeps the ordering query trivial.
+  postId        String?
+  post          Post?      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Display order within the collection. Owner-defined via drag in the
+  // editor; rendered in ascending order on the public page.
+  position      Int        @default(0)
+  createdAt     DateTime   @default(now())
+
+  @@index([collectionId, position])
+  @@index([postId])
+  @@index([productId])
 }

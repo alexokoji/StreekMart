@@ -277,6 +277,44 @@ export function verificationDecisionEmail(opts: {
   };
 }
 
+export function commissionRequestEmail(opts: {
+  designerName: string;
+  buyerName: string;
+  title: string;
+  commissionId: string;
+}): { subject: string; html: string; text: string } {
+  return {
+    subject: `New commission request — ${opts.title}`,
+    html: wrap(`
+      <p>Hi ${escapeHtml(opts.designerName)},</p>
+      <p>${escapeHtml(opts.buyerName)} sent you a commission request:
+        <strong>${escapeHtml(opts.title)}</strong>.</p>
+      <p>Open it from your dashboard to send a quote or decline.</p>
+      <p style="margin-top:24px;"><a href="${appUrl()}/designer/commissions/${opts.commissionId}" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">View request</a></p>
+    `),
+    text: `${opts.buyerName} sent a commission request: ${opts.title}. Open ${appUrl()}/designer/commissions/${opts.commissionId} to quote.`,
+  };
+}
+
+export function commissionStateChangeEmail(opts: {
+  name: string;
+  title: string;
+  body: string;
+  commissionTitle: string;
+  link: string;
+}): { subject: string; html: string; text: string } {
+  return {
+    subject: `${opts.title} — ${opts.commissionTitle}`,
+    html: wrap(`
+      <p>Hi ${escapeHtml(opts.name)},</p>
+      <p><strong>${escapeHtml(opts.title)}</strong></p>
+      <p>${escapeHtml(opts.body)}</p>
+      <p style="margin-top:24px;"><a href="${appUrl()}${opts.link}" style="color:#7c3aed; font-weight:600;">Open commission →</a></p>
+    `),
+    text: `${opts.title}: ${opts.body} (${appUrl()}${opts.link})`,
+  };
+}
+
 export function tierChangeEmail(opts: {
   name: string;
   kind: "SELLER" | "DESIGNER";

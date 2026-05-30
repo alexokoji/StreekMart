@@ -5,6 +5,7 @@ import { CATEGORIES } from "@/lib/enums";
 import { rankScore } from "@/lib/ranking";
 import { isAiEnabled } from "@/lib/ai";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
+import { buildWatermarkedUrl } from "@/lib/cloudinaryUrl";
 import { PostCard } from "@/components/feed/PostCard";
 import { ForYouRow } from "@/components/ForYouRow";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
@@ -187,7 +188,10 @@ export default async function FeedPage({
                   id: p.id,
                   title: p.title,
                   body: p.body,
-                  images: parseJsonArray(p.imagesJson),
+                  // Watermark every feed image so screenshots keep brand
+                  // attribution. Designer-owned products still render
+                  // un-marked elsewhere — this is feed-only.
+                  images: parseJsonArray(p.imagesJson).map(buildWatermarkedUrl),
                   tags: parseJsonArray(p.tagsJson),
                   createdAt: p.createdAt.toISOString(),
                   likeCount: p.likeCount,

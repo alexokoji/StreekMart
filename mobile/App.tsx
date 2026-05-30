@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   Platform,
   StyleSheet,
@@ -105,6 +106,10 @@ export default function App() {
   // Onboarding gate. `null` = still reading AsyncStorage (keep splash up),
   // `"needed"` = render Onboarding, `"done"` = render WebView.
   const [onboardingState, setOnboardingState] = useState<"needed" | "done" | null>(null);
+  // Tracks whether the WebView has history we can pop. Kept in a ref so the
+  // Android hardware-back listener (registered once) always reads the
+  // current value without needing to re-bind on every navigation.
+  const canGoBackRef = useRef(false);
 
   // Check AsyncStorage once on launch to decide whether to show onboarding.
   // Done before any other work because the splash needs to stay up if we
@@ -311,6 +316,28 @@ export default function App() {
 
   const onNavigationStateChange = useCallback((nav: WebViewNavigation) => {
     setCurrentUrl(nav.url);
+    // Sync the WebView's history flag so the Android hardware-back handler
+    // knows whether a back press should pop the WebView or exit the app.
+    canGoBackRef.current = nav.canGoBack;
+  }, []);
+
+  // Android hardware-back wiring. Without this, the hardware back button
+  // (or the system gesture nav) closes the app immediately on the home
+  // screen of the site — even when the user is several pages deep, since
+  // RN has no idea the WebView has its own navigation stack.
+  //
+  // Rule: if the WebView has history, pop it. Otherwise let the OS handle
+  // the back press (which exits the app or pops the RN root stack).
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (canGoBackRef.current && webRef.current) {
+        webRef.current.goBack();
+        return true; // consumed — block default exit
+      }
+      return false; // no history — let the OS exit / pop
+    });
+    return () => sub.remove();
   }, []);
 
   if (offline) {
@@ -385,6 +412,11 @@ export default function App() {
           javaScriptEnabled
           // iOS-style overscroll bounce — feels like a real native scroll.
           bounces
+          // Enables the iOS edge-swipe-back / forward gestures inside the
+          // WebView so a user on iPhone can swipe from the left edge to
+          // pop the WebView's history, exactly like Safari. No-op on
+          // Android; Android back is handled by the BackHandler above.
+          allowsBackForwardNavigationGestures
           // Hide the default loading indicator; we render our own overlay.
           startInLoadingState={false}
           // Persistent cache so revisits are fast.

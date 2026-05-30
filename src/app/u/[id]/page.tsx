@@ -9,6 +9,7 @@ import { Price } from "@/components/Price";
 import { FollowButton } from "./FollowButton";
 import { CoverImageUploader } from "./CoverImageUploader";
 import { ShareButton } from "@/components/ShareButton";
+import { CommissionRequestButton } from "@/components/commissions/CommissionRequestButton";
 import { TierBadge } from "@/components/TierBadge";
 import { topTier } from "@/lib/tiers";
 
@@ -261,9 +262,20 @@ export default async function PublicProfilePage({
                 initialFollowing={!!alreadyFollowing}
               />
             )}
+            {profile.isDesigner && viewer && viewer.id !== profile.id && (
+              <CommissionRequestButton
+                designerId={profile.id}
+                designerName={displayName}
+              />
+            )}
           </div>
         </div>
       </header>
+
+      {/* Public look-books rail — only renders when the profile is a
+          designer and has at least one PUBLIC collection. Lazy-loaded as
+          part of the same render so it doesn't add a request hop. */}
+      {profile.isDesigner && <LookbookRail ownerId={profile.id} handle={profile.slug ?? profile.id} />}
 
       {/* Tabs */}
       {profile.isSeller && profile.isDesigner && (
@@ -353,6 +365,64 @@ export default async function PublicProfilePage({
         </div>
       )}
     </div>
+  );
+}
+
+// Server component rail for the designer's public look-books. Renders
+// nothing when the designer hasn't published any — keeps the profile
+// clean for designers who don't curate collections.
+async function LookbookRail({ ownerId, handle }: { ownerId: string; handle: string }) {
+  const collections = await prisma.collection.findMany({
+    where: { ownerId, status: "PUBLIC" },
+    orderBy: { updatedAt: "desc" },
+    take: 6,
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      coverUrl: true,
+      _count: { select: { items: true } },
+    },
+  });
+  if (collections.length === 0) return null;
+
+  return (
+    <section>
+      <div className="mb-3 flex items-end justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+            Look-books
+          </p>
+          <h2 className="font-display text-lg font-semibold">Curated collections</h2>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {collections.map((c) => (
+          <Link
+            key={c.id}
+            href={`/lookbook/${handle}/${c.slug}`}
+            className="group block overflow-hidden rounded-xl border border-ink-100 bg-white"
+          >
+            <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-violet-100 to-fuchsia-100">
+              {c.coverUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={c.coverUrl}
+                  alt=""
+                  className="h-full w-full object-cover transition group-hover:scale-105"
+                />
+              )}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+                <p className="line-clamp-1 text-sm font-semibold text-white">
+                  {c.title}
+                </p>
+                <p className="text-[10px] text-white/80">{c._count.items} pieces</p>
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

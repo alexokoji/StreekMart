@@ -77,13 +77,8 @@ export async function uploadBufferToCloudinary(args: {
   };
 }
 
-// Helper to build an optimised delivery URL with auto-format / auto-quality.
-// Components that already store the secure_url can use this if they want a
-// transformed variant (e.g. thumbnail). Stored URLs already work as-is —
-// this is just an opt-in.
-export function buildOptimisedUrl(secureUrl: string, transform = "f_auto,q_auto"): string {
-  // Cloudinary URLs look like:
-  //   https://res.cloudinary.com/<cloud>/image/upload/<public_id>.<ext>
-  // We splice the transform in just after `/upload/`.
-  return secureUrl.replace("/upload/", `/upload/${transform}/`);
-}
+// String-only URL helpers (buildOptimisedUrl, buildWatermarkedUrl) live in
+// lib/cloudinaryUrl.ts so client components can import them without
+// dragging the Cloudinary SDK into the browser bundle. Re-export here for
+// callers that already import everything from this module.
+export { buildOptimisedUrl, buildWatermarkedUrl } from "./cloudinaryUrl";

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
+import { buildWatermarkedUrl } from "@/lib/cloudinaryUrl";
 
 export default async function PublicPostPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
@@ -14,7 +15,7 @@ export default async function PublicPostPage({ params }: { params: { id: string 
 
   prisma.post.update({ where: { id: post.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
 
-  const images = parseJsonArray(post.imagesJson);
+  const images = parseJsonArray(post.imagesJson).map(buildWatermarkedUrl);
   const tags = parseJsonArray(post.tagsJson);
 
   return (

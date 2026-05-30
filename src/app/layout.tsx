@@ -5,6 +5,7 @@ import { TopNav } from "@/components/layout/TopNav";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Footer } from "@/components/layout/Footer";
 import { SmartSearch } from "@/components/SmartSearch";
+import { FloatingSupport } from "@/components/FloatingSupport";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { getCurrentUser } from "@/lib/auth";
 import { getServerCurrencyContext } from "@/lib/currencyServer";
@@ -90,6 +91,9 @@ export default async function RootLayout({
               listens for the "upclo:open-search" event from the BottomNav FAB
               on mobile. */}
           <SmartSearch />
+          {/* Discreet help-pill in the bottom-right corner that routes to
+              /support. Stays out of the way until tapped. */}
+          <FloatingSupport />
         </CurrencyProvider>
       </body>
     </html>
