@@ -4,6 +4,7 @@ import { OrderStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { deliveryCodesMatch } from "@/lib/deliveryCode";
 import { releaseHeldFundsForOrder } from "@/lib/wallet";
+import { sendPush } from "@/lib/notifications";
 
 // POST /api/orders/[id]/confirm-by-code  { code }
 //
@@ -63,6 +64,19 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
   // Releases the held funds + stamps completedAt on the order.
   await releaseHeldFundsForOrder(order.id);
+
+  // Seller-side push: funds are now in their wallet. Buyer-side push is
+  // skipped because they're physically holding the package — they don't
+  // need a phone buzz to know it arrived.
+  void sendPush({
+    userId: order.sellerId,
+    title: "✓ Delivery confirmed",
+    body: `Order #${order.id.slice(0, 8)} · payment released to your wallet.`,
+    link: `/seller/orders/${order.id}`,
+    data: { type: "order-completed", orderId: order.id },
+  }).catch((err) =>
+    console.error("[push:order-completed] threw", { orderId: order.id, err }),
+  );
 
   return NextResponse.json({ ok: true });
 }

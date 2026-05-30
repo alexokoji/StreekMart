@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { sendPush } from "@/lib/notifications";
 
 // POST /api/follows { designerId } — toggle follow.
 const Body = z.object({ designerId: z.string() });
@@ -39,5 +40,26 @@ export async function POST(req: Request) {
   await prisma.follow.create({
     data: { followerId: guard.session.sub, designerId: parsed.data.designerId },
   });
+
+  // Notify the designer. Push only — followers happen often enough that
+  // an email per event would feel spammy; the designer dashboard's
+  // engagement stats panel rolls follower totals up weekly already.
+  const follower = await prisma.user.findUnique({
+    where: { id: guard.session.sub },
+    select: { name: true, slug: true },
+  });
+  void sendPush({
+    userId: parsed.data.designerId,
+    title: "New follower",
+    body: `${follower?.name ?? "Someone"} started following you`,
+    link: `/u/${follower?.slug ?? guard.session.sub}`,
+    data: { type: "new-follower", followerId: guard.session.sub },
+  }).catch((err) =>
+    console.error("[push:new-follower] threw", {
+      designerId: parsed.data.designerId,
+      err,
+    }),
+  );
+
   return NextResponse.json({ following: true });
 }

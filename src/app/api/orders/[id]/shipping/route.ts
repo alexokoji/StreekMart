@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { getLogisticsService } from "@/lib/services/logistics";
+import { sendPush } from "@/lib/notifications";
 
 const CreateShipmentBody = z.object({
   weight: z.number().positive().optional(),
@@ -102,6 +103,17 @@ export async function POST(req: Request, context: { params: { id: string } }) {
         },
       });
 
+      // In-city delivery → push the buyer that the seller's on the way.
+      void sendPush({
+        userId: order.buyerId,
+        title: "📦 Your order is on the way",
+        body: `${order.product.name} · seller delivering within city`,
+        link: `/account/orders/${orderId}`,
+        data: { type: "order-shipped", orderId },
+      }).catch((err) =>
+        console.error("[push:order-shipped] threw", { orderId, err }),
+      );
+
       return NextResponse.json({ ok: true, shipment: { id: shipment.id } });
     }
 
@@ -186,6 +198,22 @@ export async function POST(req: Request, context: { params: { id: string } }) {
         createdById: guard.session.sub,
       },
     });
+
+    // Push the buyer too — this path skips the /updates endpoint that
+    // would normally fan the push out, so we send directly here.
+    void sendPush({
+      userId: order.buyerId,
+      title: "📦 Your order is on the way",
+      body: `${order.product.name} · tracking ${shipmentResult.trackingCode}`,
+      link: `/account/orders/${orderId}`,
+      data: {
+        type: "order-shipped",
+        orderId,
+        trackingCode: shipmentResult.trackingCode,
+      },
+    }).catch((err) =>
+      console.error("[push:order-shipped] threw", { orderId, err }),
+    );
 
     return NextResponse.json({
       ok: true,

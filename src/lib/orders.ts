@@ -199,6 +199,22 @@ export async function finalizePaidOrders(args: {
         link: `/account/orders/${o.id}`,
         data: { type: "order-placed", orderId: o.id },
       }).catch((err) => console.error("[push:order-placed] threw", { orderId: o.id, err }));
+
+      // Seller-side: a fresh paid order needs fulfilment. Push deep-links
+      // to the seller's order view (same path the buyer uses; permission
+      // gates render the right action panel based on role).
+      void sendPush({
+        userId: o.sellerId,
+        title: "New order to fulfil",
+        body:
+          `${o.product.name}` +
+          (variantSummary ? ` · ${variantSummary}` : "") +
+          ` · ₦${o.totalPrice.toLocaleString("en-NG")}`,
+        link: `/seller/orders/${o.id}`,
+        data: { type: "order-received", orderId: o.id },
+      }).catch((err) =>
+        console.error("[push:order-received] threw", { orderId: o.id, err }),
+      );
     }
   }
 

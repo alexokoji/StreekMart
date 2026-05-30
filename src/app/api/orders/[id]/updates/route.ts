@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
+import { sendPush } from "@/lib/notifications";
 
 // GET  /api/orders/[id]/updates — timeline (buyer or seller of the order)
 // POST /api/orders/[id]/updates — append an update (seller / manager only)
@@ -84,6 +85,30 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       createdById: guard.session.sub,
     },
   });
+
+  // Ping the buyer when a substantive update lands. NOTE-kind updates skip
+  // the push so the seller can journal internal notes without spamming.
+  if (parsed.data.kind !== "NOTE") {
+    const title =
+      parsed.data.kind === "DISPATCHED"
+        ? "📦 On the way"
+        : parsed.data.kind === "ARRIVING"
+          ? "🚪 Arriving soon"
+          : "Order update";
+    void sendPush({
+      userId: r.order.buyerId,
+      title,
+      body: parsed.data.message,
+      link: `/account/orders/${r.order.id}`,
+      data: {
+        type: "order-update",
+        orderId: r.order.id,
+        kind: parsed.data.kind,
+      },
+    }).catch((err) =>
+      console.error("[push:order-update] threw", { orderId: r.order.id, err }),
+    );
+  }
 
   return NextResponse.json({ update });
 }

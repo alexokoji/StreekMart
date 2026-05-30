@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
 import { isBusinessNameTaken } from "@/lib/businessNameServer";
+import { sendPush } from "@/lib/notifications";
 
 // PATCH /api/admin/business-name-changes/[id] { decision, note? }
 //
@@ -64,6 +65,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         },
       });
     });
+    void sendPush({
+      userId: reqRow.userId,
+      title: "✓ Business name approved",
+      body: `Your business name is now "${reqRow.requestedName}".`,
+      link: "/account",
+      data: { type: "business-name-decision", decision: "APPROVED" },
+    }).catch((err) =>
+      console.error("[push:business-name-decision] threw", { userId: reqRow.userId, err }),
+    );
     return NextResponse.json({ ok: true, status: "APPROVED" });
   }
 
@@ -77,6 +87,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       decisionNote: parsed.data.note,
     },
   });
+  void sendPush({
+    userId: reqRow.userId,
+    title: "Business name change declined",
+    body: parsed.data.note ?? "Tap to view the decision note.",
+    link: "/account",
+    data: { type: "business-name-decision", decision: "REJECTED" },
+  }).catch((err) =>
+    console.error("[push:business-name-decision] threw", { userId: reqRow.userId, err }),
+  );
 
   return NextResponse.json({ ok: true, status: "REJECTED" });
 }

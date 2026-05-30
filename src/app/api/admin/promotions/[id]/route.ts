@@ -7,6 +7,7 @@ import {
   PromotionStatus,
 } from "@/lib/enums";
 import { recordTransaction } from "@/lib/wallet";
+import { sendPush } from "@/lib/notifications";
 
 // PATCH /api/admin/promotions/[id] { decision, note? }
 //
@@ -56,6 +57,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         active: true,
       },
     });
+    void sendPush({
+      userId: promo.ownerId,
+      title: "✓ Promotion approved",
+      body: `Your promotion is live for the next ${PROMOTION_DURATION_DAYS} days.`,
+      link: "/seller/promotions",
+      data: { type: "promotion-decision", promotionId: promo.id, decision: "APPROVED" },
+    }).catch((err) =>
+      console.error("[push:promotion-decision] threw", { promotionId: promo.id, err }),
+    );
     return NextResponse.json({ ok: true, status: PromotionStatus.APPROVED });
   }
 
@@ -85,6 +95,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       });
     }
   });
+
+  void sendPush({
+    userId: promo.ownerId,
+    title: "Promotion rejected",
+    body:
+      promo.priceCents > 0
+        ? `Your ₦${(promo.priceCents / 100).toLocaleString("en-NG")} fee has been refunded to your wallet.`
+        : parsed.data.note ?? "Tap for details.",
+    link: "/seller/promotions",
+    data: { type: "promotion-decision", promotionId: promo.id, decision: "REJECTED" },
+  }).catch((err) =>
+    console.error("[push:promotion-decision] threw", { promotionId: promo.id, err }),
+  );
 
   return NextResponse.json({ ok: true, status: PromotionStatus.REJECTED });
 }
