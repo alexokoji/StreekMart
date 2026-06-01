@@ -5,10 +5,11 @@ import { authorizedCron, cronForbidden } from "@/lib/cron";
 import { sendPushBulk } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 
-// Runs once a day at 19:00 UTC (= 20:00 Lagos) per vercel.json. Reminds
-// every seller / designer who has at least one ACTIVE listing to update
-// their stock numbers — keeps the storefront honest and stops "ghost"
-// listings sticking around with stale availability.
+// Runs once a day at 19:00 UTC (= 20:00 Lagos) via GitHub Actions (see
+// .github/workflows/cron-seller-stock-reminders.yml). Reminds every
+// seller / designer who has at least one ACTIVE listing to update their
+// stock numbers — keeps the storefront honest and stops "ghost" listings
+// sticking around with stale availability.
 //
 // Both channels fire: push for the in-pocket nudge, email for the people
 // who manage the shop from a laptop. The email is a single short line —

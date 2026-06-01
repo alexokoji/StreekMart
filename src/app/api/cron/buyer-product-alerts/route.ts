@@ -4,11 +4,13 @@ import { prisma } from "@/lib/db";
 import { authorizedCron, cronForbidden } from "@/lib/cron";
 import { sendPushBulk } from "@/lib/notifications";
 
-// Runs every 12 hours (see vercel.json crons). For each registered buyer
-// device, pushes a short summary of new products listed since the previous
-// run. We intentionally do NOT email here — twice-daily emails to every
-// buyer would burn through the Resend free tier and read as spam. Push is
-// opt-in by definition (the user installed the app + accepted the prompt).
+// Runs every 12 hours via GitHub Actions (see
+// .github/workflows/cron-buyer-product-alerts.yml). For each registered
+// buyer device, pushes a short summary of new products listed since the
+// previous run. We intentionally do NOT email here — twice-daily emails
+// to every buyer would burn through the Resend free tier and read as
+// spam. Push is opt-in by definition (the user installed the app +
+// accepted the prompt).
 
 export const runtime = "nodejs";
 

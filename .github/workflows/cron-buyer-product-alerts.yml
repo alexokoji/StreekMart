@@ -1,0 +1,25 @@
+name: Cron · Buyer product alerts
+
+# Runs every 12 hours via GitHub Actions cron (free on every plan, including
+# public-repo unlimited / private-repo 2 000 min/mo). Replaces the Vercel
+# Cron config that needed Pro to run sub-daily.
+#
+# `workflow_dispatch` also lets you fire this manually from the Actions tab
+# for testing.
+on:
+  schedule:
+    - cron: "0 */12 * * *" # 00:00 and 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit the alerts endpoint
+        run: |
+          curl -fsS \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -X GET \
+            --max-time 60 \
+            "${{ secrets.CRON_BASE_URL }}/api/cron/buyer-product-alerts" \
+            -w "\nHTTP %{http_code} in %{time_total}s\n"

@@ -1,7 +1,9 @@
-// Cron auth helper. Vercel Cron fires GET requests against the path
-// configured in vercel.json and signs them with the `CRON_SECRET` env var
-// as `Authorization: Bearer <secret>`. We verify that here so a stray
-// public request can't trigger an expensive fan-out.
+// Cron auth helper. The two cron endpoints under /api/cron/* are fired by
+// GitHub Actions on a schedule (see .github/workflows/cron-*.yml) — we
+// dropped Vercel Cron because the Hobby plan can't run sub-daily schedules.
+// GitHub Actions sets `Authorization: Bearer <CRON_SECRET>` from the repo
+// secret of the same name; we verify that here so a stray public request
+// can't trigger an expensive fan-out.
 //
 // In dev (no CRON_SECRET set) we accept any request — useful for
 // manually hitting the endpoint with curl or the browser to test.
