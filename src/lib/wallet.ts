@@ -81,6 +81,10 @@ export async function recordSale(args: {
   grossCents: number;
   productName: string;
   orderId: string;
+  // StreekMart-affiliated sellers bypass escrow — the net credit lands
+  // straight in their withdrawable balance instead of `heldCents`. Set
+  // from User.streekmartAffiliated in finalizePaidOrders.
+  skipHold?: boolean;
 }) {
   const fee = platformFeeCents(args.grossCents);
   const net = args.grossCents - fee;
@@ -90,7 +94,9 @@ export async function recordSale(args: {
       userId: args.sellerId,
       amountCents: args.grossCents,
       type: "SALE_CREDIT",
-      description: `Sale: ${args.productName} (held until delivery)`,
+      description: args.skipHold
+        ? `Sale: ${args.productName} (direct credit · affiliated)`
+        : `Sale: ${args.productName} (held until delivery)`,
       refType: "order",
       refId: args.orderId,
     });
@@ -105,11 +111,15 @@ export async function recordSale(args: {
         refId: args.orderId,
       });
     }
-    // Mark the net as held — withdrawable balance excludes this.
-    await tx.wallet.update({
-      where: { userId: args.sellerId },
-      data: { heldCents: { increment: net } },
-    });
+    if (!args.skipHold) {
+      // Mark the net as held — withdrawable balance excludes this.
+      // Affiliated sellers skip this step entirely so the net is
+      // withdrawable as soon as the order is paid.
+      await tx.wallet.update({
+        where: { userId: args.sellerId },
+        data: { heldCents: { increment: net } },
+      });
+    }
   });
   return { gross: args.grossCents, fee, net };
 }

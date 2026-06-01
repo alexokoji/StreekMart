@@ -90,6 +90,19 @@ export async function finalizePaidOrders(args: {
   //     credited as a separate DELIVERY entry.
   const cutBps = await platformDeliveryCutBps();
 
+  // Look up the affiliation flag once per distinct seller so the inner loop
+  // doesn't N+1 query. Affiliated sellers skip escrow — the net lands
+  // straight in their withdrawable balance (see recordSale `skipHold`).
+  const sellerIds = Array.from(new Set(pending.map((o) => o.sellerId)));
+  const sellerAffiliation = new Map<string, boolean>();
+  if (sellerIds.length > 0) {
+    const rows = await prisma.user.findMany({
+      where: { id: { in: sellerIds } },
+      select: { id: true, streekmartAffiliated: true },
+    });
+    for (const r of rows) sellerAffiliation.set(r.id, r.streekmartAffiliated);
+  }
+
   for (const o of pending) {
     await prisma.$transaction([
       prisma.product.update({
@@ -106,11 +119,13 @@ export async function finalizePaidOrders(args: {
     // double-count it; `recordSale` applies the product-side PLATFORM_FEE_BPS).
     const totalCents = Math.round(o.totalPrice * 100);
     const productCents = totalCents - o.deliveryFeeCents;
+    const isAffiliated = sellerAffiliation.get(o.sellerId) ?? false;
     await recordSale({
       sellerId: o.sellerId,
       grossCents: productCents,
       productName: o.product.name,
       orderId: o.id,
+      skipHold: isAffiliated,
     });
 
     // Delivery credit — only when the seller is the fulfiller. Held
@@ -138,10 +153,14 @@ export async function finalizePaidOrders(args: {
         });
       }
       // Add the delivery net to held funds — released when delivery confirms.
-      await prisma.wallet.update({
-        where: { userId: o.sellerId },
-        data: { heldCents: { increment: netDelivery } },
-      });
+      // Affiliated sellers skip the hold so the delivery net is withdrawable
+      // immediately, matching the product-side behaviour above.
+      if (!isAffiliated) {
+        await prisma.wallet.update({
+          where: { userId: o.sellerId },
+          data: { heldCents: { increment: netDelivery } },
+        });
+      }
     }
   }
 

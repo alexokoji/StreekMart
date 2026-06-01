@@ -308,6 +308,41 @@ export function verificationDecisionEmail(opts: {
   };
 }
 
+export function roleChangeDecisionEmail(opts: {
+  name: string;
+  approved: boolean;
+  newRoles: string[]; // ["Seller", "Designer"] etc.
+  note?: string | null;
+}): { subject: string; html: string; text: string } {
+  const rolesLabel = opts.newRoles.length === 0 ? "Buyer" : opts.newRoles.join(" · ");
+  const dashHref =
+    opts.newRoles.includes("Seller")
+      ? "/seller"
+      : opts.newRoles.includes("Designer")
+        ? "/designer"
+        : "/account";
+  return {
+    subject: opts.approved
+      ? `Your new role is live — ${rolesLabel}`
+      : "Role change request — needs another look",
+    html: wrap(
+      opts.approved
+        ? `<p>Hi ${escapeHtml(opts.name)},</p>
+           <p>Your role change has been approved. You now have access as <strong>${escapeHtml(rolesLabel)}</strong>.</p>
+           <p style="margin-top:24px;">
+             <a href="${appUrl()}${dashHref}" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">Open my dashboard</a>
+           </p>`
+        : `<p>Hi ${escapeHtml(opts.name)},</p>
+           <p>Our team reviewed your role-change request and couldn&rsquo;t approve it as submitted.</p>
+           ${opts.note ? `<p style="padding:12px; background:#fbeef0; color:#6b1a2a; border-radius:10px;">${escapeHtml(opts.note)}</p>` : ""}
+           <p>You can submit a new request from your account.</p>`,
+    ),
+    text: opts.approved
+      ? `Your role change is approved: ${rolesLabel}. Open ${appUrl()}${dashHref}`
+      : `Your role change wasn't approved.${opts.note ? " " + opts.note : ""}`,
+  };
+}
+
 // Admin-attention email. Sent to every admin when something lands in a
 // queue that needs human action: verifications, business-name changes,
 // promotion approvals, etc. Keep the format compact — the subject line

@@ -33,6 +33,7 @@ export default async function AdminUsersPage({
       sellerTier: true,
       designerTier: true,
       isAdmin: true,
+      streekmartAffiliated: true,
       suspendedAt: true,
       createdAt: true,
     },
@@ -70,6 +71,9 @@ export default async function AdminUsersPage({
                 {!u.isSeller && !u.isDesigner && !u.isAdmin && (
                   <span className="badge bg-ink-50 text-ink-500">Buyer</span>
                 )}
+                {u.streekmartAffiliated && (
+                  <span className="badge bg-gold-50 text-gold-700">★ Affiliated</span>
+                )}
               </div>
             </div>
             <ManualVerifyButtons
@@ -83,6 +87,7 @@ export default async function AdminUsersPage({
               designerVerified={u.designerVerified}
               sellerTier={u.sellerTier}
               designerTier={u.designerTier}
+              streekmartAffiliated={u.streekmartAffiliated}
               suspendedAt={u.suspendedAt}
             />
           </li>

@@ -4,12 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Per-user moderation controls for the admin user list. Hits:
-//   PATCH /api/admin/users/[id]/verify   (verify/unverify role)
-//   PATCH /api/admin/users/[id]/tier     (set seller/designer tier 1/2/3)
-//   PATCH /api/admin/users/[id]/suspend  (soft suspend/reinstate)
-//   DELETE /api/admin/users/[id]         (hard cascade delete)
+//   PATCH /api/admin/users/[id]/verify       (verify/unverify role)
+//   PATCH /api/admin/users/[id]/tier         (set seller/designer tier 1/2/3)
+//   PATCH /api/admin/users/[id]/roles        (admin-direct role flip)
+//   PATCH /api/admin/users/[id]/affiliation  (streekmart-affiliated toggle)
+//   PATCH /api/admin/users/[id]/suspend      (soft suspend/reinstate)
+//   DELETE /api/admin/users/[id]             (hard cascade delete)
 //
-// Suspend prompts for an optional reason (sent in the notification email).
+// Suspend prompts for an optional reason (sent in the suspension email).
 // Delete requires the operator to retype the target's email — the server
 // rejects the request without it.
 export function ManualVerifyButtons({
@@ -23,6 +25,7 @@ export function ManualVerifyButtons({
   designerVerified,
   sellerTier,
   designerTier,
+  streekmartAffiliated,
   suspendedAt,
 }: {
   userId: string;
@@ -35,6 +38,7 @@ export function ManualVerifyButtons({
   designerVerified: boolean;
   sellerTier: number;
   designerTier: number;
+  streekmartAffiliated: boolean;
   suspendedAt: Date | string | null;
 }) {
   const router = useRouter();
@@ -77,6 +81,57 @@ export function ManualVerifyButtons({
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.error ?? "Tier change failed.");
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function setRoles(nextSeller: boolean, nextDesigner: boolean) {
+    const label = (nextSeller ? "Seller" : "") + (nextSeller && nextDesigner ? " · " : "") + (nextDesigner ? "Designer" : "");
+    if (
+      !window.confirm(
+        `Set ${name}'s role to ${label || "Buyer only"}? They'll be notified by email.`,
+      )
+    ) {
+      return;
+    }
+    setBusy("roles");
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/roles`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isSeller: nextSeller, isDesigner: nextDesigner }),
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Role change failed.");
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleAffiliation() {
+    const next = !streekmartAffiliated;
+    const verb = next ? "mark as StreekMart-affiliated" : "remove affiliation from";
+    if (!window.confirm(`${verb} ${name}?\n\nAffiliated sellers skip escrow — payments land in their withdrawable wallet immediately on PAID.`)) {
+      return;
+    }
+    setBusy("affiliation");
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/affiliation`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ affiliated: next }),
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Affiliation change failed.");
       }
     } finally {
       setBusy(null);
@@ -199,6 +254,34 @@ export function ManualVerifyButtons({
           />
         </>
       )}
+      {/* Admin-direct role flip. Independent of the user-initiated
+          /admin/role-changes queue — lets the admin bestow a role without
+          a corresponding request. Hidden for the admin row itself. */}
+      {!isAdmin && (
+        <RoleSelect
+          isSeller={isSeller}
+          isDesigner={isDesigner}
+          disabled={busy !== null}
+          onChange={(s, d) => setRoles(s, d)}
+        />
+      )}
+      {/* Affiliation toggle. Only meaningful when the user is a seller /
+          designer; the server also enforces this. */}
+      {(isSeller || isDesigner) && !isAdmin && (
+        <button
+          type="button"
+          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+            streekmartAffiliated
+              ? "border-gold-500 bg-gold-50 text-gold-800"
+              : "border-ink-200 bg-white text-ink-600 hover:border-violet-300"
+          }`}
+          onClick={toggleAffiliation}
+          disabled={busy !== null}
+          title="Skip escrow — pay direct to wallet"
+        >
+          {streekmartAffiliated ? "★ Affiliated" : "Affiliate"}
+        </button>
+      )}
       {/* Suspension is reversible; deletion isn't. Both hidden for admins
           so a misclick can't lock out the platform's own admin row. */}
       {!isAdmin && (
@@ -233,6 +316,45 @@ export function ManualVerifyButtons({
         </button>
       )}
     </div>
+  );
+}
+
+// Admin-direct role selector. Picks any combination of seller / designer
+// and fires the PATCH on change. Selecting the same value is a no-op on
+// the server (returns `unchanged: true`), so we don't need an Apply button.
+function RoleSelect({
+  isSeller,
+  isDesigner,
+  disabled,
+  onChange,
+}: {
+  isSeller: boolean;
+  isDesigner: boolean;
+  disabled: boolean;
+  onChange: (nextSeller: boolean, nextDesigner: boolean) => void;
+}) {
+  const value =
+    isSeller && isDesigner ? "SD" : isSeller ? "S" : isDesigner ? "D" : "B";
+  return (
+    <label className="inline-flex items-center gap-1 text-[11px] text-ink-500">
+      <span className="sr-only">Role</span>
+      <select
+        aria-label="Role"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => {
+          const v = e.target.value;
+          onChange(v === "S" || v === "SD", v === "D" || v === "SD");
+        }}
+        className="rounded-md border border-ink-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-ink-700 disabled:opacity-50"
+        title="Set role"
+      >
+        <option value="B">Buyer only</option>
+        <option value="S">Seller</option>
+        <option value="D">Designer</option>
+        <option value="SD">Seller · Designer</option>
+      </select>
+    </label>
   );
 }
 
