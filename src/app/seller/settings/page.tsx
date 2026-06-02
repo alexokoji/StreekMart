@@ -4,7 +4,6 @@ import { Permission } from "@/lib/enums";
 import { requireUser } from "@/lib/auth";
 import { ProfileSettingsForm } from "@/components/forms/ProfileSettingsForm";
 import { AddressBookManager } from "@/components/forms/AddressBookManager";
-import { DeliveryFeesView } from "@/components/dashboard/DeliveryFeesView";
 import { ShareButton } from "@/components/ShareButton";
 
 export default async function SellerSettingsPage() {
@@ -79,22 +78,11 @@ export default async function SellerSettingsPage() {
         />
       </div>
 
-      <div className="card p-6">
-        <h2 className="font-display text-lg font-semibold">Delivery rates</h2>
-        <p className="text-sm text-ink-600">
-          What buyers pay your own rider when an order falls outside the platform&apos;s
-          delivery zones. Set by StreekMart admins — read-only here.
-        </p>
-        <div className="mt-4">
-          <DeliveryFeesView
-            rates={{
-              withinCityCents: user.deliveryWithinCityCents,
-              outsideCityCents: user.deliveryOutsideCityCents,
-              outsideCountryCents: user.deliveryOutsideCountryCents,
-            }}
-          />
-        </div>
-      </div>
+      {/* "Delivery rates" panel removed — every order now ships via the
+          platform's logistics provider, regardless of buyer/seller city.
+          Sellers no longer need to (or are charged for) setting their own
+          per-zone rider rates. Affiliated-seller delivery customisation,
+          when it lands, will live elsewhere in this page. */}
     </div>
   );
 }

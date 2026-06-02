@@ -19,7 +19,6 @@ import {
   formatAttributeSelection,
   parseAttributeSelection,
 } from "@/lib/productAttributes";
-import { platformDeliveryCutBps } from "@/lib/locationServer";
 
 // How many days a buyer has to wait between payment and the option to
 // self-cancel an undelivered order. Conservative default — long enough for
@@ -83,12 +82,10 @@ export async function finalizePaidOrders(args: {
   // so the seller must be credited even if the listing was archived in the
   // meantime.
   //
-  // Delivery fee split (introduced when the platform took over fees):
-  //   - PLATFORM fulfiller → fee stays with platform; seller gets only the
-  //     product portion credited.
-  //   - SELLER fulfiller   → seller's wallet gets (fee − platform cut)
-  //     credited as a separate DELIVERY entry.
-  const cutBps = await platformDeliveryCutBps();
+  // Delivery fees stay with the platform (which pays the courier) — seller
+  // only gets the product portion. The old SELLER-fulfiller credit branch
+  // was removed when the within-city / outside-city fulfilment split was
+  // retired.
 
   // Look up the affiliation flag once per distinct seller so the inner loop
   // doesn't N+1 query. Affiliated sellers skip escrow — the net lands
@@ -128,40 +125,12 @@ export async function finalizePaidOrders(args: {
       skipHold: isAffiliated,
     });
 
-    // Delivery credit — only when the seller is the fulfiller. Held
-    // alongside the product credit; releases together when buyer/rider
-    // confirms delivery.
-    if (o.deliveryFeeCents > 0 && o.deliveryFulfiller === "SELLER") {
-      const cut = Math.round((o.deliveryFeeCents * cutBps) / 10000);
-      const netDelivery = o.deliveryFeeCents - cut;
-      await recordTransaction({
-        userId: o.sellerId,
-        amountCents: netDelivery,
-        type: "SALE_CREDIT",
-        description: `Delivery fee (net of platform cut) for order #${o.id.slice(0, 8)}`,
-        refType: "order",
-        refId: o.id,
-      });
-      if (cut > 0) {
-        await recordTransaction({
-          userId: o.sellerId,
-          amountCents: -cut,
-          type: "PLATFORM_FEE",
-          description: `Delivery platform cut (${(cutBps / 100).toFixed(2)}%)`,
-          refType: "order",
-          refId: o.id,
-        });
-      }
-      // Add the delivery net to held funds — released when delivery confirms.
-      // Affiliated sellers skip the hold so the delivery net is withdrawable
-      // immediately, matching the product-side behaviour above.
-      if (!isAffiliated) {
-        await prisma.wallet.update({
-          where: { userId: o.sellerId },
-          data: { heldCents: { increment: netDelivery } },
-        });
-      }
-    }
+    // Delivery fees are no longer routed back to the seller. Every order
+    // ships via the platform's logistics provider, so the buyer's
+    // shipping spend stays with the platform (and pays out the courier
+    // separately). The legacy `if (deliveryFulfiller === "SELLER")` credit
+    // block was removed when the within-city / outside-city fulfilment
+    // split was retired.
   }
 
   // Clear the buyer's cart of anything that just got finalised. Same buyer

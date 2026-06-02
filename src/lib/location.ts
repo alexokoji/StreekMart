@@ -11,14 +11,12 @@ export type DeliveryZone =
   | "UNKNOWN";
 
 // Who's responsible for the actual delivery.
-//   "PLATFORM" — same city in the platform-supported list AND the seller
-//                doesn't have their own rider. Platform riders pick up.
-//   "SELLER"   — seller's own rider does the delivery (either because we
-//                don't serve their city, or because they have a rider on
-//                file even in a supported city — fee still goes to their
-//                wallet minus the platform cut).
-//   "BLOCKED"  — international order, or the seller is outside supported
-//                cities and has no rider. Cart refuses checkout.
+//   "PLATFORM" — the platform's logistics provider (Shipbubble) picks up
+//                and ships. Default for every in-country order.
+//   "SELLER"   — DEPRECATED. Kept on the union for back-compat with rows
+//                created under the legacy "seller delivers within own
+//                city" pattern; new orders never write this value.
+//   "BLOCKED"  — international order. Cart refuses checkout.
 export type DeliveryFulfiller = "PLATFORM" | "SELLER" | "BLOCKED";
 
 export type DeliveryQuote = {
@@ -35,10 +33,15 @@ export type LocatedUser = {
   region?: string | null;
 };
 
+// DEPRECATED — no longer drives delivery pricing. The platform's
+// logistics provider quotes every order at checkout time. Fields kept on
+// User for legacy data + the future affiliated-seller "set your own
+// delivery fee" feature. All three are optional on the input type so
+// callers don't need to project them.
 export type SellerDeliveryRates = {
-  deliveryWithinCityCents: number;
-  deliveryOutsideCityCents: number;
-  deliveryOutsideCountryCents: number;
+  deliveryWithinCityCents?: number;
+  deliveryOutsideCityCents?: number;
+  deliveryOutsideCountryCents?: number;
 };
 
 // Curated, comma-separated for display name. ISO-3166 alpha-2 codes.
@@ -130,22 +133,22 @@ export function deliveryZoneFor(buyer: LocatedUser, seller: LocatedUser): Delive
   return "OUTSIDE_CITY";
 }
 
-// Pick the seller's quoted rate for the given zone. UNKNOWN falls back to
-// the highest configured rate so we don't accidentally underbill.
+// DEPRECATED — no longer used in the cart/checkout pricing path. Kept for
+// any caller that still wants to read a seller's legacy rate. Fields on
+// SellerDeliveryRates are optional now, so we coalesce to 0 when missing.
 export function deliveryFeeCentsFor(seller: SellerDeliveryRates, zone: DeliveryZone): number {
+  const within = seller.deliveryWithinCityCents ?? 0;
+  const outside = seller.deliveryOutsideCityCents ?? 0;
+  const intl = seller.deliveryOutsideCountryCents ?? 0;
   switch (zone) {
     case "WITHIN_CITY":
-      return seller.deliveryWithinCityCents;
+      return within;
     case "OUTSIDE_CITY":
-      return seller.deliveryOutsideCityCents;
+      return outside;
     case "OUTSIDE_COUNTRY":
-      return seller.deliveryOutsideCountryCents;
+      return intl;
     default:
-      return Math.max(
-        seller.deliveryWithinCityCents,
-        seller.deliveryOutsideCityCents,
-        seller.deliveryOutsideCountryCents,
-      );
+      return Math.max(within, outside, intl);
   }
 }
 

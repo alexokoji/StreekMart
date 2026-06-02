@@ -69,53 +69,10 @@ export async function POST(req: Request, context: { params: { id: string } }) {
   }
 
   try {
-    // If delivery is within seller's city the seller delivers themselves —
-    // create a local shipment record without calling external provider.
-    if (order.deliveryZone === "WITHIN_CITY") {
-      const shipment = await prisma.shipment.create({
-        data: {
-          orderId,
-          provider: "LOCAL_SELLER",
-          externalId: `LOCAL-${Date.now()}`,
-          trackingCode: "",
-          courierName: null,
-          labelUrl: null,
-          receiptUrl: null,
-          status: "PENDING",
-        },
-      });
-
-      await prisma.order.update({
-        where: { id: orderId },
-        data: {
-          logisticsProvider: "LOCAL_SELLER",
-          status: "SHIPPED",
-          updatedAt: new Date(),
-        },
-      });
-
-      await prisma.orderUpdate.create({
-        data: {
-          orderId,
-          kind: "DISPATCHED",
-          message: `Seller will deliver within city`,
-          createdById: guard.session.sub,
-        },
-      });
-
-      // In-city delivery → push the buyer that the seller's on the way.
-      void sendPush({
-        userId: order.buyerId,
-        title: "📦 Your order is on the way",
-        body: `${order.product.name} · seller delivering within city`,
-        link: `/account/orders/${orderId}`,
-        data: { type: "order-shipped", orderId },
-      }).catch((err) =>
-        console.error("[push:order-shipped] threw", { orderId, err }),
-      );
-
-      return NextResponse.json({ ok: true, shipment: { id: shipment.id } });
-    }
+    // Every order — including buyer-in-seller's-city ones — routes through
+    // the platform's logistics provider (Shipbubble). The legacy WITHIN_CITY
+    // → LOCAL_SELLER branch has been removed; sellers no longer fulfil
+    // their own city's deliveries.
 
     const logistics = getLogisticsService();
     const shipmentResult = await logistics.createShipment({

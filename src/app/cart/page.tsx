@@ -1,40 +1,20 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray } from "@/lib/utils";
 import {
   formatAttributeSelection,
   parseAttributeSelection,
 } from "@/lib/productAttributes";
 import { Price } from "@/components/Price";
-import {
-  deliveryFeeCentsFor,
-  deliveryZoneFor,
-  deliveryZoneLabel,
-  type DeliveryZone,
-} from "@/lib/location";
 import { CartClient } from "./CartClient";
-import { DeliveryZonePicker } from "./DeliveryZonePicker";
 
 // Page is dynamic — reads cookies (for auth) and searchParams. Mark
 // explicit so Next never tries to cache an old quote on us.
 export const dynamic = "force-dynamic";
 
-export default async function CartPage({
-  searchParams,
-}: {
-  // `?zone=within` or `?zone=outside` forces a manual override for the
-  // delivery-zone calculation. Absent → auto-detect from saved address.
-  searchParams: { zone?: string };
-}) {
+export default async function CartPage() {
   const user = await requireUser();
-  const zoneOverride: "WITHIN_CITY" | "OUTSIDE_CITY" | undefined =
-    searchParams.zone === "within"
-      ? "WITHIN_CITY"
-      : searchParams.zone === "outside"
-        ? "OUTSIDE_CITY"
-        : undefined;
 
   // Lazy provision the cart on first visit.
   const cart = await prisma.cart.upsert({
@@ -51,12 +31,6 @@ export default async function CartPage({
                   id: true,
                   name: true,
                   businessName: true,
-                  country: true,
-                  city: true,
-                  region: true,
-                  deliveryWithinCityCents: true,
-                  deliveryOutsideCityCents: true,
-                  deliveryOutsideCountryCents: true,
                 },
               },
             },
@@ -104,36 +78,14 @@ export default async function CartPage({
 
   const subtotal = items.reduce((s, it) => s + it.product.effectivePrice * it.quantity, 0);
 
-  // Delivery preview — same per-seller bundling rule the checkout endpoint
-  // applies. Only computed when the buyer has filled in their address (or
-  // an explicit zone override is set).
+  // Delivery preview retired — the cart no longer prices shipping. Every
+  // delivery now routes through the platform's logistics provider
+  // (Shipbubble), and the actual courier + fee is selected by the buyer
+  // at checkout against their real picked address. We keep the buyer
+  // address-set check so we can prompt them to add one if missing.
   const buyer = { country: user.country, city: user.city, region: user.region };
   const buyerHasAddress = !!buyer.country && !!buyer.city;
-  const deliverySellerSeen = new Set<string>();
-  type DeliveryLine = { sellerName: string; zoneLabel: string; cents: number };
-  const deliveryBreakdown: DeliveryLine[] = [];
-  if (buyerHasAddress) {
-    for (const it of cart.items) {
-      const sellerId = it.product.seller.id;
-      if (deliverySellerSeen.has(sellerId)) continue;
-      deliverySellerSeen.add(sellerId);
-      // If the buyer picked an override, honour it. International is always
-      // determined by country and ignores the override.
-      const autoZone = deliveryZoneFor(buyer, it.product.seller);
-      const zone: DeliveryZone =
-        autoZone === "OUTSIDE_COUNTRY"
-          ? "OUTSIDE_COUNTRY"
-          : zoneOverride ?? autoZone;
-      const cents = deliveryFeeCentsFor(it.product.seller, zone);
-      deliveryBreakdown.push({
-        sellerName: displaySellerName(it.product.seller),
-        zoneLabel: deliveryZoneLabel(zone),
-        cents,
-      });
-    }
-  }
-  const deliveryTotalCents = deliveryBreakdown.reduce((s, d) => s + d.cents, 0);
-  const grandTotal = subtotal + deliveryTotalCents / 100;
+  const grandTotal = subtotal;
 
   return (
     // `min-w-0` on both grid children defeats the default `min-width: auto`
@@ -152,19 +104,6 @@ export default async function CartPage({
       <aside className="card sticky top-4 h-fit min-w-0 p-6">
         <h2 className="text-lg font-semibold">Order summary</h2>
 
-        {/* Buyer-driven zone override — re-renders the breakdown below. */}
-        <div className="mt-4">
-          <DeliveryZonePicker
-            current={
-              zoneOverride === "WITHIN_CITY"
-                ? "WITHIN_CITY"
-                : zoneOverride === "OUTSIDE_CITY"
-                  ? "OUTSIDE_CITY"
-                  : "AUTO"
-            }
-          />
-        </div>
-
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
             <dt>Subtotal</dt>
@@ -172,24 +111,10 @@ export default async function CartPage({
           </div>
 
           {buyerHasAddress ? (
-            deliveryBreakdown.length > 0 ? (
-              <div className="border-t pt-2">
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-gray-500">
-                  Delivery
-                </p>
-                {deliveryBreakdown.map((d) => (
-                  <div key={d.sellerName} className="flex justify-between gap-3">
-                    {/* `min-w-0 break-words` lets long business names wrap
-                        instead of widening the sticky aside past 22rem. */}
-                    <dt className="min-w-0 break-words text-gray-600">
-                      {d.sellerName}
-                      <span className="ml-1 text-[10px] text-gray-400">· {d.zoneLabel}</span>
-                    </dt>
-                    <dd className="shrink-0">{d.cents > 0 ? <Price amount={d.cents / 100} /> : "Free"}</dd>
-                  </div>
-                ))}
-              </div>
-            ) : null
+            <div className="flex justify-between text-gray-500">
+              <dt>Delivery</dt>
+              <dd className="text-right text-xs">Calculated at checkout</dd>
+            </div>
           ) : (
             <div className="flex justify-between text-gray-500">
               <dt>Delivery</dt>
@@ -206,16 +131,7 @@ export default async function CartPage({
             <dd className="font-bold"><Price amount={grandTotal} /></dd>
           </div>
         </dl>
-        {/* Carry the zone override through to checkout so the quote the
-            checkout endpoint computes matches what the buyer saw here. */}
-        <Link
-          href={
-            zoneOverride
-              ? `/cart/checkout?zone=${zoneOverride === "WITHIN_CITY" ? "within" : "outside"}`
-              : "/cart/checkout"
-          }
-          className="btn-primary mt-6 w-full text-center"
-        >
+        <Link href="/cart/checkout" className="btn-primary mt-6 w-full text-center">
           Checkout
         </Link>
         <Link href="/" className="mt-2 block text-center text-xs text-gray-500 hover:text-brand-700">

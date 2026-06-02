@@ -78,9 +78,6 @@ export async function POST(req: Request) {
                   country: true,
                   city: true,
                   region: true,
-                  deliveryWithinCityCents: true,
-                  deliveryOutsideCityCents: true,
-                  deliveryOutsideCountryCents: true,
                 },
               },
             },
@@ -112,17 +109,11 @@ export async function POST(req: Request) {
   // this BEFORE creating any Order rows so an international / unsupported-
   // city blocker rejects the whole checkout with a clean error instead of
   // half-creating PENDING rows.
+  // Per-seller quote — the only outcome that can hard-reject is cross-
+  // border (international). Fees on the quote are 0 placeholders; the real
+  // courier price comes from the buyer's explicit `shippingChoices` (the
+  // Shipbubble rates they picked in the checkout UI).
   const uniqueSellerIds = Array.from(new Set(live.map((it) => it.product.seller.id)));
-  const sellerRiderCounts = await prisma.manager.groupBy({
-    by: ["ownerId"],
-    where: { role: "rider", ownerId: { in: uniqueSellerIds } },
-    _count: { _all: true },
-  });
-  const hasRiderByOwner = new Map(
-    sellerRiderCounts.map((r) => [r.ownerId, (r._count?._all ?? 0) > 0] as const),
-  );
-
-  // Per-seller quote + which order in the group carries the fee.
   type Quote = { feeCents: number; zone: string; fulfiller: "PLATFORM" | "SELLER" };
   const quoteBySellerId = new Map<string, Quote>();
   for (const sellerId of uniqueSellerIds) {
@@ -130,7 +121,6 @@ export async function POST(req: Request) {
     const quote = await resolveDeliveryQuote({
       buyer,
       seller,
-      sellerHasRider: hasRiderByOwner.get(sellerId) ?? false,
       zoneOverride: parsed.data.zoneOverride,
     });
     if (quote.fulfiller === "BLOCKED") {

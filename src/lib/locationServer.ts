@@ -15,35 +15,34 @@ import type {
 } from "./location";
 
 // Server-only — uses prisma + the SiteSetting cache. Used by the cart and
-// the checkout endpoint to decide who delivers and what the buyer pays.
+// the checkout endpoint to decide *whether* an order can be quoted and to
+// flag the geographical zone for analytics. The actual delivery FEE comes
+// from the platform's logistics provider (Shipbubble) at checkout time —
+// this helper no longer prices deliveries from seller-set rates.
 //
-// Rules (highest precedence first):
-//   1. International (different country)  → BLOCKED.
-//   2. Within same city AND city is on the platform's supported list:
-//        a. Seller has a rider on file    → SELLER pays delivery via their
-//           rider; gets the admin-set fee credited to their wallet minus
-//           the platform cut.
-//        b. Seller has NO rider           → PLATFORM delivers; full fee
-//           stays with the platform.
-//   3. Outside city (same country) — seller MUST have a rider; otherwise
-//      BLOCKED. Fee uses the seller's own outsideCity rate.
-//   4. Within same city but NOT on the supported list — seller MUST have a
-//      rider; otherwise BLOCKED. Fee uses the seller's own withinCity rate.
+// Rules:
+//   1. International (different country) → BLOCKED. Cross-border isn't
+//      supported yet.
+//   2. Anything in-country → PLATFORM fulfiller with `feeCents: 0`. The
+//      checkout flow replaces the zero with the courier the buyer selects
+//      out of the Shipbubble rate list. The `zone` tag (WITHIN_CITY /
+//      OUTSIDE_CITY) is kept for analytics and the cart's "delivering to"
+//      label, but no longer drives pricing or fulfillment routing.
 //
-// Caller passes `sellerHasRider` because the rider lookup needs the prisma
-// client — this keeps the helper pure-ish + easy to unit test.
+// `sellerHasRider` and the SellerDeliveryRates fields are kept on the
+// signature for callers that pass them, but they no longer affect the
+// outcome. The legacy "seller delivers within city" pattern is gone — every
+// order is fulfilled by the platform's logistics provider.
 export async function resolveDeliveryQuote(args: {
   buyer: LocatedUser;
   seller: LocatedUser & SellerDeliveryRates;
-  sellerHasRider: boolean;
-  // Buyer-driven override from the cart's "Delivering to" picker. Lets a
-  // shopper whose saved address is in the seller's city explicitly say
-  // they're delivering elsewhere (or vice versa). International is still
-  // determined by country and can't be overridden — keeps the cross-border
-  // block intact.
+  // Kept for signature stability; ignored in the resolver.
+  sellerHasRider?: boolean;
+  // Kept for analytics — surfaces in the cart's "delivering to" label.
   zoneOverride?: "WITHIN_CITY" | "OUTSIDE_CITY";
 }): Promise<DeliveryQuote> {
-  const { buyer, seller, sellerHasRider, zoneOverride } = args;
+  const { buyer, seller, zoneOverride } = args;
+  void args.sellerHasRider; // intentionally unused — kept for back-compat
 
   if (!buyer.country || !seller.country) {
     return {
@@ -54,8 +53,7 @@ export async function resolveDeliveryQuote(args: {
     };
   }
 
-  // 1) International lock — every cross-country order is refused. Buyer is
-  // shown a "find local sellers" prompt in the UI.
+  // 1) International lock — cross-border still refused.
   if (buyer.country !== seller.country) {
     return {
       zone: "OUTSIDE_COUNTRY",
@@ -66,61 +64,25 @@ export async function resolveDeliveryQuote(args: {
     };
   }
 
-  // The buyer's picker overrides auto-detection. "OUTSIDE_CITY" means the
-  // buyer is telling us this seller delivers cross-city for them; "WITHIN_CITY"
-  // says the opposite. Either way we still defer to the supported-cities
-  // list + rider rules below.
+  // Compute the zone tag (analytics + UI labelling only — does not affect
+  // who fulfils the order or what the buyer is charged).
+  const autoSameCity =
+    !!buyer.city &&
+    !!seller.city &&
+    normalisedCity(buyer.city) === normalisedCity(seller.city);
   const sameCity =
     zoneOverride === "WITHIN_CITY"
       ? true
       : zoneOverride === "OUTSIDE_CITY"
         ? false
-        : !!buyer.city && !!seller.city && normalisedCity(buyer.city) === normalisedCity(seller.city);
+        : autoSameCity;
 
-  // 2) Same city → check supported list.
-  if (sameCity) {
-    // Prisma SQLite doesn't support `mode: "insensitive"`, so we pull every
-    // active city in the buyer's country and compare in JS via normalisedCity.
-    // Cities-per-country is bounded (admin manages the list), so this is cheap.
-    const allInCountry = await prisma.deliveryCity.findMany({
-      where: { active: true, country: buyer.country },
-    });
-    const matched = allInCountry.find(
-      (c) => normalisedCity(c.name) === normalisedCity(seller.city ?? ""),
-    );
-
-    if (matched) {
-      // Platform-served city — admin sets the fee. Cut is read by callers
-      // separately via platformDeliveryCutBps() when crediting the seller.
-      return {
-        zone: "WITHIN_CITY",
-        fulfiller: sellerHasRider ? "SELLER" : "PLATFORM",
-        feeCents: matched.feeCents,
-      };
-    }
-    // Same city but NOT supported by platform — seller delivers with their
-    // own rider using their own fee, or use platform delivery as fallback
-    return {
-      zone: "WITHIN_CITY",
-      fulfiller: sellerHasRider ? "SELLER" : "PLATFORM",
-      feeCents: sellerHasRider ? seller.deliveryWithinCityCents : 0,
-    };
-  }
-
-  // 3) Cross-city (same country) — seller's rider only.
-  if (!sellerHasRider) {
-    return {
-      zone: "OUTSIDE_CITY",
-      fulfiller: "BLOCKED",
-      feeCents: 0,
-      blockedReason:
-        "Cross-city orders need the seller's own delivery person. This seller hasn't set one up.",
-    };
-  }
   return {
-    zone: "OUTSIDE_CITY",
-    fulfiller: "SELLER",
-    feeCents: seller.deliveryOutsideCityCents,
+    zone: sameCity ? "WITHIN_CITY" : "OUTSIDE_CITY",
+    fulfiller: "PLATFORM",
+    // 0 is a placeholder — the checkout flow replaces it with the actual
+    // courier quote the buyer picks from the Shipbubble rate list.
+    feeCents: 0,
   };
 }
 
