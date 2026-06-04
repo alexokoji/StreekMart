@@ -15,6 +15,8 @@ import { type ProductCardData } from "@/components/storefront/ProductCard";
 import { CardGrid } from "@/components/storefront/CardGrid";
 import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
+import { PopularCategoryCards } from "@/components/storefront/PopularCategoryCards";
+import { FlashSalesCarousel } from "@/components/storefront/FlashSalesCarousel";
 import { TierBadge } from "@/components/TierBadge";
 import {
   PromotionSlider,
@@ -301,15 +303,28 @@ export default async function HomePage({
         </div>
       </section>
 
+      {/* Popular category cards — visible on every viewport (not hidden in
+          a collapsible). Tap a card to filter every rail below to that
+          category in a single tap, no scroll-through required. */}
+      <PopularCategoryCards
+        activeCategory={activeCategory}
+        categoryCounts={categoryCounts}
+        preserveSearchParams={(() => {
+          const sp = new URLSearchParams();
+          if (country) sp.set("country", country);
+          if (city) sp.set("city", city);
+          return sp;
+        })()}
+      />
+
       {/*
-        Mobile/tablet category chips — hidden on lg+ since the sidebar
-        replaces them. Wrapped in a native <details> so the section starts
-        collapsed on phones (where it'd otherwise burn ~half a screen of
-        vertical room) but stays a single tap away. Open by default on sm+.
+        Long-tail categories + location filter — still useful for buyers who
+        want a niche like "Velvet" or "Watches". Collapsed by default on
+        mobile so the popular cards + flash sales own the above-the-fold.
       */}
       <details className="group lg:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-ink-100 bg-white px-4 py-3 transition-colors hover:border-violet-400">
-          <h2 className="font-display text-base font-semibold sm:text-lg">Shop by category & location</h2>
+          <h2 className="font-display text-base font-semibold sm:text-lg">More categories & location</h2>
           <svg
             viewBox="0 0 24 24"
             className="h-4 w-4 shrink-0 text-ink-500 transition-transform group-open:rotate-180"
@@ -347,10 +362,18 @@ export default async function HomePage({
         </div>
       </details>
 
-      {/* Flash sales */}
+      {/* Flash sales — now a horizontal scroll carousel with smaller cards
+          so more deals fit in the row + the next section stays close. */}
       {flashSales.length > 0 && (
-        <Section title="🔥 Flash sales" subtitle="Limited-time discounts from sellers — grab before they're gone." href={seeAllHref("/products/flash-sales")}>
-          <CardGrid items={flashSales.map(shape)} savedSet={savedSet} cols={6} />
+        <Section
+          title="🔥 Flash sales"
+          subtitle="Limited-time discounts from sellers — swipe to see all."
+          href={seeAllHref("/products/flash-sales")}
+        >
+          <FlashSalesCarousel
+            items={flashSales.map(shape)}
+            seeAllHref={seeAllHref("/products/flash-sales")}
+          />
         </Section>
       )}
 
