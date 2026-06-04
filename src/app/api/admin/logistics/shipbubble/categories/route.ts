@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { requireApiAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { ShipbubbleService } from "@/services/logistics/shipbubble.service";
 
 /**
@@ -10,7 +11,7 @@ import { ShipbubbleService } from "@/services/logistics/shipbubble.service";
  * which skips the auto-fetch in production.
  */
 export async function GET() {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
   if ("error" in guard) return guard.error;
 
   try {

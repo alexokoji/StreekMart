@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { countryName } from "@/lib/location";
 import { Price } from "@/components/Price";
 import { CityForm } from "./CityForm";
@@ -7,7 +8,7 @@ import { CityRow } from "./CityRow";
 
 // /admin/delivery-cities — manage the platform-served delivery whitelist.
 export default async function AdminDeliveryCitiesPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
   const cities = await prisma.deliveryCity.findMany({
     orderBy: [{ active: "desc" }, { country: "asc" }, { name: "asc" }],
   });

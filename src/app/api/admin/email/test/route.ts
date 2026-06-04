@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { sendEmail, isEmailEnabled } from "@/lib/email";
 
 // POST /api/admin/email/test { to }
@@ -21,7 +22,7 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_EMAIL);
   if ("error" in guard) return guard.error;
 
   const json = await req.json().catch(() => null);
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       <p>This is a diagnostic email from StreekMart.</p>
       <p>If you received this, the Resend transport is wired correctly. Sent at ${new Date().toISOString()}.</p>
     `,
-    text: `StreekMart email test — Resend transport is wired. Sent at ${new Date().toISOString()}.`,
+    text: `StreekMart email test â€” Resend transport is wired. Sent at ${new Date().toISOString()}.`,
   });
 
   return NextResponse.json({
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
     result,
     env: {
       RESEND_API_KEY_set: !!process.env.RESEND_API_KEY,
-      EMAIL_FROM: process.env.EMAIL_FROM ?? "(unset — using Resend sandbox)",
+      EMAIL_FROM: process.env.EMAIL_FROM ?? "(unset â€” using Resend sandbox)",
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "(unset)",
     },
   });

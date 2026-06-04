@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { sendEmail, roleChangeDecisionEmail } from "@/lib/email";
 import { sendPush } from "@/lib/notifications";
 
@@ -17,7 +18,7 @@ const Body = z.object({
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_VERIFICATIONS);
   if ("error" in guard) return guard.error;
 
   const body = await req.json().catch(() => null);

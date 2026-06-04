@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { timeAgo } from "@/lib/utils";
 import { RoleChangeDecisionRow } from "./RoleChangeDecisionRow";
 
@@ -14,7 +15,7 @@ const USER_SELECT = {
 } as const;
 
 export default async function AdminRoleChangesPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_VERIFICATIONS);
   const pending = await prisma.roleChangeRequest.findMany({
     where: { status: "PENDING" },
     include: { user: { select: USER_SELECT } },

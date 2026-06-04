@@ -1,15 +1,24 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/layout/TopNav";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { Footer } from "@/components/layout/Footer";
-import { SmartSearch } from "@/components/SmartSearch";
 import { FloatingSupport } from "@/components/FloatingSupport";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { getCurrentUser } from "@/lib/auth";
 import { getServerCurrencyContext } from "@/lib/currencyServer";
+
+// SmartSearch pulls in canvas-based dominant-colour extraction (image
+// search) which is heavy + only used when the buyer opens the search
+// panel. Lazy-load so it doesn't add to first-paint JS on every page.
+// `ssr: false` is safe because the launcher uses window APIs anyway.
+const SmartSearch = dynamic(
+  () => import("@/components/SmartSearch").then((m) => ({ default: m.SmartSearch })),
+  { ssr: false, loading: () => null },
+);
 
 // Display face — Fraunces is a variable, fashion-forward serif with an
 // expressive italic. Used for headlines, prices, hero copy.

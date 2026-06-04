@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { isEmailEnabled } from "@/lib/email";
 import { timeAgo } from "@/lib/utils";
 import { BroadcastForm } from "./BroadcastForm";
 
 // /admin/email — compose a broadcast + see recent send history.
 export default async function AdminEmailPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_EMAIL);
   const live = isEmailEnabled();
   const recent = await prisma.emailBroadcast.findMany({
     orderBy: { createdAt: "desc" },

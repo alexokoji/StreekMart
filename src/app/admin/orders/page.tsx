@@ -2,6 +2,7 @@ import Link from "next/link";
 import { OrderStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { Price } from "@/components/Price";
 import { timeAgo } from "@/lib/utils";
 import { deliveryZoneLabel } from "@/lib/location";
@@ -23,7 +24,7 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: { status?: string; q?: string };
 }) {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_USERS);
 
   const filter: StatusFilter = (STATUS_FILTERS.includes(searchParams.status as StatusFilter)
     ? (searchParams.status as StatusFilter)

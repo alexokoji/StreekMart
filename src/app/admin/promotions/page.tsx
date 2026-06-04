@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { PromotionStatus } from "@/lib/enums";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { PromotionDecisionRow } from "./PromotionDecisionRow";
 
 export default async function AdminPromotionsPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_PROMOTIONS);
   const now = new Date();
 
   const pending = await prisma.promotion.findMany({

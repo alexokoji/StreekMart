@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { timeAgo } from "@/lib/utils";
 import { ManualVerifyButtons } from "./ManualVerifyButtons";
 
@@ -9,7 +10,7 @@ export default async function AdminUsersPage({
 }: {
   searchParams: { q?: string };
 }) {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_USERS);
   const q = (searchParams.q ?? "").trim();
   const users = await prisma.user.findMany({
     where: q

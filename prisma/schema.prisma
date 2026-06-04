@@ -81,6 +81,15 @@ model User {
   sellerRatingCount Int   @default(0)
   // Platform admin flag — gates /admin and the /api/admin/* endpoints.
   isAdmin      Boolean  @default(false)
+  // Staff = a user with a scoped subset of admin permissions. A super-admin
+  // (`isAdmin: true`) implicitly has every permission; staff have only the
+  // ones listed in `staffPermissionsJson`. Both flags can be true (rare —
+  // a staffer promoted to admin keeps their perm list for audit/history).
+  isStaff      Boolean  @default(false)
+  // JSON array of permission strings (see src/lib/staffPermissions.ts for
+  // the canonical list). Empty array means the staff member can sign in
+  // but can't do anything until an admin grants them perms.
+  staffPermissionsJson String @default("[]")
   // Soft-suspension. When set, the account can't sign in, all sessions are
   // invalidated at the next request (auth gate checks this column), and
   // their products/posts are hidden from the storefront. Reversible — an
@@ -768,6 +777,7 @@ model Review {
   createdAt DateTime @default(now())
 
   @@unique([productId, authorId])
+  @@index([productId])
 }
 
 // -------------------- Seller Reviews --------------------
@@ -910,6 +920,7 @@ model Favorite {
 
   @@unique([userId, productId])
   @@unique([userId, postId])
+  @@index([userId])
 }
 
 model Like {
@@ -924,6 +935,7 @@ model Like {
 
   @@unique([userId, productId])
   @@unique([userId, postId])
+  @@index([userId])
 }
 
 // -------------------- Promotions --------------------

@@ -75,6 +75,10 @@ export async function getCurrentUser() {
       // Email verification — null means the layout shows the
       // EmailVerificationBanner across the top of every page.
       emailVerifiedAt: true,
+      // Staff/admin permission flags. Used by the admin nav to gate
+      // sub-page links and the admin layout's overall access check.
+      isStaff: true,
+      staffPermissionsJson: true,
     },
   });
   if (!user) return null;
@@ -85,29 +89,39 @@ export async function getCurrentUser() {
   return user;
 }
 
-// Admin guard for /admin pages. Throws via redirect if not signed in or
-// not flagged as admin.
-export async function requireAdmin() {
+// Admin guard for /admin pages. Throws via redirect if not signed in.
+// Super-admins (`isAdmin: true`) are always allowed; staffers pass only
+// when they hold the requested `permission`. Pass `undefined` to require
+// full admin status.
+import type { AdminPermission } from "./staffPermissions";
+import { hasAdminAccess } from "./staffPermissions";
+
+export async function requireAdmin(permission?: AdminPermission) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!user.isAdmin) redirect("/unauthorized");
+  if (!hasAdminAccess(user, permission)) redirect("/unauthorized");
   return user;
 }
 
-// Admin guard for /api/admin/* route handlers.
-export async function requireApiAdmin() {
+// Admin guard for /api/admin/* route handlers. Same rules as requireAdmin.
+export async function requireApiAdmin(permission?: AdminPermission) {
   const session = await getSession();
   if (!session) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
   const me = await prisma.user.findUnique({
     where: { id: session.sub },
-    select: { id: true, isAdmin: true },
+    select: {
+      id: true,
+      isAdmin: true,
+      isStaff: true,
+      staffPermissionsJson: true,
+    },
   });
-  if (!me?.isAdmin) {
+  if (!hasAdminAccess(me, permission)) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
-  return { session, user: me };
+  return { session, user: me! };
 }
 
 // Helper for permission checks. Buyer permission is implicit for any logged-in user.

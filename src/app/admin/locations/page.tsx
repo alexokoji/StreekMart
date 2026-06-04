@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { countryName } from "@/lib/location";
 
 // /admin/locations — geographic distribution of every account, broken down by
 // country and city. Useful for picking a market expansion focus and for
 // noticing weird signups (a flood from one tiny country is suspicious).
 export default async function AdminLocationsPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
 
   const [byCountry, withoutLocation, byCity] = await Promise.all([
     prisma.user.groupBy({

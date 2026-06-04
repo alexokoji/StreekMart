@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { ProductStatus } from "@/lib/enums";
 
 // PATCH /api/admin/products/[id] { status: "ACTIVE" | "ARCHIVED" }
@@ -28,7 +29,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_PRODUCTS);
   if ("error" in guard) return guard.error;
 
   const json = await req.json().catch(() => null);
@@ -58,7 +59,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: { id: string } },
 ) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_PRODUCTS);
   if ("error" in guard) return guard.error;
 
   const target = await prisma.product.findUnique({

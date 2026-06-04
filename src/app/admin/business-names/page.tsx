@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { timeAgo } from "@/lib/utils";
 import { BusinessNameDecisionRow } from "./BusinessNameDecisionRow";
 
 export default async function AdminBusinessNameChangesPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_BUSINESS_NAMES);
 
   const pending = await prisma.businessNameChangeRequest.findMany({
     where: { status: "PENDING" },

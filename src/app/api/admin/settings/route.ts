@@ -1,21 +1,22 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { isAdminEditable, listEffectiveSettings, setSetting } from "@/lib/settings";
 
-// GET   /api/admin/settings        — list every admin-editable key + value + source.
-// PATCH /api/admin/settings        — update one or many keys at once.
+// GET   /api/admin/settings        â€” list every admin-editable key + value + source.
+// PATCH /api/admin/settings        â€” update one or many keys at once.
 
 export async function GET() {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_SETTINGS);
   if ("error" in guard) return guard.error;
   const settings = await listEffectiveSettings();
-  // Don't return secrets in plaintext — mask everything kind=secret. The
+  // Don't return secrets in plaintext â€” mask everything kind=secret. The
   // admin still sees whether a value is set (length > 0).
   const safe = settings.map((s) => ({
     def: s.def,
     source: s.source,
-    value: s.def.kind === "secret" ? (s.value ? "•".repeat(8) : "") : s.value,
+    value: s.def.kind === "secret" ? (s.value ? "â€¢".repeat(8) : "") : s.value,
     hasValue: !!s.value,
   }));
   return NextResponse.json({ settings: safe });
@@ -29,7 +30,7 @@ const PatchBody = z.object({
 });
 
 export async function PATCH(req: Request) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_SETTINGS);
   if ("error" in guard) return guard.error;
 
   const json = await req.json().catch(() => null);

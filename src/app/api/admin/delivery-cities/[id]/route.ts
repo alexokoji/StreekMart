@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 
 const PatchBody = z.object({
   feeCents: z.number().int().min(0).max(1_000_000).optional(),
@@ -10,7 +11,7 @@ const PatchBody = z.object({
 });
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
   if ("error" in guard) return guard.error;
 
   const json = await req.json().catch(() => null);
@@ -25,7 +26,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const guard = await requireApiAdmin();
+  const guard = await requireApiAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
   if ("error" in guard) return guard.error;
   await prisma.deliveryCity.delete({ where: { id: params.id } });
   return NextResponse.json({ ok: true });

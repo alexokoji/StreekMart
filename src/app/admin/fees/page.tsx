@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { Price } from "@/components/Price";
 import { timeAgo } from "@/lib/utils";
 import { PLATFORM_FEE_BPS, WITHDRAWAL_FEE_BPS } from "@/lib/monnify";
 
 export default async function AdminFeesPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
 
   const [salesAggregate, platformFeeAggregate, withdrawalFeeAggregate, recentFees] = await Promise.all([
     prisma.walletTransaction.aggregate({

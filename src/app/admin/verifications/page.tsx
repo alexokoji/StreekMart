@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { timeAgo } from "@/lib/utils";
 import { VerificationDecisionRow } from "./VerificationDecisionRow";
 
@@ -27,7 +28,7 @@ const USER_DETAIL_SELECT = {
 } as const;
 
 export default async function AdminVerificationsPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_VERIFICATIONS);
   const requests = await prisma.verificationRequest.findMany({
     where: { status: "PENDING" },
     include: { user: { select: USER_DETAIL_SELECT } },

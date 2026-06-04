@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { Price } from "@/components/Price";
 import { timeAgo } from "@/lib/utils";
 
 export default async function AdminPayoutsPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_USERS);
   const payouts = await prisma.payoutRequest.findMany({
     include: { user: { select: { id: true, name: true, email: true } } },
     orderBy: { createdAt: "desc" },

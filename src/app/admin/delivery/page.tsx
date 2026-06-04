@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { Price } from "@/components/Price";
 import { countryName } from "@/lib/location";
 import { AdminDeliveryRateEditor } from "./AdminDeliveryRateEditor";
@@ -8,7 +9,7 @@ import { AdminDeliveryRateEditor } from "./AdminDeliveryRateEditor";
 // spot outliers (e.g. someone charging $300 within-city). Sorted by the most
 // expensive rate first to surface aggressive pricing.
 export default async function AdminDeliveryRatesPage() {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
 
   const sellers = await prisma.user.findMany({
     where: { OR: [{ isSeller: true }, { isDesigner: true }] },

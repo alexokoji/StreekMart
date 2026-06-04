@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { Price } from "@/components/Price";
 import { timeAgo, parseJsonArray } from "@/lib/utils";
 import { ProductModerationButtons } from "./ProductModerationButtons";
@@ -10,7 +11,7 @@ export default async function AdminProductsPage({
 }: {
   searchParams: { q?: string; status?: string };
 }) {
-  await requireAdmin();
+  await requireAdmin(ADMIN_PERMISSIONS.MANAGE_PRODUCTS);
   const q = (searchParams.q ?? "").trim();
   const status = searchParams.status?.toUpperCase();
   const products = await prisma.product.findMany({

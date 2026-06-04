@@ -100,38 +100,41 @@ export async function finalizePaidOrders(args: {
     for (const r of rows) sellerAffiliation.set(r.id, r.streekmartAffiliated);
   }
 
-  for (const o of pending) {
-    await prisma.$transaction([
-      prisma.product.update({
-        where: { id: o.productId },
-        data: { salesCount: { increment: o.quantity } },
-      }),
-      prisma.user.update({
-        where: { id: o.sellerId },
-        data: { exposureScore: { increment: exposureDelta("sale") * o.quantity } },
-      }),
-    ]);
-
-    // Product-only credit (subtract delivery from the total so we don't
-    // double-count it; `recordSale` applies the product-side PLATFORM_FEE_BPS).
-    const totalCents = Math.round(o.totalPrice * 100);
-    const productCents = totalCents - o.deliveryFeeCents;
-    const isAffiliated = sellerAffiliation.get(o.sellerId) ?? false;
-    await recordSale({
-      sellerId: o.sellerId,
-      grossCents: productCents,
-      productName: o.product.name,
-      orderId: o.id,
-      skipHold: isAffiliated,
-    });
-
-    // Delivery fees are no longer routed back to the seller. Every order
-    // ships via the platform's logistics provider, so the buyer's
-    // shipping spend stays with the platform (and pays out the courier
-    // separately). The legacy `if (deliveryFulfiller === "SELLER")` credit
-    // block was removed when the within-city / outside-city fulfilment
-    // split was retired.
-  }
+  // Per-order side effects in parallel — every order in a checkout group is
+  // independent (different products, different sellers' wallets), so there's
+  // no ordering constraint. Sequential awaits added 100–200ms per order on
+  // typical Turso latency; on a 3-line checkout this turned into a full
+  // second of avoidable wait between webhook receipt and the buyer landing
+  // on the confirmation page.
+  await Promise.all(
+    pending.map(async (o) => {
+      await prisma.$transaction([
+        prisma.product.update({
+          where: { id: o.productId },
+          data: { salesCount: { increment: o.quantity } },
+        }),
+        prisma.user.update({
+          where: { id: o.sellerId },
+          data: {
+            exposureScore: { increment: exposureDelta("sale") * o.quantity },
+          },
+        }),
+      ]);
+      // Product-only credit (subtract delivery from the total so we don't
+      // double-count it; `recordSale` applies the platform fee).
+      const totalCents = Math.round(o.totalPrice * 100);
+      const productCents = totalCents - o.deliveryFeeCents;
+      const isAffiliated = sellerAffiliation.get(o.sellerId) ?? false;
+      await recordSale({
+        sellerId: o.sellerId,
+        grossCents: productCents,
+        productName: o.product.name,
+        orderId: o.id,
+        skipHold: isAffiliated,
+      });
+      // Delivery fees stay with the platform — see the comment block above.
+    }),
+  );
 
   // Clear the buyer's cart of anything that just got finalised. Same buyer
   // for every order in the group, so we look up the cart once.
