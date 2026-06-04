@@ -32,6 +32,7 @@ const NAV: Array<{
   { href: "/admin/locations", label: "Locations", perm: ADMIN_PERMISSIONS.MANAGE_DELIVERY },
   { href: "/admin/payouts", label: "Payouts", perm: ADMIN_PERMISSIONS.MANAGE_USERS },
   { href: "/admin/email", label: "Email broadcasts", perm: ADMIN_PERMISSIONS.MANAGE_EMAIL },
+  { href: "/admin/email-marketing", label: "Email marketing", perm: ADMIN_PERMISSIONS.MANAGE_EMAIL },
   { href: "/admin/fees", label: "Platform fees", perm: ADMIN_PERMISSIONS.MANAGE_DELIVERY },
   { href: "/admin/settings", label: "Site settings", perm: ADMIN_PERMISSIONS.MANAGE_SETTINGS },
   { href: "/admin/staff", label: "Staff", perm: ADMIN_PERMISSIONS.MANAGE_STAFF },
