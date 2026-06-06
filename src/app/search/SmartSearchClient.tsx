@@ -17,7 +17,10 @@ type Item = {
 
 type Plan = {
   categories: string[];
-  keyword_phrase: string;
+  keywords: string[];
+  materials?: string[];
+  colors?: string[];
+  occasion?: string | null;
   max_price: number | null;
   rationale: string;
 };
@@ -119,8 +122,14 @@ export function SmartSearchClient({ initialQuery = "" }: { initialQuery?: string
             {plan.max_price !== null && (
               <span className="badge bg-gray-100 text-gray-700">≤ <Price amount={plan.max_price} /></span>
             )}
-            {plan.keyword_phrase && (
-              <span className="badge bg-gray-100 text-gray-700">“{plan.keyword_phrase}”</span>
+            {plan.keywords.slice(0, 6).map((k) => (
+              <span key={k} className="badge bg-gray-100 text-gray-700">{k}</span>
+            ))}
+            {plan.colors?.map((c) => (
+              <span key={`color-${c}`} className="badge bg-amber-50 text-amber-700">{c}</span>
+            ))}
+            {plan.occasion && (
+              <span className="badge bg-violet-50 text-violet-700">{plan.occasion}</span>
             )}
           </div>
         </div>
