@@ -51,7 +51,11 @@ export type ChatResult = {
 
 // ── Provider detection ────────────────────────────────────────────────────
 
-function provider(): "gemini" | "anthropic" | null {
+function provider(): "groq" | "gemini" | "anthropic" | null {
+  // Groq first: free tier works globally (incl. Nigeria) and includes
+  // tool-use on Llama 3.3 70B. Gemini falls in here too if you later top
+  // up its credits — both keys can coexist.
+  if (process.env.GROQ_API_KEY) return "groq";
   if (process.env.GEMINI_API_KEY) return "gemini";
   if (process.env.ANTHROPIC_API_KEY) return "anthropic";
   return null;
@@ -61,16 +65,22 @@ export function isAiEnabled(): boolean {
   return provider() !== null;
 }
 
-// Default models — overridable via env. Gemini Flash chosen for free tier
-// generosity (~1,500 req/day). Claude default kept on Opus to match prior
-// behaviour for setups still on Anthropic.
+// Default models — overridable via env. Groq Llama 3.3 70B chosen for the
+// best free-tier model that still supports tool calling. Gemini Flash kept
+// for the same reason for setups using Gemini. Claude default kept on Opus.
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-opus-4-7";
 
 // Back-compat alias so older imports of `MODEL` still resolve to something
 // sensible. Concierge / call sites don't actually pass this to chat() any
 // more — chat() picks the model based on provider.
-export const MODEL = provider() === "anthropic" ? CLAUDE_MODEL : GEMINI_MODEL;
+export const MODEL =
+  provider() === "anthropic"
+    ? CLAUDE_MODEL
+    : provider() === "gemini"
+      ? GEMINI_MODEL
+      : GROQ_MODEL;
 
 // ── Public entry point ────────────────────────────────────────────────────
 
@@ -85,11 +95,148 @@ export async function chat(args: {
   responseJsonSchema?: Record<string, unknown>;
 }): Promise<ChatResult> {
   const p = provider();
+  if (p === "groq") return chatGroq(args);
   if (p === "gemini") return chatGemini(args);
   if (p === "anthropic") return chatAnthropic(args);
   throw new Error(
-    "No AI provider configured. Set GEMINI_API_KEY (recommended) or ANTHROPIC_API_KEY in your env.",
+    "No AI provider configured. Set GROQ_API_KEY (recommended) or GEMINI_API_KEY or ANTHROPIC_API_KEY in your env.",
   );
+}
+
+// ── Groq implementation (OpenAI-compatible REST) ─────────────────────────
+
+type GroqMessage =
+  | { role: "system"; content: string }
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string | null; tool_calls?: GroqToolCall[] }
+  | { role: "tool"; tool_call_id: string; content: string };
+
+type GroqToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
+};
+
+async function chatGroq(args: {
+  system: string;
+  messages: ChatTurn[];
+  tools?: ChatTool[];
+  maxTokens?: number;
+  responseJsonSchema?: Record<string, unknown>;
+}): Promise<ChatResult> {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) throw new Error("GROQ_API_KEY is not set.");
+
+  const messages: GroqMessage[] = [{ role: "system", content: args.system }];
+  for (const t of args.messages) {
+    for (const m of turnToGroqMessages(t)) messages.push(m);
+  }
+
+  const body: Record<string, unknown> = {
+    model: GROQ_MODEL,
+    messages,
+    max_tokens: args.maxTokens ?? 2048,
+  };
+
+  if (args.tools?.length) {
+    body.tools = args.tools.map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+      },
+    }));
+  }
+  if (args.responseJsonSchema) {
+    // Groq supports OpenAI's "json_object" mode. Schema isn't enforced by
+    // the API — call sites already validate the parsed JSON with zod, so
+    // a malformed response is caught downstream. Forcing a system hint
+    // about the expected shape keeps the model on the rails.
+    body.response_format = { type: "json_object" };
+    messages[0] = {
+      role: "system",
+      content:
+        args.system +
+        "\n\nIMPORTANT: respond ONLY with a valid JSON object matching this JSON Schema (no prose, no markdown fence): " +
+        JSON.stringify(args.responseJsonSchema),
+    };
+  }
+
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Groq ${res.status}: ${txt.slice(0, 300)}`);
+  }
+  const data = (await res.json()) as {
+    choices?: Array<{
+      finish_reason?: string;
+      message?: {
+        role?: string;
+        content?: string | null;
+        tool_calls?: GroqToolCall[];
+      };
+    }>;
+  };
+
+  const choice = data.choices?.[0];
+  const msg = choice?.message;
+  const text = (msg?.content ?? "").trim();
+
+  const toolCalls: ChatToolCall[] = (msg?.tool_calls ?? []).map((tc) => {
+    let input: Record<string, unknown> = {};
+    try {
+      input = tc.function.arguments ? (JSON.parse(tc.function.arguments) as Record<string, unknown>) : {};
+    } catch {
+      input = {};
+    }
+    return { id: tc.id, name: tc.function.name, input };
+  });
+
+  let stopReason: ChatStopReason = "other";
+  if (choice?.finish_reason === "tool_calls" || toolCalls.length > 0) stopReason = "tool_use";
+  else if (choice?.finish_reason === "stop") stopReason = "end_turn";
+  else if (choice?.finish_reason === "length") stopReason = "max_tokens";
+
+  return { text, toolCalls, stopReason };
+}
+
+// One ChatTurn can map to multiple wire messages: a user "toolResults"
+// turn fans out to one `role: "tool"` message per call so each result
+// stays paired with its tool_call_id, which is what Groq/OpenAI expect.
+function turnToGroqMessages(t: ChatTurn): GroqMessage[] {
+  if ("content" in t && typeof t.content === "string") {
+    if (t.role === "assistant") return [{ role: "assistant", content: t.content }];
+    return [{ role: "user", content: t.content }];
+  }
+  if (t.role === "assistant" && "toolCalls" in t) {
+    return [
+      {
+        role: "assistant",
+        content: t.text ?? null,
+        tool_calls: t.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.input ?? {}) },
+        })),
+      },
+    ];
+  }
+  if (t.role === "user" && "toolResults" in t) {
+    return t.toolResults.map((r) => ({
+      role: "tool",
+      tool_call_id: r.toolUseId,
+      content: r.isError ? `ERROR: ${r.content}` : r.content,
+    }));
+  }
+  return [{ role: "user", content: "" }];
 }
 
 // ── Gemini implementation ────────────────────────────────────────────────
