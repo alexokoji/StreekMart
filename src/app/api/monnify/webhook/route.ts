@@ -4,8 +4,7 @@ import { PromotionStatus } from "@/lib/enums";
 import { verifyWebhookHash } from "@/lib/monnify";
 import { cancelPendingOrders, finalizePaidOrders } from "@/lib/orders";
 import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
-import { markDesignPaid } from "@/app/api/preorders/route";
-import { markDeliveryPaid } from "@/app/api/preorders/[id]/pay-delivery/route";
+import { markDesignPaid, markDeliveryPaid } from "@/lib/preorderPayment";
 
 // `node:crypto` (used by verifyWebhookHash) is unavailable on the Edge
 // runtime, so pin this route to Node.

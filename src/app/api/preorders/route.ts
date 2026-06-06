@@ -3,12 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
-import {
-  PreorderStatus,
-  shouldSkipDesignerHold,
-} from "@/lib/preorders";
-import { recordSale } from "@/lib/wallet";
-import { sendEmail } from "@/lib/email";
+import { PreorderStatus } from "@/lib/preorders";
+import { markDesignPaid } from "@/lib/preorderPayment";
 import { sendPush } from "@/lib/notifications";
 
 // POST /api/preorders { postId, notes? }
@@ -157,80 +153,3 @@ export async function POST(req: Request) {
   }
 }
 
-// Helper exported via the webhook + stub-confirm routes too.
-export async function markDesignPaid(
-  preorderId: string,
-  paymentRef: string,
-  txnRef: string,
-): Promise<void> {
-  // Fetch with the bits we need to decide skip-hold + ETA.
-  const p = await prisma.preorder.findUnique({
-    where: { id: preorderId },
-    include: {
-      designer: { select: { designerVerified: true, designerTier: true, name: true, email: true } },
-      post: { select: { title: true } },
-      buyer: { select: { name: true, email: true } },
-    },
-  });
-  if (!p) return;
-  // Idempotent — if status has already advanced (rare webhook race), skip.
-  if (p.status !== PreorderStatus.PENDING_PAYMENT) return;
-
-  const now = new Date();
-  const eta = new Date(now.getTime() + p.leadDays * 24 * 60 * 60 * 1000);
-
-  await prisma.preorder.update({
-    where: { id: p.id },
-    data: {
-      status: PreorderStatus.AWAITING_READY,
-      designPaymentRef: paymentRef,
-      designPaymentTxnRef: txnRef,
-      designPaidAt: now,
-      estimatedReadyAt: eta,
-    },
-  });
-
-  // Credit the designer's wallet. Verified Tier 2/3 → straight to
-  // withdrawable balance so they can buy materials. Tier 1 (unverified)
-  // → held until completion to protect the buyer from a designer who
-  // disappears with the funds.
-  const skipHold = shouldSkipDesignerHold({
-    designerVerified: p.designer.designerVerified,
-    designerTier: p.designer.designerTier,
-  });
-  await recordSale({
-    sellerId: p.designerId,
-    grossCents: p.priceCents,
-    productName: `Preorder · ${p.post?.title ?? "design"}`,
-    orderId: p.id,
-    skipHold,
-  });
-
-  // Notifications — designer learns payment cleared, buyer gets ETA.
-  void sendPush({
-    userId: p.designerId,
-    title: "Preorder paid",
-    body: `${p.buyer.name} paid ₦${(p.priceCents / 100).toLocaleString("en-NG")} for "${p.post?.title ?? "your piece"}". Get started!`,
-    link: `/designer/preorders/${p.id}`,
-    data: { type: "preorder-paid", preorderId: p.id },
-  }).catch(() => {});
-  void sendPush({
-    userId: p.buyerId,
-    title: "Preorder confirmed",
-    body: `Estimated ready: ${eta.toLocaleDateString("en-NG", { month: "short", day: "numeric" })}. You'll be notified when it's done.`,
-    link: `/account/preorders/${p.id}`,
-    data: { type: "preorder-paid", preorderId: p.id },
-  }).catch(() => {});
-  void sendEmail({
-    to: p.designer.email,
-    subject: `Preorder paid — ${p.post?.title ?? "your piece"}`,
-    html: `<p>Hi ${p.designer.name},</p><p>${p.buyer.name} paid ₦${(p.priceCents / 100).toLocaleString("en-NG")} for a preorder. Open your dashboard to get started.</p>`,
-    text: `${p.buyer.name} paid for a preorder.`,
-  }).catch(() => {});
-  void sendEmail({
-    to: p.buyer.email,
-    subject: "Your preorder is confirmed",
-    html: `<p>Hi ${p.buyer.name},</p><p>Your preorder is in production. Estimated ready: <strong>${eta.toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })}</strong>. We'll let you know when it's available.</p>`,
-    text: `Estimated ready: ${eta.toLocaleDateString("en-NG")}.`,
-  }).catch(() => {});
-}

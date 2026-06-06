@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { PreorderStatus } from "@/lib/preorders";
+import { markDeliveryPaid } from "@/lib/preorderPayment";
 
 // POST /api/preorders/[id]/pay-delivery { addressLine, feeCents }
 //
@@ -106,48 +107,3 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   }
 }
 
-// Exported so the webhook + stub-confirm can call the same code path.
-export async function markDeliveryPaid(
-  preorderId: string,
-  paymentRef: string,
-  txnRef: string,
-): Promise<void> {
-  const p = await prisma.preorder.findUnique({
-    where: { id: preorderId },
-    include: {
-      designer: { select: { id: true, name: true, email: true } },
-      buyer: { select: { id: true, name: true, email: true } },
-      post: { select: { title: true } },
-    },
-  });
-  if (!p) return;
-  if (p.status !== PreorderStatus.READY) return;
-
-  await prisma.preorder.update({
-    where: { id: p.id },
-    data: {
-      status: PreorderStatus.AWAITING_SHIPMENT,
-      deliveryPaymentRef: paymentRef,
-      deliveryPaymentTxnRef: txnRef,
-      deliveryPaidAt: new Date(),
-    },
-  });
-
-  // Lazy-import the notification helpers to keep the module graph tight.
-  const { sendPush } = await import("@/lib/notifications");
-  const { sendEmail } = await import("@/lib/email");
-
-  void sendPush({
-    userId: p.designerId,
-    title: "Delivery paid — ship the piece",
-    body: `${p.buyer.name}'s preorder of "${p.post?.title ?? "the design"}" is ready to ship.`,
-    link: `/designer/preorders/${p.id}`,
-    data: { type: "preorder-delivery-paid", preorderId: p.id },
-  }).catch(() => {});
-  void sendEmail({
-    to: p.designer.email,
-    subject: "Preorder delivery paid — time to ship",
-    html: `<p>Hi ${p.designer.name},</p><p>The buyer paid delivery for the preorder. Open your dashboard, add a tracking code, and we'll send the delivery code to the buyer.</p>`,
-    text: "Delivery paid. Ship the piece.",
-  }).catch(() => {});
-}

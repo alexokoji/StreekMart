@@ -5,8 +5,7 @@ import { PromotionStatus } from "@/lib/enums";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders, cancelPendingOrders } from "@/lib/orders";
 import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
-import { markDesignPaid } from "@/app/api/preorders/route";
-import { markDeliveryPaid } from "@/app/api/preorders/[id]/pay-delivery/route";
+import { markDesignPaid, markDeliveryPaid } from "@/lib/preorderPayment";
 
 // POST /api/monnify/stub-confirm { paymentReference, outcome }
 //
