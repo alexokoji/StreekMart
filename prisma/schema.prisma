@@ -1215,3 +1215,73 @@ model RoleChangeRequest {
   @@index([status, createdAt])
   @@index([userId])
 }
+
+
+// -------------------- WhatsApp Concierge --------------------
+// Audit + conversation history for the WhatsApp concierge integration.
+// Each row is one message in either direction (IN = buyer-to-platform,
+// OUT = platform-to-buyer). The webhook persists incoming messages
+// before invoking the AI loop; the AI's reply persists as OUT(s) right
+// after Meta's API confirms the send.
+//
+// We don't link to a User by FK at insert time because most senders won't
+// have a StreekMart account when they first message us. A nullable
+// userId is populated opportunistically when the phone matches an
+// existing User row (see whatsapp.ts).
+model WhatsAppMessage {
+  id          String   @id @default(cuid())
+  // Sender (for IN) or recipient (for OUT) phone in E.164 form
+  // ("+2348012345678"). Always present.
+  phone       String
+  // "IN" = received from buyer, "OUT" = sent from platform.
+  direction   String
+  // Plain text body. Non-text messages (images, etc.) are stored as a
+  // JSON description for now; rich types can come later.
+  body        String
+  // Meta's external message id. Unique on inbound rows so retried
+  // webhook deliveries don't double-insert.
+  externalId  String?  @unique
+  // Optional link to a StreekMart user when we can resolve the phone.
+  // Null otherwise — we still keep the conversation history.
+  userId      String?
+  // Free-text tag the AI loop can populate (e.g. "recommendation",
+  // "greeting", "out-of-scope"). Useful for measuring how the bot is used.
+  intent      String?
+  createdAt   DateTime @default(now())
+
+  @@index([phone, createdAt])
+  @@index([externalId])
+}
+
+
+// -------------------- Meta Data Deletion Requests --------------------
+// Required by Meta for any app handling user data — they POST to the
+// configured "Data Deletion Callback URL" when a user requests deletion
+// from their Facebook / WhatsApp account; we delete the corresponding
+// data, return a confirmation_code, and let the user check status at
+// /data-deletion/<code>.
+//
+// We don't always know which of our rows belong to the requesting user
+// (the signed_request gives us a Meta-internal user_id, not necessarily
+// a phone number) — phone is set when we could resolve it.
+model DataDeletionRequest {
+  id               String   @id @default(cuid())
+  // Random hex string returned to Meta. Used by the public status page to
+  // look up the row without leaking other PII.
+  confirmationCode String   @unique
+  // The Meta user_id from the signed_request payload — opaque to us.
+  metaUserId       String
+  // Phone we successfully matched against WhatsAppMessage history, if any.
+  phone            String?
+  // PENDING | COMPLETED | FAILED
+  status           String   @default("PENDING")
+  // How many WhatsApp message rows were removed for this request.
+  deletedCount     Int      @default(0)
+  // Free-text note (error reason on FAILED, "no matching data" when the
+  // user had nothing stored, etc.).
+  notes            String?
+  createdAt        DateTime @default(now())
+  completedAt      DateTime?
+
+  @@index([metaUserId])
+}
