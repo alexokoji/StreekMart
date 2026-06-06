@@ -11,6 +11,9 @@ type Props = {
     body?: string;
     images?: string[];
     tags?: string[];
+    preorderEnabled?: boolean;
+    preorderPriceCents?: number | null;
+    preorderLeadDays?: number | null;
   };
   mode: "create" | "edit";
 };
@@ -21,6 +24,17 @@ export function PostForm({ initial, mode }: Props) {
   const [body, setBody] = useState(initial?.body ?? "");
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
   const [tagsText, setTagsText] = useState((initial?.tags ?? []).join(", "));
+  // Preorder config — when enabled with both price + lead set, buyers can
+  // request the piece from the feed / homepage.
+  const [preorderEnabled, setPreorderEnabled] = useState<boolean>(
+    initial?.preorderEnabled ?? false,
+  );
+  const [preorderPriceNgn, setPreorderPriceNgn] = useState<number | "">(
+    initial?.preorderPriceCents ? Math.round(initial.preorderPriceCents / 100) : "",
+  );
+  const [preorderLeadDays, setPreorderLeadDays] = useState<number | "">(
+    initial?.preorderLeadDays ?? "",
+  );
   const [aiNotes, setAiNotes] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -62,6 +76,18 @@ export function PostForm({ initial, mode }: Props) {
         body,
         images,
         tags: tagsText.split(",").map((s) => s.trim()).filter(Boolean),
+        // Only send preorder fields when the toggle is on AND both
+        // numeric inputs are filled. The API treats undefined as "leave
+        // unchanged" / "disabled" depending on mode.
+        preorderEnabled,
+        preorderPriceCents:
+          preorderEnabled && typeof preorderPriceNgn === "number"
+            ? Math.round(preorderPriceNgn * 100)
+            : null,
+        preorderLeadDays:
+          preorderEnabled && typeof preorderLeadDays === "number"
+            ? preorderLeadDays
+            : null,
       };
       const res = await fetch(
         mode === "create" ? "/api/posts" : `/api/posts/${initial?.id}`,
@@ -137,6 +163,71 @@ export function PostForm({ initial, mode }: Props) {
         <label className="label">Tags (comma-separated)</label>
         <input className="input" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="streetwear, vintage, denim" />
       </div>
+      {/* Preorder configuration — when enabled, the post shows a
+          "Preorder design" CTA on the feed + homepage that lets buyers
+          request the piece directly. Buyer pays the design fee upfront;
+          when verified (Tier 2+), the designer's wallet is credited
+          immediately so they can buy materials. */}
+      <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-700">
+              Preorder
+            </p>
+            <p className="mt-0.5 text-xs text-ink-500">
+              Let buyers request this piece directly. They pay the design
+              fee upfront; you make the piece within the lead time, then
+              they pay delivery separately and you ship.
+            </p>
+          </div>
+          <label className="inline-flex shrink-0 items-center gap-2">
+            <input
+              type="checkbox"
+              checked={preorderEnabled}
+              onChange={(e) => setPreorderEnabled(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-medium">Enable</span>
+          </label>
+        </div>
+        {preorderEnabled && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Design price (NGN)</label>
+              <input
+                type="number"
+                className="input"
+                min={500}
+                step={500}
+                value={preorderPriceNgn}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPreorderPriceNgn(v === "" ? "" : Number(v));
+                }}
+                placeholder="e.g. 35000"
+                required={preorderEnabled}
+              />
+            </div>
+            <div>
+              <label className="label">Lead time (days)</label>
+              <input
+                type="number"
+                className="input"
+                min={1}
+                max={120}
+                value={preorderLeadDays}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPreorderLeadDays(v === "" ? "" : Number(v));
+                }}
+                placeholder="e.g. 14"
+                required={preorderEnabled}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       {err && <p className="text-sm text-red-600">{err}</p>}
       <div className="flex justify-between">
         {mode === "edit" ? (

@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { MODEL, RECS_SYSTEM, getClient, isAiEnabled } from "@/lib/ai";
+import { RECS_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
 import { parseJsonArray } from "@/lib/utils";
 
 // Personalized "For You" — Claude curates 6 picks from a candidate set,
@@ -176,43 +175,29 @@ ${signals.slice(0, 30).map((s) => `- ${s}`).join("\n")}
 Candidate pool:
 ${candidateBrief}`;
 
-  const client = getClient();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 1200,
-    system: [{ type: "text", text: RECS_SYSTEM, cache_control: { type: "ephemeral" } }],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            picks: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  kind: { type: "string", enum: ["product", "post"] },
-                  id: { type: "string" },
-                  reason: { type: "string" },
-                },
-                required: ["kind", "id", "reason"],
-              },
+  const { text } = await chat({
+    system: RECS_SYSTEM,
+    maxTokens: 1200,
+    messages: [{ role: "user", content: userPrompt }],
+    responseJsonSchema: {
+      type: "object",
+      properties: {
+        picks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: ["product", "post"] },
+              id: { type: "string" },
+              reason: { type: "string" },
             },
+            required: ["kind", "id", "reason"],
           },
-          required: ["picks"],
         },
       },
+      required: ["picks"],
     },
-    messages: [{ role: "user", content: userPrompt }],
   });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
 
   let picks: z.infer<typeof Picks>;
   try {

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { Permission } from "@/lib/enums";
 import { requireApiUser } from "@/lib/auth";
-import { CATEGORIES, FASHION_VALIDATOR_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";
+import { CATEGORIES, FASHION_VALIDATOR_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
 
 // AI fashion-only listing validator. Called by the product create/edit form
 // and by the server-side product API to enforce that StreekMart never lists
@@ -45,42 +44,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ allowed: true, reason: "Approved by category check.", suggested_category: category });
   }
 
-  // 3. Ask Claude for the semantic check.
-  const client = getClient();
+  // 3. Ask the model for the semantic check.
   const userPrompt = `Name: ${name}\nCategory: ${category}\nDescription: ${description}`;
-
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 400,
-    system: [
-      {
-        type: "text",
-        text: FASHION_VALIDATOR_SYSTEM,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            allowed: { type: "boolean" },
-            reason: { type: "string" },
-            suggested_category: { type: ["string", "null"] },
-          },
-          required: ["allowed", "reason", "suggested_category"],
-        },
-      },
-    },
+  const { text } = await chat({
+    system: FASHION_VALIDATOR_SYSTEM,
+    maxTokens: 400,
     messages: [{ role: "user", content: userPrompt }],
+    responseJsonSchema: {
+      type: "object",
+      properties: {
+        allowed: { type: "boolean" },
+        reason: { type: "string" },
+        suggested_category: { type: ["string", "null"] },
+      },
+      required: ["allowed", "reason", "suggested_category"],
+    },
   });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
 
   try {
     const verdict = Verdict.parse(JSON.parse(text));

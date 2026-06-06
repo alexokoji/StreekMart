@@ -4,6 +4,8 @@ import { PromotionStatus } from "@/lib/enums";
 import { verifyWebhookHash } from "@/lib/monnify";
 import { cancelPendingOrders, finalizePaidOrders } from "@/lib/orders";
 import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
+import { markDesignPaid } from "@/app/api/preorders/route";
+import { markDeliveryPaid } from "@/app/api/preorders/[id]/pay-delivery/route";
 
 // `node:crypto` (used by verifyWebhookHash) is unavailable on the Edge
 // runtime, so pin this route to Node.
@@ -67,6 +69,19 @@ export async function POST(req: Request) {
         // retries on non-2xx) and we don't want a duplicate alert per hit.
         if (updated.count > 0) void notifyAdminsOfPromotionReview(ref);
         return NextResponse.json({ ok: true, promotion: updated.count });
+      }
+      // Preorder design payment — flips PENDING_PAYMENT → AWAITING_READY
+      // and credits the designer wallet (skip-hold for verified designers).
+      if (ref.startsWith("PREORDER_DESIGN_")) {
+        const preorderId = ref.replace("PREORDER_DESIGN_", "");
+        await markDesignPaid(preorderId, ref, data.transactionReference ?? `TX_${ref}`);
+        return NextResponse.json({ ok: true, preorder: "design-paid" });
+      }
+      // Preorder delivery payment — flips READY → AWAITING_SHIPMENT.
+      if (ref.startsWith("PREORDER_DELIVERY_")) {
+        const preorderId = ref.replace("PREORDER_DELIVERY_", "");
+        await markDeliveryPaid(preorderId, ref, data.transactionReference ?? `TX_${ref}`);
+        return NextResponse.json({ ok: true, preorder: "delivery-paid" });
       }
       const result = await finalizePaidOrders({
         paymentReference: ref,

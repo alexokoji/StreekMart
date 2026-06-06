@@ -21,6 +21,9 @@ export default async function EditPostPage({ params }: { params: { id: string } 
             body: post.body,
             images: parseJsonArray(post.imagesJson),
             tags: parseJsonArray(post.tagsJson),
+            preorderEnabled: post.preorderEnabled,
+            preorderPriceCents: post.preorderPriceCents,
+            preorderLeadDays: post.preorderLeadDays,
           }}
         />
       </div>

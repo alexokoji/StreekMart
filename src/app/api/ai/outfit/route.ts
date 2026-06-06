@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { CATEGORIES, MODEL, OUTFIT_PAIRING_SYSTEM, getClient, isAiEnabled } from "@/lib/ai";
+import { CATEGORIES, OUTFIT_PAIRING_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
 
 // AI outfit pairing — given a product, suggest 3 ways to style it.
 // Public: no auth required (improves discovery for guests).
@@ -38,48 +37,28 @@ export async function POST(req: Request) {
 Category: ${product.category}
 Description: ${product.description}`;
 
-  const client = getClient();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 600,
-    system: [
-      {
-        type: "text",
-        text: OUTFIT_PAIRING_SYSTEM,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            pairings: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  category: { type: "string", enum: [...CATEGORIES] },
-                  idea: { type: "string" },
-                },
-                required: ["category", "idea"],
-              },
+  const { text } = await chat({
+    system: OUTFIT_PAIRING_SYSTEM,
+    maxTokens: 600,
+    messages: [{ role: "user", content: userPrompt }],
+    responseJsonSchema: {
+      type: "object",
+      properties: {
+        pairings: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              category: { type: "string", enum: [...CATEGORIES] },
+              idea: { type: "string" },
             },
+            required: ["category", "idea"],
           },
-          required: ["pairings"],
         },
       },
+      required: ["pairings"],
     },
-    messages: [{ role: "user", content: userPrompt }],
   });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
 
   try {
     const data = Pairings.parse(JSON.parse(text));

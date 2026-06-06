@@ -49,6 +49,11 @@ export default async function AccountPage() {
         <KpiLink href="/messages" label="Unread messages" value={unreadMessages} />
       </div>
 
+      <div className="flex flex-wrap gap-2 text-sm">
+        <Link href="/account/orders" className="btn-secondary">My orders</Link>
+        <Link href="/account/preorders" className="btn-secondary">My preorders</Link>
+      </div>
+
       <section className="card p-6">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold">Recent orders</h2>

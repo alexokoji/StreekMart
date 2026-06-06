@@ -17,6 +17,10 @@ import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
 import { PopularCategoryCards } from "@/components/storefront/PopularCategoryCards";
 import { FlashSalesCarousel } from "@/components/storefront/FlashSalesCarousel";
+import {
+  PreorderDesignsRail,
+  type PreorderDesignCard,
+} from "@/components/storefront/PreorderDesignsRail";
 import { TierBadge } from "@/components/TierBadge";
 import {
   PromotionSlider,
@@ -52,7 +56,36 @@ export default async function HomePage({
     ...(activeCategory ? { category: activeCategory } : {}),
   };
 
-  const [products, designers, savedFavorites, perCategoryGrouped, activePromotions] = await Promise.all([
+  // "Frequently visited designers" — anyone the user has followed, saved a
+  // post from, or liked a post from. Strongest available proxy without a
+  // dedicated view-tracking table. Guests fall back to top designers below.
+  const interactedDesignerIds = user
+    ? await prisma.$transaction([
+        prisma.follow.findMany({
+          where: { followerId: user.id },
+          select: { designerId: true },
+          take: 50,
+        }),
+        prisma.favorite.findMany({
+          where: { userId: user.id, postId: { not: null } },
+          select: { post: { select: { authorId: true } } },
+          take: 50,
+        }),
+        prisma.like.findMany({
+          where: { userId: user.id, postId: { not: null } },
+          select: { post: { select: { authorId: true } } },
+          take: 50,
+        }),
+      ]).then(([follows, favs, likes]) => {
+        const set = new Set<string>();
+        follows.forEach((f) => set.add(f.designerId));
+        favs.forEach((f) => f.post && set.add(f.post.authorId));
+        likes.forEach((l) => l.post && set.add(l.post.authorId));
+        return Array.from(set);
+      })
+    : [];
+
+  const [products, designers, savedFavorites, perCategoryGrouped, activePromotions, preorderablePosts] = await Promise.all([
     prisma.product.findMany({
       where: productWhere,
       include: {
@@ -125,7 +158,48 @@ export default async function HomePage({
       orderBy: { startsAt: "asc" },
       take: 10,
     }),
+    // Preorderable designer posts. When the user has interacted with at
+    // least one designer, restrict to that set so the rail feels personal;
+    // otherwise pull from Tier 2+ designers ranked by exposure. Always
+    // filter for posts with both numerics actually set — the boolean alone
+    // isn't a guarantee since older rows could have nulled price/lead.
+    prisma.post.findMany({
+      where: {
+        preorderEnabled: true,
+        preorderPriceCents: { not: null },
+        preorderLeadDays: { not: null },
+        author: {
+          isDesigner: true,
+          ...(interactedDesignerIds.length > 0
+            ? { id: { in: interactedDesignerIds } }
+            : { designerTier: { gte: 2 } }),
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        imagesJson: true,
+        preorderPriceCents: true,
+        preorderLeadDays: true,
+        author: { select: { id: true, name: true, slug: true } },
+      },
+    }),
   ]);
+
+  const preorderDesignCards: PreorderDesignCard[] = preorderablePosts
+    .filter((p) => p.preorderPriceCents != null && p.preorderLeadDays != null)
+    .map((p) => ({
+      postId: p.id,
+      title: p.title,
+      image: parseJsonArray(p.imagesJson)[0] ?? null,
+      priceCents: p.preorderPriceCents!,
+      leadDays: p.preorderLeadDays!,
+      designerId: p.author.id,
+      designerSlug: p.author.slug,
+      designerName: p.author.name,
+    }));
 
   const savedSet = new Set(savedFavorites.map((f) => f.productId!));
   const categoryCounts = new Map(perCategoryGrouped.map((c) => [c.category, c._count._all]));
@@ -403,6 +477,20 @@ export default async function HomePage({
 
       {/* Smart suggestions — personalised for signed-in users, trending for guests. */}
       <SmartSuggestions />
+
+      {/* Preorder designs — surfaces preorderable posts from designers the
+          user has engaged with (follow / save / like). Guests fall back to
+          Tier 2+ designers ranked by exposure. */}
+      {preorderDesignCards.length > 0 && (
+        <PreorderDesignsRail
+          subtitle={
+            user && interactedDesignerIds.length > 0
+              ? "Custom pieces from designers you've engaged with — request now, pay delivery once it's ready."
+              : "Request a custom piece from one of our top designers — pay upfront, delivery comes after the make."
+          }
+          items={preorderDesignCards}
+        />
+      )}
 
       {/* Top designers — only renders when at least one verified designer exists. */}
       {designers.length > 0 && (

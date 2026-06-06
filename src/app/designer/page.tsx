@@ -92,6 +92,7 @@ export default async function DesignerDashboardPage() {
         <h1 className="text-2xl font-bold">Welcome, {user.name}</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/designer/commissions" className="btn-secondary">Commissions</Link>
+          <Link href="/designer/preorders" className="btn-secondary">Preorders</Link>
           <Link href="/designer/lookbooks" className="btn-secondary">Look-books</Link>
           <Link href="/designer/products/new" className="btn-secondary">+ List product</Link>
           <Link href="/designer/posts/new" className="btn-primary">+ New post</Link>

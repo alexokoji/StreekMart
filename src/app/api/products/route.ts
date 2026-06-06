@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/enums";
 import { prisma } from "@/lib/db";
@@ -7,7 +6,7 @@ import { requireApiUser } from "@/lib/auth";
 import { resolveActingOwner } from "@/lib/managersServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 import { AttributesSchema } from "@/lib/productAttributes";
-import { FASHION_VALIDATOR_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";
+import { FASHION_VALIDATOR_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
 
 // GET /api/products?mine=1&category=&q=&kind=MATERIAL|PRODUCT
 export async function GET(req: Request) {
@@ -234,37 +233,22 @@ async function validateListing(
   }
 
   try {
-    const client = getClient();
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 400,
-      system: [
-        { type: "text", text: FASHION_VALIDATOR_SYSTEM, cache_control: { type: "ephemeral" } },
-      ],
-      output_config: {
-        format: {
-          type: "json_schema",
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              allowed: { type: "boolean" },
-              reason: { type: "string" },
-              suggested_category: { type: ["string", "null"] },
-            },
-            required: ["allowed", "reason", "suggested_category"],
-          },
-        },
-      },
+    const { text } = await chat({
+      system: FASHION_VALIDATOR_SYSTEM,
+      maxTokens: 400,
       messages: [
         { role: "user", content: `Name: ${name}\nCategory: ${category}\nDescription: ${description}` },
       ],
+      responseJsonSchema: {
+        type: "object",
+        properties: {
+          allowed: { type: "boolean" },
+          reason: { type: "string" },
+          suggested_category: { type: ["string", "null"] },
+        },
+        required: ["allowed", "reason", "suggested_category"],
+      },
     });
-
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
     const parsed = JSON.parse(text);
     return {
       allowed: !!parsed.allowed,
@@ -272,7 +256,7 @@ async function validateListing(
       suggested_category: typeof parsed.suggested_category === "string" ? parsed.suggested_category : null,
     };
   } catch {
-    // If Claude errors out, fall back to the category check rather than blocking the seller.
+    // If the validator errors out, fall back to the category check rather than blocking the seller.
     return { allowed: true, reason: "Validator unavailable; allowed by category check.", suggested_category: category };
   }
 }

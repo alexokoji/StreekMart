@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
-import { CATEGORIES, MODEL, SMART_SEARCH_SYSTEM, getClient, isAiEnabled } from "@/lib/ai";
+import { CATEGORIES, SMART_SEARCH_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
 import { parseJsonArray } from "@/lib/utils";
 
 // Structured output schema — Claude returns JSON matching this shape.
@@ -19,7 +18,7 @@ const Body = z.object({ query: z.string().min(2).max(300) });
 export async function POST(req: Request) {
   if (!isAiEnabled()) {
     return NextResponse.json(
-      { error: "AI features are disabled. Set ANTHROPIC_API_KEY in .env." },
+      { error: "AI features are disabled. Set GEMINI_API_KEY in .env." },
       { status: 503 },
     );
   }
@@ -28,44 +27,24 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const client = getClient();
-
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 512,
-    system: [
-      {
-        type: "text",
-        text: SMART_SEARCH_SYSTEM,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            categories: {
-              type: "array",
-              items: { type: "string", enum: [...CATEGORIES] },
-            },
-            keyword_phrase: { type: "string" },
-            max_price: { type: ["number", "null"] },
-            rationale: { type: "string" },
-          },
-          required: ["categories", "keyword_phrase", "max_price", "rationale"],
-        },
-      },
-    },
+  const { text } = await chat({
+    system: SMART_SEARCH_SYSTEM,
+    maxTokens: 512,
     messages: [{ role: "user", content: parsed.data.query }],
+    responseJsonSchema: {
+      type: "object",
+      properties: {
+        categories: {
+          type: "array",
+          items: { type: "string", enum: [...CATEGORIES] },
+        },
+        keyword_phrase: { type: "string" },
+        max_price: { type: ["number", "null"] },
+        rationale: { type: "string" },
+      },
+      required: ["categories", "keyword_phrase", "max_price", "rationale"],
+    },
   });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
 
   let plan: z.infer<typeof SearchPlan>;
   try {

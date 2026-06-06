@@ -5,6 +5,8 @@ import { PromotionStatus } from "@/lib/enums";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders, cancelPendingOrders } from "@/lib/orders";
 import { notifyAdminsOfPromotionReview } from "@/lib/adminNotifications";
+import { markDesignPaid } from "@/app/api/preorders/route";
+import { markDeliveryPaid } from "@/app/api/preorders/[id]/pay-delivery/route";
 
 // POST /api/monnify/stub-confirm { paymentReference, outcome }
 //
@@ -55,6 +57,17 @@ export async function POST(req: Request) {
     });
     if (updated.count > 0) void notifyAdminsOfPromotionReview(ref);
     return NextResponse.json({ ok: true, promotion: updated.count });
+  }
+
+  if (ref.startsWith("PREORDER_DESIGN_")) {
+    const preorderId = ref.replace("PREORDER_DESIGN_", "");
+    await markDesignPaid(preorderId, ref, `STUB_${ref}`);
+    return NextResponse.json({ ok: true, preorder: "design-paid" });
+  }
+  if (ref.startsWith("PREORDER_DELIVERY_")) {
+    const preorderId = ref.replace("PREORDER_DELIVERY_", "");
+    await markDeliveryPaid(preorderId, ref, `STUB_${ref}`);
+    return NextResponse.json({ ok: true, preorder: "delivery-paid" });
   }
 
   const result = await finalizePaidOrders({

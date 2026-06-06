@@ -192,6 +192,9 @@ export default async function FeedPage({
                   // attribution. Designer-owned products still render
                   // un-marked elsewhere — this is feed-only.
                   images: parseJsonArray(p.imagesJson).map(buildWatermarkedUrl),
+                  preorderEnabled: p.preorderEnabled,
+                  preorderPriceCents: p.preorderPriceCents,
+                  preorderLeadDays: p.preorderLeadDays,
                   tags: parseJsonArray(p.tagsJson),
                   createdAt: p.createdAt.toISOString(),
                   likeCount: p.likeCount,

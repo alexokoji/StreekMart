@@ -1,36 +1,19 @@
 // AI integration layer for StreekMart.
 //
-// All Claude API calls go through here. The system prompts are large and
-// stable, so we mark them with `cache_control: {type: "ephemeral"}` to enable
-// prompt caching — repeat requests in the same conversation reuse the prefix
-// at ~10% the cost of a fresh write.
-//
-// Default model: claude-opus-4-7 (override via CLAUDE_MODEL env var).
+// All AI calls now go through `chat()` in src/lib/llm.ts which selects a
+// provider (Gemini first, Anthropic fallback). This file holds the stable
+// system prompts + the concierge tool schemas in provider-agnostic shape.
 
-import Anthropic from "@anthropic-ai/sdk";
+import type { ChatTool } from "./llm";
 
-let _client: Anthropic | null = null;
-
-export function getClient(): Anthropic {
-  if (_client) return _client;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env to enable AI features.",
-    );
-  }
-  _client = new Anthropic({ apiKey });
-  return _client;
-}
-
-export const MODEL = process.env.CLAUDE_MODEL || "claude-opus-4-7";
-
-export function isAiEnabled(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
-}
+// Surface the provider-agnostic primitives to the rest of the app so old
+// imports of `getClient` / `MODEL` / `isAiEnabled` continue to resolve.
+export { chat, isAiEnabled, MODEL } from "./llm";
+export type { ChatTool, ChatTurn, ChatResult } from "./llm";
 
 // ----------------------------------------------------------------------------
-// System prompts (kept stable so prompt caching is effective)
+// System prompts (kept stable so providers that support prefix caching can
+// reuse the prefix across turns)
 // ----------------------------------------------------------------------------
 
 // Re-export the canonical category list so AI prompts and the rest of the app
@@ -121,17 +104,16 @@ Return STRICT JSON: {"allowed": boolean, "reason": string, "suggested_category":
 - "suggested_category" is one of the available categories you'd recommend if allowed; null if rejected.`;
 
 // ----------------------------------------------------------------------------
-// Concierge tool schemas (manual JSON Schema — used with the manual tool loop
-// so we have explicit control over execution and can return product card data
-// alongside the assistant's text).
+// Concierge tool schemas — provider-agnostic JSON Schema. chat() translates
+// these into Gemini FunctionDeclarations or Anthropic Tools at call time.
 // ----------------------------------------------------------------------------
 
-export const CONCIERGE_TOOLS: Anthropic.Tool[] = [
+export const CONCIERGE_TOOLS: ChatTool[] = [
   {
     name: "search_products",
     description:
       "Search the StreekMart marketplace for clothing and accessories. Returns real listings with id, name, price, category, and seller name. Always use this before recommending specific products.",
-    input_schema: {
+    parameters: {
       type: "object",
       properties: {
         query: {
@@ -158,13 +140,13 @@ export const CONCIERGE_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_categories",
     description: "Return the full list of product categories available on StreekMart.",
-    input_schema: { type: "object", properties: {} },
+    parameters: { type: "object", properties: {} },
   },
   {
     name: "get_trending_designers",
     description:
       "Return the top designers ranked by exposure score (engagement + sales). Useful when a user asks 'who should I follow' or wants designer recommendations.",
-    input_schema: {
+    parameters: {
       type: "object",
       properties: {
         limit: {

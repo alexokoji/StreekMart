@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { Permission } from "@/lib/enums";
 import { requireApiUser } from "@/lib/auth";
-import { DESCRIPTION_WRITER_SYSTEM, MODEL, getClient, isAiEnabled } from "@/lib/ai";
+import { DESCRIPTION_WRITER_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
 
 // AI product-description writer.
 // Sellers and designers paste a few keywords; Claude returns a polished blurb.
@@ -17,7 +16,7 @@ const Body = z.object({
 export async function POST(req: Request) {
   if (!isAiEnabled()) {
     return NextResponse.json(
-      { error: "AI features are disabled. Set ANTHROPIC_API_KEY in .env." },
+      { error: "AI features are disabled. Set GEMINI_API_KEY in .env." },
       { status: 503 },
     );
   }
@@ -41,24 +40,13 @@ export async function POST(req: Request) {
     .filter(Boolean)
     .join("\n");
 
-  const client = getClient();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 400,
-    system: [
-      {
-        type: "text",
-        text: DESCRIPTION_WRITER_SYSTEM,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
+  const { text } = await chat({
+    system: DESCRIPTION_WRITER_SYSTEM,
+    maxTokens: 400,
     messages: [{ role: "user", content: userPrompt }],
   });
 
-  const description = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("")
+  const description = text
     .trim()
     // Strip accidental wrapping quotes if the model adds them despite instructions.
     .replace(/^["“”]+|["“”]+$/g, "");

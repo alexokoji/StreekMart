@@ -177,6 +177,8 @@ model User {
   pushTokens            PushToken[]
   commissionsAsBuyer    CommissionRequest[] @relation("BuyerCommissions")
   commissionsAsDesigner CommissionRequest[] @relation("DesignerCommissions")
+  preordersAsBuyer      Preorder[] @relation("BuyerPreorders")
+  preordersAsDesigner   Preorder[] @relation("DesignerPreorders")
   collections           Collection[]
 }
 
@@ -528,6 +530,16 @@ model Post {
   viewCount  Int      @default(0)
   likeCount  Int      @default(0)
   saveCount  Int      @default(0)
+  // Preorder configuration. When `preorderEnabled` is true and both
+  // price + lead are set, buyers can preorder the piece in this post
+  // from the feed / homepage rail. The buyer pays the design price
+  // upfront, the designer makes the piece within `preorderLeadDays`,
+  // then the buyer pays delivery separately and the piece ships.
+  // Stored on Post (not a separate table) because most preorderable
+  // posts will keep their config attached for the post's lifetime.
+  preorderEnabled    Boolean @default(false)
+  preorderPriceCents Int?
+  preorderLeadDays   Int?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -537,6 +549,7 @@ model Post {
   sketches   Sketch[]
   comments   Comment[]
   collectionItems CollectionItem[]
+  preorders  Preorder[]
 }
 
 // -------------------- Comments on posts --------------------
@@ -1284,4 +1297,87 @@ model DataDeletionRequest {
   completedAt      DateTime?
 
   @@index([metaUserId])
+}
+
+
+// -------------------- Preorders --------------------
+// Buyer requests a designer's piece from the feed/home. Lifecycle:
+//
+//   PENDING_PAYMENT      → buyer just clicked "Preorder", needs to pay the
+//                          design price.
+//   AWAITING_READY       → design paid. Designer's wallet credited (skip-
+//                          hold for verified Tier 2/3 designers so they
+//                          can withdraw and buy materials).
+//   READY                → designer marked the piece ready. Buyer needs
+//                          to pay delivery + supply shipping address.
+//   AWAITING_SHIPMENT    → delivery paid. Designer creates the actual
+//                          shipment via the existing logistics flow.
+//   SHIPPED              → shipment created with tracking. Buyer sees
+//                          delivery code.
+//   COMPLETED            → buyer confirmed receipt with the code.
+//   CANCELLED            → terminal failure (either side).
+//
+// Two payments, two gateway references:
+//   designPaymentRef    = PREORDER_DESIGN_<id>
+//   deliveryPaymentRef  = PREORDER_DELIVERY_<id>
+// Webhook routes by prefix.
+model Preorder {
+  id          String   @id @default(cuid())
+  buyerId     String
+  buyer       User     @relation("BuyerPreorders", fields: [buyerId], references: [id], onDelete: Cascade)
+  designerId  String
+  designer    User     @relation("DesignerPreorders", fields: [designerId], references: [id], onDelete: Cascade)
+  // The post the buyer requested. Nullable so a designer deleting a post
+  // doesn't cascade-wipe in-flight preorders.
+  postId      String?
+  post        Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  // Snapshot of the post's config at preorder time. Storing a copy here
+  // means a designer raising / lowering the price later doesn't rewrite
+  // what the buyer already agreed to pay.
+  priceCents       Int
+  leadDays         Int
+  // Buyer's free-text notes (size, color, references).
+  notes            String?
+
+  status           String  @default("PENDING_PAYMENT")
+
+  // Design payment
+  designPaymentRef String?  @unique
+  designPaymentTxnRef String?
+  designPaidAt     DateTime?
+
+  // Ready / production milestones
+  readyAt          DateTime?
+  // Computed at design payment time as designPaidAt + leadDays. Surfaced
+  // to the buyer as the ETA.
+  estimatedReadyAt DateTime?
+
+  // Delivery payment + shipping
+  deliveryFeeCents      Int?
+  deliveryPaymentRef    String?  @unique
+  deliveryPaymentTxnRef String?
+  deliveryPaidAt        DateTime?
+  shippingAddress       String?
+  shippingFormattedAddress String?
+  shippingLatitude      Float?
+  shippingLongitude     Float?
+  shippingPlaceId       String?
+
+  // Fulfilment / shipment
+  trackingCode     String?
+  logisticsProvider String?
+  shippedAt        DateTime?
+  deliveryCode     String?
+  completedAt      DateTime?
+
+  cancellationReason String?
+  cancelledAt        DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([buyerId])
+  @@index([designerId])
+  @@index([status, createdAt])
 }

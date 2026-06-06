@@ -16,6 +16,11 @@ type PostData = {
   likeCount: number;
   commentCount: number;
   promoted: boolean;
+  // Preorder fields — when `preorderEnabled` is true the card renders a
+  // "Preorder design" CTA right under the actions row.
+  preorderEnabled?: boolean;
+  preorderPriceCents?: number | null;
+  preorderLeadDays?: number | null;
   author: {
     id: string;
     name: string;
@@ -254,6 +259,41 @@ export function PostCard({
           {saved ? "★" : "☆"} <span className="hidden sm:inline">Save</span>
         </ActionButton>
       </div>
+
+      {/* Preorder CTA — when the post is preorderable, buyers see a
+          prominent banner under the action bar. Designer's own post +
+          unauthenticated visitors don't get the button: own-post would
+          let them buy from themselves, and unauth users need to log in
+          to start a preorder. */}
+      {post.preorderEnabled &&
+        typeof post.preorderPriceCents === "number" &&
+        typeof post.preorderLeadDays === "number" &&
+        !isOwn && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-violet-100 bg-violet-50/60 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-700">
+                Preorder design
+              </p>
+              <p className="text-sm font-semibold text-ink-800">
+                ₦{(post.preorderPriceCents / 100).toLocaleString("en-NG")}
+                <span className="ml-1.5 text-xs font-normal text-ink-500">
+                  · ready in {post.preorderLeadDays} day
+                  {post.preorderLeadDays === 1 ? "" : "s"}
+                </span>
+              </p>
+            </div>
+            <Link
+              href={
+                authed
+                  ? `/preorder/${post.id}`
+                  : `/login?redirect=${encodeURIComponent(`/preorder/${post.id}`)}`
+              }
+              className="btn-primary text-xs"
+            >
+              Preorder this piece
+            </Link>
+          </div>
+        )}
 
       {/* Comments */}
       {showComments && (

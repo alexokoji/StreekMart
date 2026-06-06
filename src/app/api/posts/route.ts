@@ -35,6 +35,11 @@ const Body = z.object({
   body: z.string().min(1),
   images: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([]),
+  // Preorder config (optional). When enabled with both numeric fields the
+  // post shows the "Preorder design" CTA on the feed / homepage.
+  preorderEnabled: z.boolean().optional(),
+  preorderPriceCents: z.number().int().min(50_000).max(1_000_000_000).nullable().optional(),
+  preorderLeadDays: z.number().int().min(1).max(120).nullable().optional(),
   // Managers with the `post` permission can publish under the owner's name.
   actAsOwnerId: z.string().optional(),
 });
@@ -65,6 +70,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Owner is not a designer" }, { status: 403 });
   }
 
+  // Sanity check: a preorder needs BOTH price and lead time to make sense.
+  // We disable the toggle silently when either is missing rather than
+  // erroring — the form already gates this, this is the API-level fallback.
+  const preorderActive =
+    parsed.data.preorderEnabled === true &&
+    typeof parsed.data.preorderPriceCents === "number" &&
+    typeof parsed.data.preorderLeadDays === "number";
+
   const post = await prisma.post.create({
     data: {
       authorId: ownerId,
@@ -72,6 +85,9 @@ export async function POST(req: Request) {
       body: parsed.data.body,
       imagesJson: JSON.stringify(parsed.data.images),
       tagsJson: JSON.stringify(parsed.data.tags),
+      preorderEnabled: preorderActive,
+      preorderPriceCents: preorderActive ? parsed.data.preorderPriceCents : null,
+      preorderLeadDays: preorderActive ? parsed.data.preorderLeadDays : null,
     },
   });
   return NextResponse.json({ post });

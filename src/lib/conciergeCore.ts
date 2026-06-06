@@ -3,15 +3,10 @@
 // call this so they share the same brain — same system prompt, same
 // `search_products` / `get_categories` / `get_trending_designers` tools.
 
-import Anthropic from "@anthropic-ai/sdk";
 import { ProductStatus } from "./enums";
 import { prisma } from "./db";
-import {
-  CONCIERGE_SYSTEM,
-  CONCIERGE_TOOLS,
-  MODEL,
-  getClient,
-} from "./ai";
+import { CONCIERGE_SYSTEM, CONCIERGE_TOOLS } from "./ai";
+import { chat, type ChatTurn } from "./llm";
 import { parseJsonArray } from "./utils";
 
 export type ConciergeProductCard = {
@@ -32,83 +27,62 @@ export type ConciergeResult = {
 const MAX_LOOP_ITERATIONS = 6;
 
 /**
- * Run the concierge against a conversation history and return Claude's
- * final reply + the product cards the search tool surfaced along the way.
+ * Run the concierge against a conversation history and return the final
+ * reply + the product cards the search tool surfaced along the way.
  *
  * `messages` is the running history (user + assistant turns). For a
  * fresh-conversation invocation just pass one user message.
  *
- * `productHref` is a function that maps a productId → URL the user can
- * click to. Web invocations pass `id => /products/${id}`; WhatsApp
- * passes the absolute https URL so the links preview cleanly in chat.
+ * `productHref` maps a productId → URL the user can click. Web invocations
+ * pass `id => /products/${id}`; WhatsApp passes the absolute https URL so
+ * the links preview cleanly in chat.
  */
 export async function runConcierge(args: {
   messages: Array<{ role: "user" | "assistant"; content: string }>;
   productHref: (productId: string) => string;
 }): Promise<ConciergeResult> {
-  const client = getClient();
-  const messages: Anthropic.MessageParam[] = args.messages.map((m) => ({
+  const turns: ChatTurn[] = args.messages.map((m) => ({
     role: m.role,
     content: m.content,
   }));
   const cards = new Map<string, ConciergeProductCard>();
 
   for (let i = 0; i < MAX_LOOP_ITERATIONS; i++) {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: [
-        {
-          type: "text",
-          text: CONCIERGE_SYSTEM,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
+    const result = await chat({
+      system: CONCIERGE_SYSTEM,
       tools: CONCIERGE_TOOLS,
-      messages,
+      messages: turns,
+      maxTokens: 2048,
     });
 
-    if (
-      response.stop_reason === "end_turn" ||
-      response.stop_reason === "stop_sequence" ||
-      response.stop_reason !== "tool_use"
-    ) {
-      const text = response.content
-        .filter((b): b is Anthropic.TextBlock => b.type === "text")
-        .map((b) => b.text)
-        .join("\n")
-        .trim();
+    if (result.stopReason !== "tool_use" || result.toolCalls.length === 0) {
       return {
-        reply: text || "I'm not sure how to help with that — try asking again?",
+        reply: result.text || "I'm not sure how to help with that — try asking again?",
         products: Array.from(cards.values()),
       };
     }
 
-    // Tool use: append the assistant turn verbatim, run every tool, then
-    // reply with matching tool_result blocks in a single user turn.
-    messages.push({ role: "assistant", content: response.content });
-    const toolUses = response.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-    );
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-    for (const tu of toolUses) {
+    // Replay the assistant tool-call turn, run every tool, append the
+    // results in a single user turn — same shape both providers expect.
+    turns.push({
+      role: "assistant",
+      text: result.text || undefined,
+      toolCalls: result.toolCalls,
+    });
+    const toolResults: Array<{ toolUseId: string; content: string; isError?: boolean }> = [];
+    for (const tu of result.toolCalls) {
       try {
-        const result = await runConciergeTool(tu.name, tu.input, cards, args.productHref);
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: tu.id,
-          content: JSON.stringify(result),
-        });
+        const out = await runConciergeTool(tu.name, tu.input, cards, args.productHref);
+        toolResults.push({ toolUseId: tu.id, content: JSON.stringify(out) });
       } catch (err) {
         toolResults.push({
-          type: "tool_result",
-          tool_use_id: tu.id,
-          is_error: true,
+          toolUseId: tu.id,
+          isError: true,
           content: err instanceof Error ? err.message : "Tool execution failed",
         });
       }
     }
-    messages.push({ role: "user", content: toolResults });
+    turns.push({ role: "user", toolResults });
   }
 
   return {

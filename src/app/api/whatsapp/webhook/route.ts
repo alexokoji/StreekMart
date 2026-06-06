@@ -73,12 +73,17 @@ export async function POST(req: Request) {
     }
   }
 
-  // Fire-and-forget handling so we ACK Meta in <100 ms — Meta retries
-  // aggressively on slow webhooks. Any error inside lands in the logs.
+  // Process inline. Earlier this was fire-and-forget so we could ACK Meta
+  // in <100 ms, but on Vercel serverless the lambda freezes the moment we
+  // return — any unawaited Promise gets dropped on the floor, including
+  // the concierge call AND the outbound send. Meta's webhook timeout is
+  // ~20s; a typical concierge turn finishes in 3–5s, so awaiting is safe.
   for (const m of messages) {
-    void handleInbound(m).catch((err) =>
-      console.error("[whatsapp:webhook] handler threw", { err }),
-    );
+    try {
+      await handleInbound(m);
+    } catch (err) {
+      console.error("[whatsapp:webhook] handler threw", { err });
+    }
   }
 
   return NextResponse.json({ ok: true });
@@ -123,7 +128,7 @@ async function handleInbound(message: InboundMessage): Promise<void> {
   if (!isAiEnabled() || !isWhatsAppEnabled()) {
     await sendWhatsAppText({
       to: message.from,
-      body: "Hey! StreekMart's concierge isn't on right now — try browsing https://streekmart.online while we get this fixed.",
+      body: "Hey! StreekMart's concierge isn't on right now — try browsing https://www.streekmart.online while we get this fixed.",
     });
     return;
   }
