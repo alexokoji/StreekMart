@@ -26,7 +26,12 @@ export class KorapayGateway implements PaymentGateway {
       notification_url: `${this.getNotificationUrl()}/api/korapay/webhook`,
       redirect_url: input.redirectUrl,
       metadata: {
-        description: input.description,
+        // Korapay validates metadata.description ≤ 50 chars and 422s the
+        // whole init if it's longer. Truncate here so call sites (promote
+        // dialog, cart checkout, preorders, delivery payments) don't all
+        // have to remember the limit. Ellipsis to make the truncation
+        // legible in the dashboard.
+        description: truncateForMetadata(input.description, 50),
       },
     };
 
@@ -174,4 +179,18 @@ export class KorapayGateway implements PaymentGateway {
 
 export function createKorapayGateway(): PaymentGateway {
   return new KorapayGateway();
+}
+
+// Korapay caps metadata.description at 50 characters. Anything longer
+// 422s the whole init request. Trim with an ellipsis so the dashboard
+// row stays legible, and prefer to truncate at a word boundary when the
+// last word would otherwise be cut mid-character.
+function truncateForMetadata(raw: string, maxLen: number): string {
+  if (!raw) return "";
+  if (raw.length <= maxLen) return raw;
+  const cut = raw.slice(0, maxLen - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  // Only break at a space if we wouldn't lose too much of the head.
+  const head = lastSpace > maxLen / 2 ? cut.slice(0, lastSpace) : cut;
+  return `${head.trimEnd()}…`;
 }

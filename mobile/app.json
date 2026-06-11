@@ -2,16 +2,20 @@
   "expo": {
     "name": "StreekMart",
     "slug": "streekmart",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "streekmart",
     "userInterfaceStyle": "automatic",
-    "primaryColor": "#7c3aed",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#7c3aed"
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#0b0b10"
+      }
     },
     "assetBundlePatterns": [
       "**/*"
@@ -39,10 +43,10 @@
     },
     "android": {
       "package": "com.streekmart.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#7c3aed"
+        "backgroundColor": "#ffffff"
       },
       "permissions": [
         "INTERNET",
@@ -74,7 +78,7 @@
       ]
     },
     "extra": {
-      "siteUrl": "https://streekmart.online",
+      "apiUrl": "https://www.streekmart.online",
       "eas": {
         "projectId": "97a68bcd-daf5-4f86-9600-5b682e28f1e1"
       }
@@ -91,9 +95,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#7c3aed",
+          "backgroundColor": "#ffffff",
           "image": "./assets/splash.png",
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#0b0b10",
+            "image": "./assets/splash.png",
+            "resizeMode": "contain"
+          }
         }
       ],
       [
