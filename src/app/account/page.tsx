@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
+import { ReferralCard } from "@/components/ReferralCard";
+import { ensureReferralCode } from "@/lib/referrals";
 
 // /account is the buyer dashboard. Sellers and designers have their own
 // dashboards; we forward them there so the avatar chip lands on the right
@@ -16,7 +18,8 @@ export default async function AccountPage() {
   if (user.isSeller && !user.isDesigner) redirect("/seller");
   if (user.isDesigner && !user.isSeller) redirect("/designer");
 
-  const [orders, wishlistCount, cart, unreadMessages] = await Promise.all([
+  const referralCode = await ensureReferralCode(user.id);
+  const [orders, wishlistCount, cart, unreadMessages, referralCount, currentUser] = await Promise.all([
     prisma.order.findMany({
       where: { buyerId: user.id },
       include: { product: { select: { name: true } } },
@@ -31,6 +34,8 @@ export default async function AccountPage() {
     prisma.message.count({
       where: { chat: { participants: { some: { userId: user.id } } }, readAt: null, senderId: { not: user.id } },
     }).catch(() => 0),
+    prisma.referral.count({ where: { referrerId: user.id } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { pointsBalance: true } }),
   ]);
 
   return (
@@ -53,6 +58,13 @@ export default async function AccountPage() {
         <Link href="/account/orders" className="btn-secondary">My orders</Link>
         <Link href="/account/preorders" className="btn-secondary">My preorders</Link>
       </div>
+
+      <ReferralCard
+        code={referralCode}
+        pointsBalance={currentUser?.pointsBalance ?? 0}
+        referralCount={referralCount}
+        siteUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://www.streekmart.online"}
+      />
 
       <section className="card p-6">
         <div className="flex items-center justify-between">

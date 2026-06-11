@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CATEGORY_GROUPS } from "@/lib/enums";
 import { ImageUploader } from "@/components/forms/ImageUploader";
@@ -42,9 +42,13 @@ type Props = {
   redirectBase?: string;
 };
 
-const ALL_CATEGORIES = Object.entries(CATEGORY_GROUPS) as ReadonlyArray<
-  readonly [string, readonly string[]]
->;
+// Seed list used for the first render so the dropdown isn't empty before
+// /api/categories returns. The live list (including any admin-added
+// categories) replaces it on mount.
+type CategoryGroupTuple = readonly [string, readonly string[]];
+const SEED_CATEGORIES: ReadonlyArray<CategoryGroupTuple> = Object.entries(
+  CATEGORY_GROUPS,
+) as ReadonlyArray<CategoryGroupTuple>;
 
 export function ProductForm({ initial, mode, redirectBase = "/seller/products" }: Props) {
   const router = useRouter();
@@ -59,7 +63,34 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
   const [description, setDescription] = useState(initial?.description ?? "");
   const [price, setPrice] = useState<number>(initialLocalPrice);
   const [salePrice, setSalePrice] = useState<number | "">(initialLocalSale);
-  const [category, setCategory] = useState(initial?.category ?? ALL_CATEGORIES[0][1][0]);
+  // Categories come from the live admin-managed list at /api/categories.
+  // We hydrate with the seed list so the first render isn't empty, then
+  // swap in the fetched list on mount. If the seller is editing a product
+  // whose category was renamed/disabled in the meantime, we keep it as
+  // the selected value so they aren't silently switched.
+  const [categoryGroups, setCategoryGroups] = useState<ReadonlyArray<CategoryGroupTuple>>(
+    SEED_CATEGORIES,
+  );
+  const [category, setCategory] = useState(initial?.category ?? SEED_CATEGORIES[0][1][0]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/categories?grouped=1");
+        if (!res.ok) return;
+        const data = (await res.json()) as { groups?: Record<string, string[]> };
+        if (cancelled || !data.groups) return;
+        const tuples = Object.entries(data.groups) as ReadonlyArray<CategoryGroupTuple>;
+        if (tuples.length > 0) setCategoryGroups(tuples);
+      } catch {
+        // network blip — stick with the seed list, the form still works.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [status, setStatus] = useState<ProductStatusValue>(
     (initial?.status as ProductStatusValue) ?? "ACTIVE",
   );
@@ -358,7 +389,13 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
       <div>
         <label className="label">Category</label>
         <select className="input" value={category} onChange={(e) => changeCategory(e.target.value)}>
-          {ALL_CATEGORIES.map(([group, items]) => (
+          {/* If the product's existing category was retired by admin it
+              won't be in the fetched list — preserve it as a hidden
+              option so the seller doesn't lose their selection on edit. */}
+          {!categoryGroups.some(([, items]) => items.includes(category)) && category && (
+            <option value={category}>{category} (retired)</option>
+          )}
+          {categoryGroups.map(([group, items]) => (
             <optgroup key={group} label={group}>
               {items.map((c) => (
                 <option key={c} value={c}>{c}</option>

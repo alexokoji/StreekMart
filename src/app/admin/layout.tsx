@@ -23,6 +23,7 @@ const NAV: Array<{
   { href: "/admin/verifications", label: "Verifications", perm: ADMIN_PERMISSIONS.MANAGE_VERIFICATIONS },
   { href: "/admin/role-changes", label: "Role changes", perm: ADMIN_PERMISSIONS.MANAGE_VERIFICATIONS },
   { href: "/admin/products", label: "Products", perm: ADMIN_PERMISSIONS.MANAGE_PRODUCTS },
+  { href: "/admin/categories", label: "Categories", perm: ADMIN_PERMISSIONS.MANAGE_SETTINGS },
   { href: "/admin/orders", label: "Orders", perm: ADMIN_PERMISSIONS.MANAGE_USERS },
   { href: "/admin/refunds", label: "Refunds", perm: ADMIN_PERMISSIONS.MANAGE_USERS },
   { href: "/admin/promotions", label: "Promotions", perm: ADMIN_PERMISSIONS.MANAGE_PROMOTIONS },

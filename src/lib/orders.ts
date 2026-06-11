@@ -19,6 +19,7 @@ import {
   formatAttributeSelection,
   parseAttributeSelection,
 } from "@/lib/productAttributes";
+import { markRefereeQualified } from "@/lib/referrals";
 
 // How many days a buyer has to wait between payment and the option to
 // self-cancel an undelivered order. Conservative default — long enough for
@@ -208,6 +209,19 @@ export async function finalizePaidOrders(args: {
       );
     }
   }
+
+  // Referral qualification — each unique buyer in this checkout batch
+  // counts as a "first paid order" candidate. markRefereeQualified is
+  // idempotent (only awards on the first successful call per Referral
+  // row) so re-firing it for repeat buyers is safe.
+  const buyerIds = Array.from(new Set(pending.map((o) => o.buyerId)));
+  await Promise.all(
+    buyerIds.map((id) =>
+      markRefereeQualified(id).catch((err) =>
+        console.error("[referral:qualify] threw", { buyerId: id, err }),
+      ),
+    ),
+  );
 
   return {
     finalisedOrderIds: pending.map((o) => o.id),

@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { LocationPicker } from "@/components/forms/LocationPicker";
 import { CATEGORY_GROUPS } from "@/lib/enums";
 
-const INTEREST_OPTIONS = Object.values(CATEGORY_GROUPS).flat();
+// Seed list used until /api/categories returns. Replaced on mount with
+// the live admin-managed list (see RegisterForm body) so admin-added
+// categories appear in the interest picker for new signups.
+const SEED_INTEREST_OPTIONS = Object.values(CATEGORY_GROUPS).flat();
 
 type Gender = "female" | "male" | "nonbinary" | "prefer-not-to-say";
 
@@ -16,6 +19,20 @@ export function RegisterForm() {
   // aren't configured, the start endpoint surfaces an error — we don't hide
   // the button silently because that confused dev setup before.
   const router = useRouter();
+  // Referral capture — if landed via /register?ref=<code>, remember the
+  // code and forward it to /api/auth/register. Also drop a cookie so the
+  // Google OAuth round-trip survives the redirect to accounts.google.com.
+  const searchParams = useSearchParams();
+  const refFromUrl = searchParams?.get("ref") ?? "";
+  const [refCode] = useState(refFromUrl);
+  useEffect(() => {
+    if (refCode) {
+      // Cookie used by /api/auth/google/callback. 30-day window covers
+      // even slow oauth users.
+      document.cookie = `streekmart_ref=${encodeURIComponent(refCode)}; path=/; max-age=${30 * 24 * 60 * 60}`;
+    }
+  }, [refCode]);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -26,10 +43,29 @@ export function RegisterForm() {
   const [location, setLocation] = useState({ country: "", region: "", city: "" });
   const [gender, setGender] = useState<Gender | "">("");
   const [interests, setInterests] = useState<string[]>([]);
+  const [interestOptions, setInterestOptions] = useState<string[]>(SEED_INTEREST_OPTIONS);
   const [isSeller, setIsSeller] = useState(false);
   const [isDesigner, setIsDesigner] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/categories");
+        if (!res.ok) return;
+        const data = (await res.json()) as { categories?: Array<{ name: string }> };
+        if (cancelled || !data.categories?.length) return;
+        setInterestOptions(data.categories.map((c) => c.name));
+      } catch {
+        // stay with the seed list — non-fatal
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function toggleInterest(c: string) {
     setInterests((cur) => (cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]));
@@ -59,6 +95,7 @@ export function RegisterForm() {
           interests: interests.length > 0 ? interests : undefined,
           isSeller,
           isDesigner,
+          referralCode: refCode || undefined,
         }),
       });
       const data = await res.json();
@@ -197,7 +234,7 @@ export function RegisterForm() {
           <div className="mt-3">
             <label className="label">Interests</label>
             <div className="flex flex-wrap gap-1.5">
-              {INTEREST_OPTIONS.map((c) => {
+              {interestOptions.map((c) => {
                 const on = interests.includes(c);
                 return (
                   <button

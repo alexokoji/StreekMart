@@ -12,6 +12,7 @@ import { uniqueSlugFrom } from "@/lib/slug";
 import { isValidCountryCode } from "@/lib/location";
 import { sendEmail, welcomeEmail, emailVerificationEmail } from "@/lib/email";
 import { generateEmailVerificationToken } from "@/lib/emailVerification";
+import { ensureReferralCode, recordReferralOnSignup } from "@/lib/referrals";
 
 // Build the absolute URL we drop into the verification email so the click
 // path stays correct in dev (localhost), preview (vercel.app), and prod.
@@ -47,6 +48,10 @@ const Body = z.object({
   // with any client that doesn't send them. Used by recs + smart-suggestions.
   gender: z.enum(["female", "male", "nonbinary", "prefer-not-to-say"]).optional(),
   interests: z.array(z.string().min(1).max(80)).max(20).optional(),
+  // Referral code from /register?ref=<code>. Stored on the body so OAuth
+  // and password flows go through the same capture path. Empty/invalid
+  // codes are ignored silently — recordReferralOnSignup tolerates them.
+  referralCode: z.string().trim().min(4).max(12).optional(),
 });
 
 export async function POST(req: Request) {
@@ -59,7 +64,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { email, password, name, phone, businessName, country, city, region, isSeller, isDesigner, gender, interests } = parsed.data;
+  const { email, password, name, phone, businessName, country, city, region, isSeller, isDesigner, gender, interests, referralCode } = parsed.data;
   if (!isValidCountryCode(country.toUpperCase())) {
     return NextResponse.json({ error: "Pick a supported country" }, { status: 400 });
   }
@@ -126,6 +131,16 @@ export async function POST(req: Request) {
       cart: { create: {} },
     },
   });
+
+  // Provision the new user's own referral code so we can show it on
+  // their dashboard immediately. If a referrer code was passed in via
+  // ?ref=, record the relationship + award points to the referrer.
+  await ensureReferralCode(user.id);
+  if (referralCode) {
+    await recordReferralOnSignup({ newUserId: user.id, code: referralCode }).catch((err) =>
+      console.error("[referral:signup] threw", { code: referralCode, err }),
+    );
+  }
 
   // Sign the user in immediately so they can browse the site / cart while
   // checking their email. Unverified accounts surface a "please verify"

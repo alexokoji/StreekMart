@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/enums";
+import { Permission, ProductStatus } from "@/lib/enums";
+import { isValidCategory, kindForCategoryAsync } from "@/lib/categories";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
@@ -75,8 +76,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  // Category change → re-validate against allowlist + recompute kind.
-  if (parsed.data.category !== undefined && !CATEGORIES.includes(parsed.data.category)) {
+  // Category change → re-validate against the live admin-managed list +
+  // recompute kind.
+  if (
+    parsed.data.category !== undefined &&
+    !(await isValidCategory(parsed.data.category))
+  ) {
     return NextResponse.json(
       { error: `"${parsed.data.category}" is not an allowed fashion category.` },
       { status: 422 },
@@ -120,7 +125,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       // "explicitly cleared" (null) — only write the field when the caller
       // actually sent it.
       ...(salePrice !== undefined ? { salePrice: salePrice ?? null } : {}),
-      ...(rest.category ? { kind: kindForCategory(rest.category) } : {}),
+      ...(rest.category ? { kind: await kindForCategoryAsync(rest.category) } : {}),
       ...(images ? { imagesJson: JSON.stringify(images) } : {}),
       ...(sizes !== undefined ? { sizesJson: JSON.stringify(sizes) } : {}),
       ...(attributes !== undefined ? { attributesJson: JSON.stringify(attributes) } : {}),

@@ -2,12 +2,11 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  CATEGORIES,
-  CATEGORY_GROUPS,
   ProductKind,
   ProductStatus,
   PromotionStatus,
 } from "@/lib/enums";
+import { readActiveCategoryNames, readCategoryGroups } from "@/lib/categories";
 import { displaySellerName } from "@/lib/businessName";
 import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
@@ -38,13 +37,22 @@ export default async function HomePage({
   const user = await getCurrentUser();
   const now = new Date();
 
+  // Live admin-managed category list — drives both the CategoryRail's
+  // group ordering and the activeCategory validation. Pulled once and
+  // shared across the page so a single read covers every surface.
+  const [categoryGroups, activeCategoryNames] = await Promise.all([
+    readCategoryGroups(),
+    readActiveCategoryNames(),
+  ]);
+  const activeCategorySet = new Set(activeCategoryNames);
+
   // Optional URL-based filters — applied to every product rail on the page
   // so a click on the CategoryRail or LocationFilter narrows the home page
   // in place rather than punting to the feed.
   const country = searchParams.country?.toUpperCase().slice(0, 2);
   const city = searchParams.city?.trim();
   const activeCategory =
-    searchParams.category && CATEGORIES.includes(searchParams.category)
+    searchParams.category && activeCategorySet.has(searchParams.category)
       ? searchParams.category
       : null;
   const sellerWhere: Record<string, unknown> = {};
@@ -314,7 +322,7 @@ export default async function HomePage({
       </div>
 
       <section className="grid gap-4 lg:grid-cols-[14rem_1fr]">
-        <CategoryRail counts={categoryCounts} basePath="/" activeCategory={activeCategory} />
+        <CategoryRail counts={categoryCounts} groups={categoryGroups} basePath="/" activeCategory={activeCategory} />
 
         <div className="relative h-[300px] overflow-hidden rounded-2xl bg-g-aurora text-white shadow-soft sm:h-[360px] lg:h-[420px]">
           <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold-300/30 blur-3xl" />
@@ -416,7 +424,7 @@ export default async function HomePage({
           <div className="rounded-xl border border-ink-100 bg-white p-3">
             <LocationFilter />
           </div>
-          {(Object.entries(CATEGORY_GROUPS) as ReadonlyArray<readonly [string, readonly string[]]>).map(([group, items]) => (
+          {Object.entries(categoryGroups).map(([group, items]) => (
             <div key={group}>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-ink-500">{group}</p>
               <div className="flex flex-wrap gap-1.5">

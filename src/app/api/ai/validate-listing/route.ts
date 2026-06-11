@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Permission } from "@/lib/enums";
 import { requireApiUser } from "@/lib/auth";
-import { CATEGORIES, FASHION_VALIDATOR_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
+import { buildFashionValidatorSystem, chat, isAiEnabled } from "@/lib/ai";
+import { isValidCategory } from "@/lib/categories";
 
 // AI fashion-only listing validator. Called by the product create/edit form
 // and by the server-side product API to enforce that StreekMart never lists
@@ -29,9 +30,10 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  // 1. Hard category check — anything outside the allowlist is auto-rejected.
+  // 1. Hard category check — anything outside the live admin-managed
+  // allowlist is auto-rejected.
   const { name, description, category } = parsed.data;
-  if (!CATEGORIES.includes(category)) {
+  if (!(await isValidCategory(category))) {
     return NextResponse.json({
       allowed: false,
       reason: `"${category}" is not a fashion category on StreekMart.`,
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
   // 3. Ask the model for the semantic check.
   const userPrompt = `Name: ${name}\nCategory: ${category}\nDescription: ${description}`;
   const { text } = await chat({
-    system: FASHION_VALIDATOR_SYSTEM,
+    system: await buildFashionValidatorSystem(),
     maxTokens: 400,
     messages: [{ role: "user", content: userPrompt }],
     responseJsonSchema: {

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { CATEGORIES, Permission, ProductStatus, kindForCategory } from "@/lib/enums";
+import { Permission, ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { resolveActingOwner } from "@/lib/managersServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 import { AttributesSchema } from "@/lib/productAttributes";
-import { FASHION_VALIDATOR_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
+import { buildFashionValidatorSystem, chat, isAiEnabled } from "@/lib/ai";
+import { isValidCategory, kindForCategoryAsync } from "@/lib/categories";
 
 // GET /api/products?mine=1&category=&q=&kind=MATERIAL|PRODUCT
 export async function GET(req: Request) {
@@ -184,8 +185,8 @@ export async function POST(req: Request) {
   const salePriceStored: number | null = salePrice ?? null;
   void currency;
 
-  // 1. Hard category check (fashion-only allowlist).
-  if (!CATEGORIES.includes(category)) {
+  // 1. Hard category check — runs against the live admin-managed list.
+  if (!(await isValidCategory(category))) {
     return NextResponse.json(
       { error: `"${category}" is not an allowed fashion category.`, validation: { allowed: false, reason: `"${category}" is not an allowed fashion category.` } },
       { status: 422 },
@@ -209,7 +210,7 @@ export async function POST(req: Request) {
       price: priceStored,
       salePrice: salePriceStored,
       category,
-      kind: kindForCategory(category),
+      kind: await kindForCategoryAsync(category),
       status: status ?? ProductStatus.ACTIVE,
       stock: stock ?? 99,
       unit: unit ?? "piece",
@@ -234,7 +235,7 @@ async function validateListing(
 
   try {
     const { text } = await chat({
-      system: FASHION_VALIDATOR_SYSTEM,
+      system: await buildFashionValidatorSystem(),
       maxTokens: 400,
       messages: [
         { role: "user", content: `Name: ${name}\nCategory: ${category}\nDescription: ${description}` },

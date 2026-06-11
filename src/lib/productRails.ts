@@ -5,7 +5,7 @@
 // page of a given rail.
 
 import { prisma } from "./db";
-import { ProductKind, ProductStatus, PromotionStatus, CATEGORIES } from "./enums";
+import { ProductKind, ProductStatus, PromotionStatus } from "./enums";
 import { shapeProductForCard, rankScore } from "./productShape";
 import type { ProductCardData } from "@/components/storefront/ProductCard";
 
@@ -42,8 +42,13 @@ export type RailFilters = {
 function normalizeFilters(filters: RailFilters | undefined) {
   if (!filters) return {};
   const out: { category?: string; country?: string; city?: string } = {};
-  if (filters.category && CATEGORIES.includes(filters.category)) {
-    out.category = filters.category;
+  // Used to validate against the CATEGORIES const allowlist, but admins
+  // can now add categories at runtime via /admin/categories. We trim and
+  // pass through any non-empty value — if the user typed a junk category
+  // the rail just renders zero results, same UX as any failed filter.
+  if (filters.category) {
+    const t = filters.category.trim();
+    if (t.length > 0) out.category = t;
   }
   if (filters.country) {
     const c = filters.country.trim().toUpperCase().slice(0, 2);

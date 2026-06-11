@@ -5,7 +5,7 @@
 
 import { ProductStatus } from "./enums";
 import { prisma } from "./db";
-import { CONCIERGE_SYSTEM, CONCIERGE_TOOLS } from "./ai";
+import { buildConciergeSystem, buildConciergeTools } from "./ai";
 import { chat, type ChatTurn } from "./llm";
 import { parseJsonArray } from "./utils";
 
@@ -47,10 +47,17 @@ export async function runConcierge(args: {
   }));
   const cards = new Map<string, ConciergeProductCard>();
 
+  // Build prompt + tools once per turn — both are cached in-process
+  // (PROMPT_TTL_MS) so this is a hot-path memo lookup most of the time.
+  const [conciergeSystem, conciergeTools] = await Promise.all([
+    buildConciergeSystem(),
+    buildConciergeTools(),
+  ]);
+
   for (let i = 0; i < MAX_LOOP_ITERATIONS; i++) {
     const result = await chat({
-      system: CONCIERGE_SYSTEM,
-      tools: CONCIERGE_TOOLS,
+      system: conciergeSystem,
+      tools: conciergeTools,
       messages: turns,
       maxTokens: 2048,
     });

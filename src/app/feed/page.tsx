@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { CATEGORIES } from "@/lib/enums";
 import { rankScore } from "@/lib/ranking";
 import { isAiEnabled } from "@/lib/ai";
+import { readActiveCategoryNames } from "@/lib/categories";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { buildWatermarkedUrl } from "@/lib/cloudinaryUrl";
 import { PostCard } from "@/components/feed/PostCard";
@@ -20,7 +20,10 @@ export default async function FeedPage({
 }) {
   const user = await getCurrentUser();
   const now = new Date();
-  const category = searchParams.category && CATEGORIES.includes(searchParams.category)
+  // Live admin-managed category list — used for both the filter validation
+  // and the chip rail below the hero.
+  const activeCategories = await readActiveCategoryNames();
+  const category = searchParams.category && activeCategories.includes(searchParams.category)
     ? searchParams.category
     : null;
 
@@ -122,7 +125,7 @@ export default async function FeedPage({
       <div className="card p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-ink-500">Categories</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {CATEGORIES.slice(0, 12).map((c) => (
+          {activeCategories.slice(0, 12).map((c) => (
             <Link
               key={c}
               href={`/feed?category=${encodeURIComponent(c)}`}

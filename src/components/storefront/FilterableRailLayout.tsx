@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ProductStatus } from "@/lib/enums";
+import { readCategoryGroups } from "@/lib/categories";
 import { CategoryRail } from "./CategoryRail";
 import { LocationFilter } from "./LocationFilter";
 
@@ -33,14 +34,17 @@ export async function FilterableRailLayout({
   const sellerWhere: Record<string, unknown> = {};
   if (locationFilter.country) sellerWhere.country = locationFilter.country;
   if (locationFilter.city) sellerWhere.city = { equals: locationFilter.city };
-  const grouped = await prisma.product.groupBy({
-    by: ["category"],
-    where: {
-      status: ProductStatus.ACTIVE,
-      ...(Object.keys(sellerWhere).length > 0 ? { seller: sellerWhere } : {}),
-    },
-    _count: { _all: true },
-  });
+  const [grouped, categoryGroups] = await Promise.all([
+    prisma.product.groupBy({
+      by: ["category"],
+      where: {
+        status: ProductStatus.ACTIVE,
+        ...(Object.keys(sellerWhere).length > 0 ? { seller: sellerWhere } : {}),
+      },
+      _count: { _all: true },
+    }),
+    readCategoryGroups(),
+  ]);
   const categoryCounts = new Map(grouped.map((g) => [g.category, g._count._all]));
 
   return (
@@ -60,6 +64,7 @@ export async function FilterableRailLayout({
       <section className="grid gap-4 lg:grid-cols-[14rem_1fr]">
         <CategoryRail
           counts={categoryCounts}
+          groups={categoryGroups}
           basePath={basePath}
           activeCategory={activeCategory}
         />

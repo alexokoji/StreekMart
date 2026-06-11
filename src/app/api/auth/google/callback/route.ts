@@ -11,6 +11,13 @@ import {
 import { uniqueSlugFrom } from "@/lib/slug";
 import { sendEmail, welcomeEmail, emailVerificationEmail } from "@/lib/email";
 import { generateEmailVerificationToken } from "@/lib/emailVerification";
+import { ensureReferralCode, recordReferralOnSignup } from "@/lib/referrals";
+
+// Short-lived cookie set on /register?ref=<code> so the code survives the
+// Google OAuth round-trip (the redirect to accounts.google.com would lose
+// any state we kept on the page). Read here AFTER user.create so the
+// signup branch can credit the referrer.
+const REF_COOKIE = "streekmart_ref";
 
 export const runtime = "nodejs";
 
@@ -107,6 +114,15 @@ export async function GET(req: Request) {
       },
     });
     isNewSignup = true;
+    // Provision the new user's referral code + capture any inbound code.
+    await ensureReferralCode(user.id);
+    const inboundCode = cookies().get(REF_COOKIE)?.value;
+    if (inboundCode) {
+      await recordReferralOnSignup({ newUserId: user.id, code: inboundCode }).catch((err) =>
+        console.error("[referral:google] threw", { code: inboundCode, err }),
+      );
+      cookies().set(REF_COOKIE, "", { path: "/", maxAge: 0 });
+    }
   } else {
     // Lazy-provision a cart for older accounts.
     await prisma.cart.upsert({

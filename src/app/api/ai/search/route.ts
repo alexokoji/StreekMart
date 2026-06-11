@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
-import { CATEGORIES, SMART_SEARCH_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
+import { buildSmartSearchSystem, chat, isAiEnabled } from "@/lib/ai";
+import { readActiveCategoryNames } from "@/lib/categories";
 import { getSession } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
 import {
@@ -25,8 +26,10 @@ const AllowedOccasions = [
   "formal", "gym", "date", "sleep", "rain", "winter", "summer",
 ] as const;
 
+// Category validation is now runtime — admins can add categories at
+// /admin/categories so a baked-in z.enum can't reflect the live set.
 const SearchPlan = z.object({
-  categories: z.array(z.enum(CATEGORIES)).max(3),
+  categories: z.array(z.string().min(1).max(40)).max(3),
   keywords: z.array(z.string().min(2).max(40)).max(12),
   materials: z.array(z.string().min(2).max(40)).max(6).optional().default([]),
   colors: z.array(z.string().min(2).max(40)).max(6).optional().default([]),
@@ -50,15 +53,21 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const rawQuery = parsed.data.query;
 
-  // 1. Ask the LLM to extract structured intent.
+  // 1. Ask the LLM to extract structured intent. The category enum in the
+  // response schema is the live admin-managed list so the model can pick
+  // any category an admin added without a code change.
+  const [smartSearchSystem, activeCategories] = await Promise.all([
+    buildSmartSearchSystem(),
+    readActiveCategoryNames(),
+  ]);
   const { text } = await chat({
-    system: SMART_SEARCH_SYSTEM,
+    system: smartSearchSystem,
     maxTokens: 600,
     messages: [{ role: "user", content: rawQuery }],
     responseJsonSchema: {
       type: "object",
       properties: {
-        categories: { type: "array", items: { type: "string", enum: [...CATEGORIES] } },
+        categories: { type: "array", items: { type: "string", enum: activeCategories } },
         keywords: { type: "array", items: { type: "string" } },
         materials: { type: "array", items: { type: "string" } },
         colors: { type: "array", items: { type: "string" } },
@@ -79,6 +88,11 @@ export async function POST(req: Request) {
       { status: 422 },
     );
   }
+  // Drop any category the model invented that isn't actually active — the
+  // schema enum should have prevented this, but Groq's json_object mode
+  // is advisory rather than strict.
+  const liveCategorySet = new Set(activeCategories);
+  plan.categories = plan.categories.filter((c) => liveCategorySet.has(c));
 
   // 2. Synthesize a ParsedQuery the existing ranker understands. Lowercase
   // everything so substring matching is case-insensitive (the ranker

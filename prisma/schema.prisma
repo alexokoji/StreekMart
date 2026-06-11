@@ -180,6 +180,14 @@ model User {
   preordersAsBuyer      Preorder[] @relation("BuyerPreorders")
   preordersAsDesigner   Preorder[] @relation("DesignerPreorders")
   collections           Collection[]
+  // Referral program — every user gets a code at signup (see lib/referrals.ts).
+  // pointsBalance is the running total maintained alongside the ledger so the
+  // dashboard doesn't have to sum the whole ledger on every render.
+  referralCode          String?     @unique
+  pointsBalance         Int         @default(0)
+  referralsByMe         Referral[]  @relation("ReferralsByMe")
+  myReferrer            Referral?   @relation("MyReferrer")
+  pointsLedger          PointsLedger[]
 }
 
 // Expo push tokens. One row per device — the same user may install on
@@ -448,6 +456,78 @@ model EmailBroadcast {
   createdAt   DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// -------------------- Categories --------------------
+// Admin-managed category list. The legacy CATEGORY_GROUPS const in
+// src/lib/enums.ts is the seed; admins can add new categories from
+// /admin/categories without a code change. Products reference categories
+// by their `name` (not id) so existing rows keep working.
+
+model Category {
+  id           String   @id @default(cuid())
+  // Display name — must be unique. Used as the literal value stored on
+  // Product.category, Post tags, AI prompts, search filters. Renaming an
+  // existing category currently breaks references; the admin UI surfaces
+  // a warning before allowing a rename.
+  name         String   @unique
+  // Group for the homepage category rail: Materials | Clothing |
+  // Accessories | Beauty | (admin can introduce new groups freely).
+  groupName    String   @default("Clothing")
+  // Drives storefront sort order within the group. Lower = earlier.
+  displayOrder Int      @default(100)
+  // Lets admins retire a category without deleting it. Disabled categories
+  // hide from buyer-facing dropdowns but the historical Product.category
+  // values keep resolving.
+  enabled      Boolean  @default(true)
+  // Categorisation kind — when an admin adds a fabric category we want
+  // products created in it to land on the Materials rail. Mirrors the
+  // kindForCategory() switch in enums.ts. Values: "MATERIAL" | "PRODUCT".
+  kind         String   @default("PRODUCT")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// -------------------- Referrals & points --------------------
+// Each user gets a referral code at signup. When a new user signs up with
+// `?ref=<code>` we record the relationship and credit points to the
+// referrer (and optionally to the new user). Points are spendable later
+// (rules tbd); this schema just bookkeeps balance + ledger.
+
+model Referral {
+  id           String   @id @default(cuid())
+  // Who invited the new user.
+  referrerId   String
+  referrer     User     @relation("ReferralsByMe", fields: [referrerId], references: [id], onDelete: Cascade)
+  // The new user who signed up via the referrer's code.
+  refereeId    String   @unique
+  referee      User     @relation("MyReferrer", fields: [refereeId], references: [id], onDelete: Cascade)
+  // Snapshot of the code at capture time so a later code-change on the
+  // referrer doesn't rewrite history.
+  codeUsed     String
+  // Whether the referee has reached the "qualified" milestone (first
+  // completed order). Drives when the milestone bonus pays out.
+  qualifiedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([referrerId])
+}
+
+model PointsLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Positive credit / negative debit.
+  delta     Int
+  // Human-readable reason: "referral:signup", "referral:qualified",
+  // "spend:order:<id>", "admin:adjust", etc.
+  reason    String
+  // Optional pointer to the source entity (referral id, order id, etc.) so
+  // the admin UI can link straight to the cause.
+  refId     String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // -------------------- Products --------------------

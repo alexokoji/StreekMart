@@ -1,5 +1,4 @@
 import { getCurrentUser } from "@/lib/auth";
-import { CATEGORIES } from "@/lib/enums";
 import { fetchRailPage, fetchSavedIdsFor, type RailFilters } from "@/lib/productRails";
 import { InfiniteProductGrid } from "@/components/storefront/InfiniteProductGrid";
 import { FilterableRailLayout } from "@/components/storefront/FilterableRailLayout";
@@ -19,9 +18,7 @@ export default async function FlashSalesPage({
 }) {
   const user = await getCurrentUser();
   const filters: RailFilters = {
-    category: searchParams.category && CATEGORIES.includes(searchParams.category)
-      ? searchParams.category
-      : null,
+    category: searchParams.category ?? null,
     country: searchParams.country ?? null,
     city: searchParams.city ?? null,
   };

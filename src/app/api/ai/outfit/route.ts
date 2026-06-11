@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import { CATEGORIES, OUTFIT_PAIRING_SYSTEM, chat, isAiEnabled } from "@/lib/ai";
+import { buildOutfitPairingSystem, chat, isAiEnabled } from "@/lib/ai";
+import { readActiveCategoryNames } from "@/lib/categories";
 
 // AI outfit pairing — given a product, suggest 3 ways to style it.
 // Public: no auth required (improves discovery for guests).
@@ -12,7 +13,10 @@ const Pairings = z.object({
   pairings: z
     .array(
       z.object({
-        category: z.enum(CATEGORIES),
+        // Validated at runtime against the live category list rather than
+        // a baked-in z.enum so admin-added categories work without a code
+        // change.
+        category: z.string().min(1).max(40),
         idea: z.string().min(5).max(220),
       }),
     )
@@ -37,8 +41,12 @@ export async function POST(req: Request) {
 Category: ${product.category}
 Description: ${product.description}`;
 
+  const [outfitSystem, activeCategories] = await Promise.all([
+    buildOutfitPairingSystem(),
+    readActiveCategoryNames(),
+  ]);
   const { text } = await chat({
-    system: OUTFIT_PAIRING_SYSTEM,
+    system: outfitSystem,
     maxTokens: 600,
     messages: [{ role: "user", content: userPrompt }],
     responseJsonSchema: {
@@ -49,7 +57,7 @@ Description: ${product.description}`;
           items: {
             type: "object",
             properties: {
-              category: { type: "string", enum: [...CATEGORIES] },
+              category: { type: "string", enum: activeCategories },
               idea: { type: "string" },
             },
             required: ["category", "idea"],
@@ -62,6 +70,10 @@ Description: ${product.description}`;
 
   try {
     const data = Pairings.parse(JSON.parse(text));
+    // Drop pairings whose category isn't in the live list (defensive
+    // against an off-schema response from a non-strict provider).
+    const live = new Set(activeCategories);
+    data.pairings = data.pairings.filter((p) => live.has(p.category));
     return NextResponse.json(data);
   } catch {
     return NextResponse.json({ error: "Couldn't generate pairings." }, { status: 422 });
