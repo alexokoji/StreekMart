@@ -6,6 +6,11 @@ import { useEffect, useState } from "react";
 // time; renders "Ended" past it. Updates every 1s. The "Flash sales"
 // rail uses this with target=end-of-day so the user sees urgency on
 // every visit without us needing a per-product saleEndsAt column.
+//
+// NB: helpers like end-of-day live in src/lib/time.ts so server
+// components can import them. Importing plain functions from a
+// "use client" module breaks SSR -- Next.js replaces them with a
+// non-callable client reference proxy.
 export function CountdownTimer({
   target,
   label,
@@ -32,10 +37,4 @@ export function CountdownTimer({
       <span>{String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}</span>
     </span>
   );
-}
-
-// Helper for the flash sales rail: end of the current UTC day.
-export function endOfTodayMs(): number {
-  const d = new Date();
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 }

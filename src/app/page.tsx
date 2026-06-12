@@ -16,7 +16,8 @@ import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
 import { PopularCategoryCards } from "@/components/storefront/PopularCategoryCards";
 import { FlashSalesCarousel } from "@/components/storefront/FlashSalesCarousel";
-import { CountdownTimer, endOfTodayMs } from "@/components/CountdownTimer";
+import { CountdownTimer } from "@/components/CountdownTimer";
+import { endOfTodayMs } from "@/lib/time";
 import {
   PreorderDesignsRail,
   type PreorderDesignCard,
