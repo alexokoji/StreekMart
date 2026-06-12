@@ -59,13 +59,8 @@ export function PreorderDesignsRail({
             </div>
             <div className="p-2.5">
               <p className="line-clamp-1 text-sm font-semibold">{c.title}</p>
-              <Link
-                href={`/u/${c.designerSlug ?? c.designerId}`}
-                onClick={(e) => e.stopPropagation()}
-                className="line-clamp-1 text-[11px] text-ink-500 hover:underline"
-              >
-                {c.designerName}
-              </Link>
+              {/* nested Link removed */}
+              <p className="line-clamp-1 text-[11px] text-ink-500">{c.designerName}</p>
               <div className="mt-1.5 flex items-center justify-between">
                 <span className="text-sm font-bold text-violet-700">
                   ₦{(c.priceCents / 100).toLocaleString("en-NG")}
