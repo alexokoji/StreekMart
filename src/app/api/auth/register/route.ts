@@ -26,31 +26,31 @@ function siteOrigin(): string {
 //
 // Location (country + city) is required at signup so we can match buyers
 // with nearby sellers and apply the right delivery rate at checkout. Region
-// (state/province) is optional — useful in larger countries.
+// (state/province) is optional â€” useful in larger countries.
 const Body = z.object({
   email: z.string().email(),
   password: z.string().min(8, "Password must be at least 8 characters"),
   name: z.string().min(2),
-  // Required for everyone — phone is the platform's contact channel for
+  // Required for everyone â€” phone is the platform's contact channel for
   // delivery + order updates.
   phone: z
     .string()
     .regex(/^[+]?[\d\s().-]{7,20}$/, "Enter a valid phone number"),
   // Required when isSeller is true (further-validated below). Sellers can't
-  // list a product without one — buyers identify shops by their business name.
+  // list a product without one â€” buyers identify shops by their business name.
   businessName: z.string().min(2).max(80).optional(),
   country: z.string().length(2, "Pick a country"),
   city: z.string().min(2, "Enter your city").max(80),
   region: z.string().max(80).optional(),
   isSeller: z.boolean().optional().default(false),
   isDesigner: z.boolean().optional().default(false),
-  // Taste signal collected at signup. Both optional — backwards-compatible
+  // Taste signal collected at signup. Both optional â€” backwards-compatible
   // with any client that doesn't send them. Used by recs + smart-suggestions.
   gender: z.enum(["female", "male", "nonbinary", "prefer-not-to-say"]).optional(),
   interests: z.array(z.string().min(1).max(80)).max(20).optional(),
   // Referral code from /register?ref=<code>. Stored on the body so OAuth
   // and password flows go through the same capture path. Empty/invalid
-  // codes are ignored silently — recordReferralOnSignup tolerates them.
+  // codes are ignored silently â€” recordReferralOnSignup tolerates them.
   referralCode: z.string().trim().min(4).max(12).optional(),
 });
 
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
   }
 
   // Sellers must register with a business name. We allow non-sellers to
-  // skip it — they may still set one later if they enable seller permission.
+  // skip it â€” they may still set one later if they enable seller permission.
   if (isSeller && !businessName) {
     return NextResponse.json(
       { error: "Sellers must enter a business name." },
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
   }
 
   // Auto-generate a memorable handle from the user's name. Collision-safe
-  // — uniqueSlugFrom appends -2, -3, etc. as needed.
+  // â€” uniqueSlugFrom appends -2, -3, etc. as needed.
   const slug = await uniqueSlugFrom(name);
 
   // Generate the email-verification token alongside the account itself so
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
       isDesigner,
       emailVerificationToken: verification.token,
       emailVerificationTokenExpiresAt: verification.expiresAt,
-      // Provision an empty cart up front — every account is a buyer.
+      // Provision an empty cart up front â€” every account is a buyer.
       cart: { create: {} },
     },
   });
@@ -145,7 +145,10 @@ export async function POST(req: Request) {
   // Sign the user in immediately so they can browse the site / cart while
   // checking their email. Unverified accounts surface a "please verify"
   // banner from the layout but aren't otherwise restricted.
-  await setSessionCookie({
+  // Returned in the response body so the mobile client (which cannot
+  // read the httpOnly cookie from a fetch) can store the JWT in
+  // SecureStore. Web flow keeps using the cookie.
+  const sessionToken = await setSessionCookie({
     sub: user.id,
     email: user.email,
     name: user.name,
@@ -153,7 +156,7 @@ export async function POST(req: Request) {
     isDesigner: user.isDesigner,
   });
 
-  // Welcome email + verification email — fire-and-forget. Stub mode (no
+  // Welcome email + verification email â€” fire-and-forget. Stub mode (no
   // RESEND_API_KEY) just logs to stdout, so dev signups never fail because
   // email isn't wired. Log failures so prod incidents are debuggable;
   // signup still succeeds.
@@ -175,10 +178,13 @@ export async function POST(req: Request) {
     .catch((err) => console.error("[email:verify] threw", { to: user.email, err }));
 
   return NextResponse.json({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    isSeller: user.isSeller,
-    isDesigner: user.isDesigner,
+    token: sessionToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      isSeller: user.isSeller,
+      isDesigner: user.isDesigner,
+    },
   });
 }

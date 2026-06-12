@@ -5,12 +5,13 @@ import { requireUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { ReferralCard } from "@/components/ReferralCard";
+import { DailyCheckIn } from "@/components/DailyCheckIn";
 import { ensureReferralCode } from "@/lib/referrals";
 
 // /account is the buyer dashboard. Sellers and designers have their own
 // dashboards; we forward them there so the avatar chip lands on the right
 // surface every time. A user with both Seller AND Designer permissions stays
-// here so they can pick which dashboard to enter — landing them automatically
+// here so they can pick which dashboard to enter â€” landing them automatically
 // on either one would be wrong.
 export default async function AccountPage() {
   const user = await requireUser();
@@ -57,6 +58,10 @@ export default async function AccountPage() {
       <div className="flex flex-wrap gap-2 text-sm">
         <Link href="/account/orders" className="btn-secondary">My orders</Link>
         <Link href="/account/preorders" className="btn-secondary">My preorders</Link>
+        <Link href="/account/notifications" className="btn-secondary">Notifications</Link>
+        <Link href="/account/payment-methods" className="btn-secondary">Payment methods</Link>
+        <Link href="/account/coupons" className="btn-secondary">Coupons</Link>
+        <Link href="/account/addresses" className="btn-secondary">Addresses</Link>
       </div>
 
       <ReferralCard
@@ -65,6 +70,8 @@ export default async function AccountPage() {
         referralCount={referralCount}
         siteUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://www.streekmart.online"}
       />
+
+      <DailyCheckIn />
 
       <section className="card p-6">
         <div className="flex items-center justify-between">

@@ -14,7 +14,7 @@ export function LoginForm({
 }) {
   // Google button is always rendered. If GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
   // aren't set, /api/auth/google/start returns an error and the page surfaces
-  // it via ?error= — better than silently hiding the button (the previous
+  // it via ?error= â€” better than silently hiding the button (the previous
   // behaviour confused dev setup).
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -59,8 +59,11 @@ export function LoginForm({
           <input id="password" type="password" required className="input" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         {err && <p className="text-sm text-red-600">{err}</p>}
+        <div className="text-right">
+          <Link href="/forgot-password" className="text-xs text-brand-700 hover:underline">Forgot your password?</Link>
+        </div>
         <button type="submit" className="btn-primary w-full" disabled={loading}>
-          {loading ? "Signing in…" : "Sign in"}
+          {loading ? "Signing inâ€¦" : "Sign in"}
         </button>
       </form>
 

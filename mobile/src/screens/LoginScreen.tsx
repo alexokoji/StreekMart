@@ -61,6 +61,9 @@ export function LoginScreen() {
         />
       </View>
 
+      <Pressable onPress={() => nav.navigate("ForgotPassword")} style={{ marginTop: 8, alignItems: "flex-end" }}>
+        <Text style={[type.small, { color: t.accent, fontWeight: "600" }]}>Forgot your password?</Text>
+      </Pressable>
       <Button
         label="Sign in"
         loading={signingIn}

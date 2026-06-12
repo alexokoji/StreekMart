@@ -197,7 +197,7 @@ export async function POST(req: Request) {
   const totalCents = Math.round(orders.reduce((s, o) => s + o.totalPrice, 0) * 100);
 
   // Buyer pays the full amount directly. Wallet is only for seller payouts and refunds.
-  const remainingCents = totalCents;
+  let remainingCents = totalCents;
 
   // If the wallet fully covers the order, finalise immediately. No gateway
   // hop, no live-mode check — the buyer already paid (with refund credit)
@@ -245,7 +245,46 @@ export async function POST(req: Request) {
     }
   }
 
-  if (!isStubMode) {
+  // -------- Promo code application --------
+  // We validate the code once here, deduct the discount from the amount
+  // sent to the gateway (so the buyer pays less), and record a redemption
+  // tagged with the paymentReference after the gateway hand-off succeeds.
+  // Seller payouts stay calculated against the original totalPrice -- the
+  // platform absorbs the discount.
+  let promoDiscountCents = 0;
+  let promoForRedemption: { id: string; userId: string } | null = null;
+  const submittedPromoCode = parsed.data.promoCode?.trim().toUpperCase();
+  if (submittedPromoCode) {
+    const promo = await prisma.promoCode.findUnique({ where: { code: submittedPromoCode } });
+    if (promo && promo.enabled) {
+      const now = new Date();
+      const active = (!promo.startsAt || promo.startsAt <= now) && (!promo.endsAt || promo.endsAt >= now);
+      const subtotalCents = remainingCents; // pre-gateway amount
+      const meetsMin = !promo.minSubtotalCents || subtotalCents >= promo.minSubtotalCents;
+      const totalUses = promo.usageLimit ? await prisma.promoCodeRedemption.count({ where: { promoCodeId: promo.id } }) : 0;
+      const myUses = await prisma.promoCodeRedemption.count({ where: { promoCodeId: promo.id, userId: guard.session.sub } });
+      const underTotalCap = !promo.usageLimit || totalUses < promo.usageLimit;
+      const underPerUserCap = myUses < promo.perUserLimit;
+      if (active && meetsMin && underTotalCap && underPerUserCap) {
+        if (promo.kind === "FLAT") {
+          promoDiscountCents = promo.value;
+        } else if (promo.kind === "PERCENT") {
+          promoDiscountCents = Math.round((subtotalCents * promo.value) / 10_000);
+          if (promo.maxDiscountCents && promoDiscountCents > promo.maxDiscountCents) promoDiscountCents = promo.maxDiscountCents;
+        }
+        if (promoDiscountCents > subtotalCents) promoDiscountCents = subtotalCents;
+        if (promoDiscountCents > 0) {
+          promoForRedemption = { id: promo.id, userId: guard.session.sub };
+          remainingCents = subtotalCents - promoDiscountCents;
+        }
+      }
+    }
+  }
+
+  // promoApplied: flag for the subsequent redemption recording.
+  const promoApplied = promoForRedemption !== null;
+
+    if (!isStubMode) {
     try {
       const gateway = getGatewaySelector();
       const txn = await gateway.initCheckout({
@@ -256,6 +295,16 @@ export async function POST(req: Request) {
         paymentReference,
         redirectUrl: buildRedirectUrl(req, paymentReference),
       });
+      if (promoApplied && promoForRedemption) {
+        await prisma.promoCodeRedemption.create({
+          data: {
+            promoCodeId: promoForRedemption.id,
+            userId: promoForRedemption.userId,
+            paymentReference,
+            discountCents: promoDiscountCents,
+          },
+        });
+      }
       return NextResponse.json({
         ok: true,
         paymentReference,
@@ -278,6 +327,16 @@ export async function POST(req: Request) {
 
   // Stub mode: short-circuit straight through to PAID via the same helper
   // the webhook calls. Keeps the post-payment side effects in one place.
+  if (promoApplied && promoForRedemption) {
+    await prisma.promoCodeRedemption.create({
+      data: {
+        promoCodeId: promoForRedemption.id,
+        userId: promoForRedemption.userId,
+        paymentReference,
+        discountCents: promoDiscountCents,
+      },
+    });
+  }
   await finalizePaidOrders({ paymentReference, paymentTxnRef: `STUB_${paymentReference}` });
   return NextResponse.json({
     ok: true,

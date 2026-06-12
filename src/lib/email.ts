@@ -1,6 +1,6 @@
 // Email sender + transactional templates.
 //
-// Provider: Resend (https://resend.com — 3,000 emails / month free).
+// Provider: Resend (https://resend.com â€” 3,000 emails / month free).
 //
 // Stub mode (no RESEND_API_KEY): logs the email to stdout instead of
 // sending. Mirrors the Monnify stub pattern so devs can run the whole
@@ -17,7 +17,7 @@ export function isEmailEnabled(): boolean {
 
 function fromAddress(): string {
   // Override with EMAIL_FROM in production once you've set up a verified
-  // sending domain on Resend. The default works for testing only — Resend
+  // sending domain on Resend. The default works for testing only â€” Resend
   // restricts the onresend.com address to your own account email.
   return process.env.EMAIL_FROM ?? "StreekMart <onboarding@resend.dev>";
 }
@@ -47,11 +47,11 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
   const toList = Array.isArray(args.to) ? args.to : [args.to];
 
   if (!isEmailEnabled()) {
-    // Stub mode — print + pretend we sent. Useful for dev / CI.
+    // Stub mode â€” print + pretend we sent. Useful for dev / CI.
     // In prod this line is the smoking gun for "emails not arriving":
     // RESEND_API_KEY isn't set on the Vercel env.
     console.warn(
-      "[email:stub] RESEND_API_KEY not set — email NOT sent.",
+      "[email:stub] RESEND_API_KEY not set â€” email NOT sent.",
       { to: toList, subject: args.subject },
     );
     return { ok: true, id: "stub-" + Date.now() };
@@ -95,7 +95,7 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
 // Resolve a recipient set for an admin broadcast.
 //
 // SPECIFIC takes an array of User IDs. EMAILS takes an array of email
-// addresses — useful when the admin already has the addresses (e.g. CSV
+// addresses â€” useful when the admin already has the addresses (e.g. CSV
 // export, support ticket) and doesn't want to look up IDs first. Unknown
 // addresses are still included as send targets so a "blast to my mailing
 // list" use case works even for non-users.
@@ -154,7 +154,7 @@ export async function resolveAudienceEmails(
       where.id = { in: specificIds };
       break;
   }
-  // Never blast to suspended accounts — they can't sign in or interact
+  // Never blast to suspended accounts â€” they can't sign in or interact
   // with the platform, and sending them content would just generate
   // bounce / unsubscribe noise.
   where.suspendedAt = null;
@@ -168,7 +168,7 @@ export async function resolveAudienceEmails(
 // ---------- Templates ----------
 
 function wrap(content: string): string {
-  // Tiny inline-styled wrapper — most email clients strip <head>/<style>
+  // Tiny inline-styled wrapper â€” most email clients strip <head>/<style>
   // tags, so inline is the safest path. Keep this minimal; design lives in
   // the app, not the inbox.
   //
@@ -177,7 +177,7 @@ function wrap(content: string): string {
   // from blowing up if a client ignores height. alt text falls back to the
   // brand name when images are blocked (common default in Outlook / Gmail).
   // Square icon (the bag mark) reads better in email clients than the wide
-  // wordmark — Gmail/Outlook clamp wide images at narrow widths and the
+  // wordmark â€” Gmail/Outlook clamp wide images at narrow widths and the
   // wordmark would end up unreadable. The brand name is in the subject
   // line and the footer, so we don't lose recognition.
   const logoSrc = `${appUrl()}/icon.png`;
@@ -199,18 +199,18 @@ export function welcomeEmail(name: string): { subject: string; html: string; tex
   return {
     subject: `Welcome to ${SITE}, ${name}!`,
     html: wrap(`
-      <p>Hey ${escapeHtml(name)} 👋</p>
-      <p>Welcome aboard. ${SITE} is the home for fabrics, ready-to-wear, and independent designers — and you're now part of it.</p>
+      <p>Hey ${escapeHtml(name)} ðŸ‘‹</p>
+      <p>Welcome aboard. ${SITE} is the home for fabrics, ready-to-wear, and independent designers â€” and you're now part of it.</p>
       <p style="margin-top:24px;"><a href="${appUrl()}" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">Browse the storefront</a></p>
-      <p style="margin-top:24px; color:#525258;">If you signed up to sell or design, head to your dashboard to request verification — it's required before you can list products.</p>
+      <p style="margin-top:24px; color:#525258;">If you signed up to sell or design, head to your dashboard to request verification â€” it's required before you can list products.</p>
     `),
     text: `Welcome to ${SITE}, ${name}! Visit ${appUrl()} to start browsing. Sellers/designers must verify before listing.`,
   };
 }
 
 // Confirm-your-email message. Sent on signup for both password and Google
-// sign-ups. The link routes to /verify-email?token=… which marks the User
-// row's `emailVerifiedAt`. We send to Google users too — even though Google
+// sign-ups. The link routes to /verify-email?token=â€¦ which marks the User
+// row's `emailVerifiedAt`. We send to Google users too â€” even though Google
 // has already vetted the address, having the user click confirms they
 // actually received the email and that delivery channel works for future
 // transactional messages (order codes, etc.).
@@ -219,7 +219,7 @@ export function emailVerificationEmail(opts: {
   verificationLink: string;
 }): { subject: string; html: string; text: string } {
   return {
-    subject: `Verify your email — ${SITE}`,
+    subject: `Verify your email â€” ${SITE}`,
     html: wrap(`
       <p>Hey ${escapeHtml(opts.name)},</p>
       <p>One quick step before you're all set: confirm this is your email
@@ -239,13 +239,41 @@ export function emailVerificationEmail(opts: {
   };
 }
 
+// Password-reset email. Generated when a user posts to
+// /api/auth/forgot-password. Link carries a single-use token consumed by
+// /api/auth/reset-password. Expires after 60 minutes -- short window
+// because the token is broadcast in cleartext via email.
+export function passwordResetEmail(opts: {
+  name: string;
+  resetLink: string;
+}): { subject: string; html: string; text: string } {
+  return {
+    subject: `Reset your password -- ${SITE}`,
+    html: wrap(`
+      <p>Hey ${escapeHtml(opts.name)},</p>
+      <p>We received a request to reset your password. Tap the button below to choose a new one.</p>
+      <p style="margin-top:24px;">
+        <a href="${opts.resetLink}" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">Reset password</a>
+      </p>
+      <p style="margin-top:16px; font-size:12px; color:#737378;">
+        Or paste this URL into your browser:<br/>
+        <span style="word-break:break-all;">${escapeHtml(opts.resetLink)}</span>
+      </p>
+      <p style="margin-top:24px; color:#525258;">The link expires in 60 minutes.
+        If you didn&rsquo;t ask for a reset, you can safely ignore this
+        email -- your password stays unchanged.</p>
+    `),
+    text: `Reset your ${SITE} password by visiting: ${opts.resetLink} (expires in 60 minutes).`,
+  };
+}
+
 export function orderPlacedEmail(opts: {
   name: string;
   orderId: string;
   productName: string;
   deliveryCode: string | null;
   totalDisplay: string;
-  /** Pre-formatted "Color: Blue · Size: M" string. Empty when the
+  /** Pre-formatted "Color: Blue Â· Size: M" string. Empty when the
    *  product had no buyer-selectable variants. */
   variantSummary?: string;
 }): { subject: string; html: string; text: string } {
@@ -256,7 +284,7 @@ export function orderPlacedEmail(opts: {
          <div style="margin-top:8px; font-size:11px; color:#737378;">Share with the dispatch rider on arrival.</div>
        </div>`
     : "";
-  // Variant subline — only renders when the buyer made a real pick.
+  // Variant subline â€” only renders when the buyer made a real pick.
   // Surfaced as a styled <p> so it reads as a distinct fact rather than
   // floating after the product name.
   const variantBlock = opts.variantSummary
@@ -265,16 +293,16 @@ export function orderPlacedEmail(opts: {
        </p>`
     : "";
   return {
-    subject: `Order placed — ${opts.productName}`,
+    subject: `Order placed â€” ${opts.productName}`,
     html: wrap(`
       <p>Hi ${escapeHtml(opts.name)},</p>
       <p>Your order for <strong>${escapeHtml(opts.productName)}</strong> is confirmed. Total: <strong>${escapeHtml(opts.totalDisplay)}</strong>.</p>
       ${variantBlock}
       ${codeBlock}
-      <p style="margin-top:24px;"><a href="${appUrl()}/account/orders/${opts.orderId}" style="color:#7c3aed; font-weight:600;">Track this order →</a></p>
+      <p style="margin-top:24px;"><a href="${appUrl()}/account/orders/${opts.orderId}" style="color:#7c3aed; font-weight:600;">Track this order â†’</a></p>
     `),
     text:
-      `Order confirmed: ${opts.productName} · ${opts.totalDisplay}.` +
+      `Order confirmed: ${opts.productName} Â· ${opts.totalDisplay}.` +
       (opts.variantSummary ? ` Variant: ${opts.variantSummary}.` : "") +
       ` Delivery code: ${opts.deliveryCode ?? "n/a"}. ` +
       `Track at ${appUrl()}/account/orders/${opts.orderId}`,
@@ -290,13 +318,13 @@ export function verificationDecisionEmail(opts: {
   const role = opts.kind.toLowerCase();
   return {
     subject: opts.approved
-      ? `You're a verified ${role} on ${SITE} ✓`
+      ? `You're a verified ${role} on ${SITE} âœ“`
       : `Your ${role} verification needs another look`,
     html: wrap(
       opts.approved
         ? `<p>Hi ${escapeHtml(opts.name)},</p>
            <p>Your ${role} account is now verified. A check-mark badge is showing next to your name, and your listings are eligible for recommendations.</p>
-           <p style="margin-top:24px;"><a href="${appUrl()}/${role === "seller" ? "seller" : "designer"}" style="color:#7c3aed; font-weight:600;">Open your dashboard →</a></p>`
+           <p style="margin-top:24px;"><a href="${appUrl()}/${role === "seller" ? "seller" : "designer"}" style="color:#7c3aed; font-weight:600;">Open your dashboard â†’</a></p>`
         : `<p>Hi ${escapeHtml(opts.name)},</p>
            <p>Our team reviewed your ${role} verification and couldn&rsquo;t approve it as-is.</p>
            ${opts.note ? `<p style="padding:12px; background:#fbeef0; color:#6b1a2a; border-radius:10px;">${escapeHtml(opts.note)}</p>` : ""}
@@ -314,7 +342,7 @@ export function roleChangeDecisionEmail(opts: {
   newRoles: string[]; // ["Seller", "Designer"] etc.
   note?: string | null;
 }): { subject: string; html: string; text: string } {
-  const rolesLabel = opts.newRoles.length === 0 ? "Buyer" : opts.newRoles.join(" · ");
+  const rolesLabel = opts.newRoles.length === 0 ? "Buyer" : opts.newRoles.join(" Â· ");
   const dashHref =
     opts.newRoles.includes("Seller")
       ? "/seller"
@@ -323,8 +351,8 @@ export function roleChangeDecisionEmail(opts: {
         : "/account";
   return {
     subject: opts.approved
-      ? `Your new role is live — ${rolesLabel}`
-      : "Role change request — needs another look",
+      ? `Your new role is live â€” ${rolesLabel}`
+      : "Role change request â€” needs another look",
     html: wrap(
       opts.approved
         ? `<p>Hi ${escapeHtml(opts.name)},</p>
@@ -345,7 +373,7 @@ export function roleChangeDecisionEmail(opts: {
 
 // Admin-attention email. Sent to every admin when something lands in a
 // queue that needs human action: verifications, business-name changes,
-// promotion approvals, etc. Keep the format compact — the subject line
+// promotion approvals, etc. Keep the format compact â€” the subject line
 // alone is usually enough for triage.
 export function adminAttentionEmail(opts: {
   kind: string;             // e.g. "Verification request"
@@ -363,7 +391,7 @@ export function adminAttentionEmail(opts: {
     )
     .join("");
   return {
-    subject: `[Admin] ${opts.kind} — ${opts.summary}`,
+    subject: `[Admin] ${opts.kind} â€” ${opts.summary}`,
     html: wrap(`
       <p style="margin:0; color:#737378; font-size:11px; text-transform:uppercase; letter-spacing:0.18em;">New ${escapeHtml(opts.kind.toLowerCase())}</p>
       <p style="margin:6px 0 14px; font-size:16px; font-weight:600;">${escapeHtml(opts.summary)}</p>
@@ -372,7 +400,7 @@ export function adminAttentionEmail(opts: {
         <a href="${appUrl()}${opts.link}" style="display:inline-block; padding:9px 16px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600; font-size:13px;">Review in admin</a>
       </p>
     `),
-    text: `[Admin] ${opts.kind} — ${opts.summary}. Review: ${appUrl()}${opts.link}`,
+    text: `[Admin] ${opts.kind} â€” ${opts.summary}. Review: ${appUrl()}${opts.link}`,
   };
 }
 
@@ -383,7 +411,7 @@ export function commissionRequestEmail(opts: {
   commissionId: string;
 }): { subject: string; html: string; text: string } {
   return {
-    subject: `New commission request — ${opts.title}`,
+    subject: `New commission request â€” ${opts.title}`,
     html: wrap(`
       <p>Hi ${escapeHtml(opts.designerName)},</p>
       <p>${escapeHtml(opts.buyerName)} sent you a commission request:
@@ -403,12 +431,12 @@ export function commissionStateChangeEmail(opts: {
   link: string;
 }): { subject: string; html: string; text: string } {
   return {
-    subject: `${opts.title} — ${opts.commissionTitle}`,
+    subject: `${opts.title} â€” ${opts.commissionTitle}`,
     html: wrap(`
       <p>Hi ${escapeHtml(opts.name)},</p>
       <p><strong>${escapeHtml(opts.title)}</strong></p>
       <p>${escapeHtml(opts.body)}</p>
-      <p style="margin-top:24px;"><a href="${appUrl()}${opts.link}" style="color:#7c3aed; font-weight:600;">Open commission →</a></p>
+      <p style="margin-top:24px;"><a href="${appUrl()}${opts.link}" style="color:#7c3aed; font-weight:600;">Open commission â†’</a></p>
     `),
     text: `${opts.title}: ${opts.body} (${appUrl()}${opts.link})`,
   };
@@ -423,10 +451,10 @@ export function tierChangeEmail(opts: {
   const role = opts.kind.toLowerCase();
   const went = opts.tier > opts.previousTier ? "upgraded" : opts.tier < opts.previousTier ? "moved" : "set";
   const tierLabel =
-    opts.tier === 3 ? "Tier 3 (Gold ★)"
-      : opts.tier === 2 ? "Tier 2 (Blue ✓)"
+    opts.tier === 3 ? "Tier 3 (Gold â˜…)"
+      : opts.tier === 2 ? "Tier 2 (Blue âœ“)"
       : "Tier 1 (Unverified)";
-  // Perks copy mirrors the rules in lib/tiers.ts — keep these in sync if the
+  // Perks copy mirrors the rules in lib/tiers.ts â€” keep these in sync if the
   // product caps or withdrawal fees change there.
   const perks =
     opts.tier === 3
@@ -441,7 +469,7 @@ export function tierChangeEmail(opts: {
            <li>Withdrawal fee: <strong>3%</strong></li>
            <li>Blue check shows on your storefront and posts</li>
          </ul>`
-      : `<p>Your account is now Tier 1 — listings are paused until verification is restored. Reach out to support if this was unexpected.</p>`;
+      : `<p>Your account is now Tier 1 â€” listings are paused until verification is restored. Reach out to support if this was unexpected.</p>`;
   return {
     subject:
       opts.tier > opts.previousTier
@@ -451,7 +479,7 @@ export function tierChangeEmail(opts: {
       <p>Hi ${escapeHtml(opts.name)},</p>
       <p>An admin has ${went} your ${role} account to <strong>${tierLabel}</strong>.</p>
       ${perks}
-      <p style="margin-top:20px;"><a href="${appUrl()}/${role === "seller" ? "seller" : "designer"}" style="color:#7c3aed; font-weight:600;">Open your dashboard →</a></p>
+      <p style="margin-top:20px;"><a href="${appUrl()}/${role === "seller" ? "seller" : "designer"}" style="color:#7c3aed; font-weight:600;">Open your dashboard â†’</a></p>
     `),
     text: `Your ${role} account has been ${went} to ${tierLabel}.`,
   };
@@ -480,7 +508,7 @@ export function accountReinstatedEmail(name: string): { subject: string; html: s
     subject: `Your ${SITE} account is active again`,
     html: wrap(`
       <p>Hi ${escapeHtml(name)},</p>
-      <p>Good news — your ${SITE} account has been reinstated. You can sign in and continue where you left off.</p>
+      <p>Good news â€” your ${SITE} account has been reinstated. You can sign in and continue where you left off.</p>
       <p style="margin-top:24px;"><a href="${appUrl()}/login" style="display:inline-block; padding:10px 18px; background:#7c3aed; color:#ffffff; text-decoration:none; border-radius:10px; font-weight:600;">Sign in</a></p>
     `),
     text: `Your ${SITE} account is active again. Sign in at ${appUrl()}/login.`,

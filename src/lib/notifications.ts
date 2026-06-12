@@ -39,6 +39,20 @@ export type SendPushResult = {
 };
 
 export async function sendPush(args: SendPushArgs): Promise<SendPushResult> {
+  // Persist the notification to the inbox table BEFORE we attempt the push
+  // so the bell-icon UI still shows past events even if Expo rejects the
+  // ticket. Failures here are logged but never block the send.
+  prisma.notification.create({
+    data: {
+      userId: args.userId,
+      type: typeof args.data?.type === "string" ? (args.data!.type as string) : "system",
+      title: args.title,
+      body: args.body,
+      link: args.link ?? null,
+      dataJson: args.data ? JSON.stringify(args.data) : null,
+    },
+  }).catch((err) => console.error("[notification:persist] threw", { userId: args.userId, err }));
+
   const tokens = await prisma.pushToken.findMany({
     where: { userId: args.userId },
     select: { token: true },

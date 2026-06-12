@@ -1,52 +1,45 @@
 // StreekMart mobile theme tokens.
 //
-// Palette blends AliExpress / Jumia warmth (oranges + coral CTAs) with
-// StreekMart's violet brand accent. Dark mode is a near-true-black so
-// product imagery pops and battery cost on OLED panels stays low.
-//
-// Tokens are exposed through useTheme() — never import this file directly
-// from a screen so the consuming component re-renders on theme switches.
+// Palette mirrors the web tailwind.config.ts so the app and site look
+// like they came from the same brand. Primary identity is violet
+// (matches the btn-primary and brand chips on the site); fuchsia + gold
+// are the accent + premium colors; burgundy is danger.
 
 export type ColorScheme = "light" | "dark";
 
 export const palette = {
-  // Brand violet — retained from the storefront so the web<->app brand
-  // feels continuous. Used for tertiary accents only; CTAs are coral.
-  violet: "#7c3aed",
-  violetSoft: "#a78bfa",
-
-  // Coral primary CTA. AliExpress-inspired, friendlier than red.
-  coral: "#ff5b3c",
-  coralDeep: "#e63b1f",
-
-  // Gold — used for verified / premium chips.
-  gold: "#cf9f32",
-
-  // Neutrals (light)
+  violet50: "#f5f3ff",
+  violet100: "#ede9fe",
+  violet200: "#ddd6fe",
+  violet400: "#a78bfa",
+  violet500: "#8b5cf6",
+  violet600: "#7c3aed",
+  violet700: "#6d28d9",
+  violet900: "#4c1d95",
+  violet950: "#2e1065",
+  fuchsia400: "#e879f9",
+  fuchsia500: "#d946ef",
+  fuchsia600: "#c026d3",
+  gold200: "#e9d089",
+  gold400: "#cf9f32",
+  gold500: "#b9881e",
+  burgundy: "#6b1a2a",
+  burgundy500: "#8b1d33",
   white: "#ffffff",
-  ink50: "#f7f7f9",
-  ink100: "#eeeef2",
-  ink200: "#dcdce3",
-  ink300: "#b9b9c4",
-  ink500: "#7c7c8a",
-  ink700: "#3f3f49",
-  ink900: "#161620",
-
-  // Neutrals (dark)
-  black: "#0b0b10",
-  dark900: "#13131b",
-  dark800: "#1c1c26",
-  dark700: "#252531",
-  dark600: "#33333f",
-  dark300: "#888896",
-
-  // Semantic
+  ink50: "#f7f7f8",
+  ink100: "#e4e4e8",
+  ink200: "#cccccf",
+  ink300: "#a3a3a8",
+  ink400: "#737378",
+  ink500: "#525258",
+  ink600: "#404048",
+  ink700: "#262630",
+  ink800: "#171720",
+  ink900: "#0a0a14",
   successBg: "#dcfce7",
   successFg: "#0a7434",
   warningBg: "#fff7d8",
   warningFg: "#92590b",
-  dangerBg: "#fee2e2",
-  dangerFg: "#9b0b22",
 };
 
 export type Theme = {
@@ -63,9 +56,12 @@ export type Theme = {
   cta: string;
   ctaPressed: string;
   ctaText: string;
+  promo: string;
+  premium: string;
   success: { fg: string; bg: string };
   warning: { fg: string; bg: string };
   danger: { fg: string; bg: string };
+  auroraGradient: [string, string, string, string];
   shadow: string;
   statusBarStyle: "dark" | "light";
 };
@@ -79,56 +75,47 @@ export const lightTheme: Theme = {
   text: palette.ink900,
   textMuted: palette.ink500,
   textFaint: palette.ink300,
-  accent: palette.violet,
-  accentSoft: palette.violetSoft,
-  cta: palette.coral,
-  ctaPressed: palette.coralDeep,
+  accent: palette.violet600,
+  accentSoft: palette.violet100,
+  cta: palette.violet600,
+  ctaPressed: palette.violet700,
   ctaText: palette.white,
+  promo: palette.fuchsia500,
+  premium: palette.gold400,
   success: { fg: palette.successFg, bg: palette.successBg },
   warning: { fg: palette.warningFg, bg: palette.warningBg },
-  danger: { fg: palette.dangerFg, bg: palette.dangerBg },
-  shadow: "rgba(20, 20, 30, 0.08)",
+  danger: { fg: palette.burgundy, bg: "#fbeef0" },
+  auroraGradient: [palette.violet900, palette.violet600, palette.fuchsia500, palette.gold400],
+  shadow: "rgba(76, 29, 149, 0.12)",
   statusBarStyle: "dark",
 };
 
 export const darkTheme: Theme = {
   scheme: "dark",
-  bg: palette.black,
-  bgElevated: palette.dark900,
-  card: palette.dark800,
-  border: palette.dark700,
+  bg: palette.ink900,
+  bgElevated: palette.ink800,
+  card: palette.ink700,
+  border: palette.ink600,
   text: palette.white,
-  textMuted: palette.dark300,
-  textFaint: palette.dark600,
-  accent: palette.violetSoft,
-  accentSoft: palette.violet,
-  cta: palette.coral,
-  ctaPressed: palette.coralDeep,
+  textMuted: palette.ink300,
+  textFaint: palette.ink500,
+  accent: palette.violet400,
+  accentSoft: palette.violet950,
+  cta: palette.violet600,
+  ctaPressed: palette.violet700,
   ctaText: palette.white,
-  success: { fg: palette.successBg, bg: "rgba(10, 116, 52, 0.18)" },
-  warning: { fg: palette.warningBg, bg: "rgba(146, 89, 11, 0.22)" },
-  danger: { fg: palette.dangerBg, bg: "rgba(155, 11, 34, 0.22)" },
-  shadow: "rgba(0, 0, 0, 0.45)",
+  promo: palette.fuchsia400,
+  premium: palette.gold200,
+  success: { fg: "#86efac", bg: "rgba(10, 116, 52, 0.20)" },
+  warning: { fg: palette.gold200, bg: "rgba(146, 89, 11, 0.20)" },
+  danger: { fg: "#fda4af", bg: "rgba(107, 26, 42, 0.30)" },
+  auroraGradient: [palette.violet950, palette.violet700, palette.fuchsia600, palette.gold500],
+  shadow: "rgba(0, 0, 0, 0.55)",
   statusBarStyle: "light",
 };
 
-export const spacing = {
-  xs: 4,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 36,
-};
-
-export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  pill: 999,
-};
-
+export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 36 };
+export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 };
 export const type = {
   display: { fontSize: 28, fontWeight: "800" as const },
   h1: { fontSize: 22, fontWeight: "700" as const },

@@ -16,6 +16,7 @@ import { CategoryRail } from "@/components/storefront/CategoryRail";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
 import { PopularCategoryCards } from "@/components/storefront/PopularCategoryCards";
 import { FlashSalesCarousel } from "@/components/storefront/FlashSalesCarousel";
+import { CountdownTimer, endOfTodayMs } from "@/components/CountdownTimer";
 import {
   PreorderDesignsRail,
   type PreorderDesignCard,
@@ -208,6 +209,42 @@ export default async function HomePage({
       designerSlug: p.author.slug,
       designerName: p.author.name,
     }));
+
+  const recentlyViewed = user ? await prisma.recentlyViewed.findMany({
+    where: { userId: user.id },
+    orderBy: { viewedAt: "desc" },
+    take: 10,
+    include: { product: { include: { seller: { select: { id: true, name: true, businessName: true } } } } },
+  }).then((rows) => rows.filter((r) => r.product && r.product.status === "ACTIVE")) : [];
+
+  const buyAgainRows = user ? await prisma.order.findMany({
+    where: { buyerId: user.id, status: "COMPLETED" },
+    orderBy: { completedAt: "desc" },
+    take: 30,
+    include: { product: { include: { seller: { select: { id: true, name: true, businessName: true, exposureScore: true, sellerVerified: true, sellerTier: true, sellerRatingAvg: true, sellerRatingCount: true } } } } },
+  }).then((rows) => {
+    const seen = new Set();
+    const out = [];
+    for (const o of rows) {
+      if (!o.product || seen.has(o.product.id) || o.product.status !== "ACTIVE") continue;
+      seen.add(o.product.id);
+      out.push(o.product);
+      if (out.length >= 6) break;
+    }
+    return out;
+  }) : [];
+
+  const followedSellerIds = user ? (await prisma.follow.findMany({
+    where: { followerId: user.id },
+    select: { designerId: true },
+    take: 50,
+  })).map((f) => f.designerId) : [];
+  const followingProducts = followedSellerIds.length > 0 ? await prisma.product.findMany({
+    where: { sellerId: { in: followedSellerIds }, status: "ACTIVE" },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    include: { seller: { select: { id: true, name: true, businessName: true, exposureScore: true, sellerVerified: true, sellerTier: true, sellerRatingAvg: true, sellerRatingCount: true } } },
+  }) : [];
 
   const savedSet = new Set(savedFavorites.map((f) => f.productId!));
   const categoryCounts = new Map(perCategoryGrouped.map((c) => [c.category, c._count._all]));
@@ -449,12 +486,36 @@ export default async function HomePage({
       {flashSales.length > 0 && (
         <Section
           title="🔥 Flash sales"
-          subtitle="Limited-time discounts from sellers — swipe to see all."
+          subtitle={<span className="inline-flex items-center gap-2">Limited-time discounts <CountdownTimer target={new Date(endOfTodayMs())} label="ends in" /></span>}
           href={seeAllHref("/products/flash-sales")}
         >
           <FlashSalesCarousel
             items={flashSales.map(shape)}
             seeAllHref={seeAllHref("/products/flash-sales")}
+          />
+        </Section>
+      )}
+
+      {/* Recently viewed - signed-in users only, 6 items shown */}
+      {recentlyViewed.length > 0 && (
+        <Section title="Recently viewed" subtitle="Pick up where you left off." href={undefined}>
+          <CardGrid
+            items={recentlyViewed.slice(0, 6).map((r) => ({
+              id: r.product!.id,
+              name: r.product!.name,
+              price: r.product!.price,
+              salePrice: r.product!.salePrice,
+              category: r.product!.category,
+              image: parseJsonArray(r.product!.imagesJson)[0] ?? null,
+              images: parseJsonArray(r.product!.imagesJson),
+              sellerName: displaySellerName(r.product!.seller),
+              sellerTier: r.product!.seller && (r.product!.seller as { sellerTier?: number }).sellerTier ? (r.product!.seller as { sellerTier?: number }).sellerTier! : 1,
+              promoted: false,
+              rating: r.product!.ratingAvg ?? 0,
+              ratingCount: r.product!.ratingCount ?? 0,
+            }))}
+            savedSet={savedSet}
+            cols={6}
           />
         </Section>
       )}
@@ -498,6 +559,52 @@ export default async function HomePage({
           }
           items={preorderDesignCards}
         />
+      )}
+
+      {buyAgainRows.length > 0 && (
+        <Section title="Buy it again" subtitle="From your past orders." href={undefined}>
+          <CardGrid
+            items={buyAgainRows.map((p) => ({
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              salePrice: p.salePrice,
+              category: p.category,
+              image: parseJsonArray(p.imagesJson)[0] ?? null,
+              images: parseJsonArray(p.imagesJson),
+              sellerName: displaySellerName(p.seller),
+              sellerTier: ((p.seller as { sellerTier?: number | null }).sellerTier ?? 1),
+              promoted: false,
+              rating: p.ratingAvg ?? 0,
+              ratingCount: p.ratingCount ?? 0,
+            }))}
+            savedSet={savedSet}
+            cols={6}
+          />
+        </Section>
+      )}
+
+      {followingProducts.length > 0 && (
+        <Section title="From stores you follow" subtitle="Latest from sellers you follow." href={undefined}>
+          <CardGrid
+            items={followingProducts.map((p) => ({
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              salePrice: p.salePrice,
+              category: p.category,
+              image: parseJsonArray(p.imagesJson)[0] ?? null,
+              images: parseJsonArray(p.imagesJson),
+              sellerName: displaySellerName(p.seller),
+              sellerTier: ((p.seller as { sellerTier?: number | null }).sellerTier ?? 1),
+              promoted: false,
+              rating: p.ratingAvg ?? 0,
+              ratingCount: p.ratingCount ?? 0,
+            }))}
+            savedSet={savedSet}
+            cols={6}
+          />
+        </Section>
       )}
 
       {/* Top designers — only renders when at least one verified designer exists. */}
@@ -630,7 +737,7 @@ function Section({
   children,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   href?: string;
   children: React.ReactNode;
 }) {

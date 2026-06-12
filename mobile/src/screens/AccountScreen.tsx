@@ -6,6 +6,7 @@ import { Screen } from "../components/Screen";
 import { Button } from "../components/Button";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
+import { DailyCheckIn } from "../components/DailyCheckIn";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
@@ -31,7 +32,7 @@ export function AccountScreen() {
           onPress={() => nav.navigate("Register")}
         />
         <Pressable onPress={() => nav.navigate("Settings")} style={{ marginTop: 16, alignItems: "center" }}>
-          <Text style={[type.small, { color: t.textMuted }]}>App settings →</Text>
+          <Text style={[type.small, { color: t.textMuted }]}>App settings</Text>
         </Pressable>
       </Screen>
     );
@@ -56,25 +57,32 @@ export function AccountScreen() {
         </View>
       </View>
 
-      {typeof user.pointsBalance === "number" && (
-        <View style={[styles.pointsCard, { backgroundColor: t.cta }]}>
-          <Text style={[type.small, { color: t.ctaText, opacity: 0.85 }]}>POINTS</Text>
-          <Text style={[type.display, { color: t.ctaText, marginTop: 4 }]}>
-            {user.pointsBalance.toLocaleString()}
-          </Text>
-          <Text style={[type.small, { color: t.ctaText, opacity: 0.85, marginTop: 4 }]}>
-            Refer friends to earn more.
-          </Text>
-        </View>
-      )}
+      <DailyCheckIn />
 
       <View style={styles.linksList}>
-        <LinkRow label="My orders" onPress={() => nav.navigate("Settings")} />
-        <LinkRow label="My preorders" onPress={() => nav.navigate("Settings")} />
-        <LinkRow label="Wishlist" onPress={() => nav.navigate("Settings")} />
-        <LinkRow label="Messages" onPress={() => nav.navigate("Settings")} />
+        <LinkRow label="My orders" onPress={() => nav.navigate("Orders")} />
+        <LinkRow label="Wishlist" onPress={() => nav.navigate("Wishlist")} />
+        <LinkRow label="Messages" onPress={() => nav.navigate("Chats")} />
+        <LinkRow label="Notifications" onPress={() => nav.navigate("Notifications")} />
+        <LinkRow label="Payment methods" onPress={() => nav.navigate("PaymentMethods")} />
+        <LinkRow label="Coupons" onPress={() => nav.navigate("Coupons")} />
+        <LinkRow label="Delivery addresses" onPress={() => nav.navigate("Addresses")} />
         <LinkRow label="Settings & notifications" onPress={() => nav.navigate("Settings")} />
       </View>
+
+      {(user.isSeller || user.isDesigner || user.isAdmin) && (
+        <View style={[styles.linksList, { marginTop: 20 }]}>
+          {user.isSeller && (
+            <LinkRow label="Seller dashboard" onPress={() => nav.navigate("SellerDashboard")} />
+          )}
+          {user.isDesigner && (
+            <LinkRow label="Designer dashboard" onPress={() => nav.navigate("DesignerDashboard")} />
+          )}
+          {user.isAdmin && (
+            <LinkRow label="Admin dashboard" onPress={() => nav.navigate("AdminDashboard")} />
+          )}
+        </View>
+      )}
 
       <Button
         label="Sign out"
@@ -102,7 +110,7 @@ function LinkRow({ label, onPress }: { label: string; onPress: () => void }) {
       ]}
     >
       <Text style={[type.body, { color: t.text }]}>{label}</Text>
-      <Text style={{ color: t.textMuted, fontSize: 18 }}>›</Text>
+      <Text style={{ color: t.textMuted, fontSize: 18 }}>{String.fromCharCode(8250)}</Text>
     </Pressable>
   );
 }

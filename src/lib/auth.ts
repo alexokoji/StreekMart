@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
@@ -16,7 +16,13 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
   return bcrypt.compare(plain, hash);
 }
 
-export async function setSessionCookie(payload: SessionPayload) {
+// Sign, set the httpOnly cookie (web flow), AND return the raw token so
+// the caller can include it in the JSON response. The mobile app needs
+// the token in the body because it cannot read httpOnly cookies from a
+// fetch response -- it stores the JWT in SecureStore and replays it via
+// Authorization: Bearer. Returning a token on every login is harmless
+// for the web path; the cookie is still the source of truth there.
+export async function setSessionCookie(payload: SessionPayload): Promise<string> {
   const token = await signSession(payload);
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -25,16 +31,33 @@ export async function setSessionCookie(payload: SessionPayload) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+  return token;
 }
 
 export async function clearSessionCookie() {
   cookies().delete(SESSION_COOKIE);
 }
 
+// Resolve the current session.
+//   - Mobile clients send the JWT as `Authorization: Bearer <token>` so
+//     they do not need cookie access. Checked FIRST because it is an
+//     explicit signal.
+//   - Web clients use the httpOnly cookie set above.
+// Either path goes through the same `verifySession` so expired or
+// tampered tokens are rejected uniformly.
 export async function getSession(): Promise<SessionPayload | null> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return verifySession(token);
+  const authHeader =
+    headers().get("authorization") ?? headers().get("Authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const bearer = authHeader.slice(7).trim();
+    if (bearer) {
+      const session = await verifySession(bearer);
+      if (session) return session;
+    }
+  }
+  const cookieToken = cookies().get(SESSION_COOKIE)?.value;
+  if (!cookieToken) return null;
+  return verifySession(cookieToken);
 }
 
 export async function getCurrentUser() {
@@ -60,7 +83,7 @@ export async function getCurrentUser() {
       sellerTier: true,
       designerTier: true,
       isAdmin: true,
-      // Suspension gate — we return null when set so every guard above
+      // Suspension gate Ã¢â‚¬â€ we return null when set so every guard above
       // (requireUser, requireAdmin) treats the user as signed-out.
       suspendedAt: true,
       bio: true,
@@ -72,7 +95,7 @@ export async function getCurrentUser() {
       deliveryWithinCityCents: true,
       deliveryOutsideCityCents: true,
       deliveryOutsideCountryCents: true,
-      // Email verification — null means the layout shows the
+      // Email verification Ã¢â‚¬â€ null means the layout shows the
       // EmailVerificationBanner across the top of every page.
       emailVerifiedAt: true,
       // Staff/admin permission flags. Used by the admin nav to gate
@@ -136,7 +159,7 @@ export function hasPermission(
   return false;
 }
 
-// Server-component guard. Pass a single permission or an array (any-of) — Buyer is implicit.
+// Server-component guard. Pass a single permission or an array (any-of) Ã¢â‚¬â€ Buyer is implicit.
 // On failure: redirect to /login or /unauthorized.
 export async function requireUser(perm?: Permission | Permission[]) {
   const user = await getCurrentUser();
@@ -154,7 +177,7 @@ export async function requireUser(perm?: Permission | Permission[]) {
 //
 // Includes a suspension check that 401s when the account has been suspended
 // since the cookie was minted. The JWT itself isn't revocable, so this DB
-// hit is what enforces revocation — accept the small per-request cost for
+// hit is what enforces revocation Ã¢â‚¬â€ accept the small per-request cost for
 // the safety of "suspending a bad actor immediately stops their writes."
 export async function requireApiUser(perm?: Permission | Permission[]) {
   const session = await getSession();

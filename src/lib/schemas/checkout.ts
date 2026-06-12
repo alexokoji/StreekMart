@@ -10,6 +10,9 @@ export const CheckoutBodySchema = z.object({
   shippingPlaceId: z.string().max(255).optional(),
   notes: z.string().max(500).optional(),
   paymentMethod: z.enum(["DIRECT", "ON_DELIVERY"]).default("DIRECT"),
+  // Optional promo code applied at checkout. Validated server-side via
+  // /api/promo-codes/validate logic before being recorded.
+  promoCode: z.string().trim().toUpperCase().max(40).optional(),
   zoneOverride: z.enum(["WITHIN_CITY", "OUTSIDE_CITY"]).optional(),
   shippingChoices: z
     .array(

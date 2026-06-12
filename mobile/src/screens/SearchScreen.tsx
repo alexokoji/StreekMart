@@ -13,7 +13,9 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
 import { ProductCard, type ProductCardData } from "../components/ProductCard";
 import { useTheme } from "../state/ThemeContext";
-import { api } from "../api/client";
+import * as ImagePicker from "expo-image-picker";
+import Constants from "expo-constants";
+import { api, getAuthToken } from "../api/client";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
@@ -28,6 +30,51 @@ export function SearchScreen() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [busy, setBusy] = useState(false);
+  const [imageSearching, setImageSearching] = useState(false);
+
+  async function pickImageAndSearch() {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return;
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        allowsEditing: false,
+      });
+      if (picked.canceled || !picked.assets[0]) return;
+      setImageSearching(true);
+      setResults([]);
+      setSuggestions([]);
+      const asset = picked.assets[0];
+      // Build multipart manually -- RN fetch handles File objects via FormData.
+      const form = new FormData();
+      const uri = asset.uri;
+      const name = uri.split("/").pop() ?? "upload.jpg";
+      const type = asset.mimeType ?? "image/jpeg";
+      // RN FormData accepts a {uri, name, type} object for image fields.
+      form.append("file", { uri, name, type } as unknown as Blob);
+      const apiUrl = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ?? "https://www.streekmart.online";
+      const token = await getAuthToken();
+      const res = await fetch(apiUrl + "/api/search/image-upload", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: form,
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.results)) {
+        setResults(data.results.map((r: { id: string; name: string; price: number; salePrice: number | null; image: string | null; sellerName: string }) => ({
+          id: r.id, name: r.name, price: r.price, salePrice: r.salePrice, image: r.image, sellerName: r.sellerName,
+        })));
+      }
+    } catch (err) {
+      console.error("[image-search] failed", err);
+    } finally {
+      setImageSearching(false);
+    }
+  }
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced suggestion lookup
@@ -73,16 +120,21 @@ export function SearchScreen() {
   return (
     <Screen padding={false} keyboard>
       <View style={[styles.searchHeader, { backgroundColor: t.bgElevated, borderColor: t.border }]}>
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          onSubmitEditing={() => submit(q)}
-          autoFocus
-          returnKeyType="search"
-          placeholder="What are you shopping for?"
-          placeholderTextColor={t.textMuted}
-          style={[styles.searchInput, { color: t.text, backgroundColor: t.bg }]}
-        />
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            onSubmitEditing={() => submit(q)}
+            autoFocus
+            returnKeyType="search"
+            placeholder="What are you shopping for?"
+            placeholderTextColor={t.textMuted}
+            style={[styles.searchInput, { color: t.text, backgroundColor: t.bg, flex: 1 }]}
+          />
+          <Pressable onPress={pickImageAndSearch} disabled={imageSearching} style={[styles.cameraBtn, { backgroundColor: t.cta, opacity: imageSearching ? 0.5 : 1 }]}>
+            <Text style={{ color: t.ctaText, fontSize: 16 }}>{imageSearching ? "..." : "Image"}</Text>
+          </Pressable>
+        </View>
       </View>
 
       {busy ? (
@@ -137,6 +189,13 @@ const styles = StyleSheet.create({
   searchHeader: {
     padding: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cameraBtn: {
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 999,
+    justifyContent: "center",
+    alignItems: "center",
   },
   searchInput: {
     height: 44,

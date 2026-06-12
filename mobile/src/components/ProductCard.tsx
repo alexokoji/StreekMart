@@ -13,19 +13,22 @@ export type ProductCardData = {
   sellerName?: string;
   ratingAvg?: number;
   promoted?: boolean;
+  saved?: boolean;
 };
 
 function formatNgn(value: number): string {
-  return `₦${Math.round(value).toLocaleString("en-NG")}`;
+  return `Ã¢â€šÂ¦${Math.round(value).toLocaleString("en-NG")}`;
 }
 
 export function ProductCard({
   product,
   onPress,
+  onToggleSave,
   compact = false,
 }: {
   product: ProductCardData;
   onPress?: () => void;
+  onToggleSave?: () => void;
   compact?: boolean;
 }) {
   const t = useTheme();
@@ -64,9 +67,20 @@ export function ProductCard({
           </View>
         )}
         {hasDiscount && (
-          <View style={[styles.discountBadge, { backgroundColor: t.cta }]}>
+          <View style={[styles.discountBadge, { backgroundColor: t.promo }]}>
             <Text style={[type.micro, { color: t.ctaText }]}>-{discountPct}%</Text>
           </View>
+        )}
+        {onToggleSave && (
+          <Pressable
+            onPress={(e) => { e.stopPropagation && e.stopPropagation(); onToggleSave(); }}
+            hitSlop={8}
+            style={styles.heartBtn}
+          >
+            <Text style={{ fontSize: 18, color: product.saved ? t.promo : t.textMuted }}>
+              {product.saved ? "♥" : "♡"}
+            </Text>
+          </Pressable>
         )}
       </View>
       <View style={styles.body}>
@@ -129,5 +143,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  heartBtn: {
+    position: "absolute",
+    bottom: 6,
+    right: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

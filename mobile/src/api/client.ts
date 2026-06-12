@@ -57,7 +57,7 @@ type RequestOpts = {
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined | null>;
   signal?: AbortSignal;
-  // Skip Authorization header — used by login/register requests.
+  // Skip Authorization header â€” used by login/register requests.
   noAuth?: boolean;
 };
 
@@ -79,14 +79,17 @@ async function request<T>(path: string, opts: RequestOpts = {}): Promise<T> {
     "User-Agent": APP_UA_TAG,
   };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
-  if (token) headers["Cookie"] = `streekmart_session=${token}`;
+  // Mobile auth uses Authorization: Bearer rather than a cookie because
+  // RN's fetch cannot read the httpOnly cookie the web server sets. The
+  // server's getSession() checks the Bearer header first, then falls
+  // back to the cookie for browser requests.
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(buildUrl(path, opts.query), {
     method: opts.method ?? "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     signal: opts.signal,
-    credentials: "include",
   });
 
   const contentType = res.headers.get("content-type") ?? "";

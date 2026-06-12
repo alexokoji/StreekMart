@@ -42,7 +42,7 @@ export function CheckoutForm({
         : undefined;
   const [shippingAddress, setShippingAddress] = useState<PickedAddress | null>(null);
   const [notes, setNotes] = useState("");
-  const { setShippingKoboTotal } = useCheckoutTotals();
+  const { setShippingKoboTotal, promoCode: promoCodeFromContext } = useCheckoutTotals();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("DIRECT");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +101,7 @@ export function CheckoutForm({
           });
         }
       }
+      if (promoCodeFromContext) body.promoCode = promoCodeFromContext;
       if (shippingChoices.length > 0) body.shippingChoices = shippingChoices;
 
       const res = await fetch("/api/cart/checkout", {

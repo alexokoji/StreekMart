@@ -7,6 +7,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api, getAuthToken, setAuthToken } from "../api/client";
+import { clearApiCache } from "../api/cache";
 
 export type CurrentUser = {
   id: string;
@@ -124,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await api.post("/api/auth/logout").catch(() => {});
     await setAuthToken(null);
+    await clearApiCache();
     setUser(null);
   }, []);
 

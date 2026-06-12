@@ -11,6 +11,7 @@ import { AddToCartButton } from "@/components/AddToCartButton";
 import { OutfitPairings } from "@/components/OutfitPairings";
 import { ProductImageSlider } from "@/components/storefront/ProductImageSlider";
 import { TierBadge } from "@/components/TierBadge";
+import { ProductReviews } from "@/components/storefront/ProductReviews";
 import { perUnitLabel } from "@/lib/units";
 
 export default async function PublicProductPage({ params }: { params: { id: string } }) {
@@ -35,6 +36,14 @@ export default async function PublicProductPage({ params }: { params: { id: stri
   if (!product) notFound();
 
   prisma.product.update({ where: { id: product.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
+  // Track recently-viewed for buyers. Anonymous views skip this (no userId).
+  if (user) {
+    prisma.recentlyViewed.upsert({
+      where: { userId_productId: { userId: user.id, productId: product.id } },
+      create: { userId: user.id, productId: product.id },
+      update: {},
+    }).catch(() => {});
+  }
 
   const images = parseJsonArray(product.imagesJson);
   const effective = product.salePrice ?? product.price;
@@ -159,6 +168,9 @@ export default async function PublicProductPage({ params }: { params: { id: stri
         )}
       </div>
 
+      <div className="lg:col-span-2">
+        <ProductReviews productId={product.id} />
+      </div>
     </div>
   );
 }

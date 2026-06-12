@@ -19,8 +19,8 @@ export async function POST(req: Request) {
   }
 
   const designer = await prisma.user.findUnique({ where: { id: parsed.data.designerId } });
-  if (!designer || !designer.isDesigner) {
-    return NextResponse.json({ error: "Not a designer." }, { status: 404 });
+  if (!designer || (!designer.isDesigner && !designer.isSeller)) {
+    return NextResponse.json({ error: "Cannot follow this account." }, { status: 404 });
   }
 
   const existing = await prisma.follow.findUnique({

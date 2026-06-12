@@ -147,7 +147,7 @@ export function CartScreen() {
               <Button
                 label="Proceed to checkout"
                 style={{ marginTop: 12 }}
-                onPress={() => Alert.alert("Checkout", "Checkout lives in the web flow for V2 — coming next.")}
+                onPress={() => nav.navigate("Checkout")}
               />
             </View>
           ) : null
@@ -196,7 +196,7 @@ function CartRow({
         </Text>
         <View style={styles.qtyRow}>
           <Pressable onPress={onDecrement} style={[styles.qtyBtn, { borderColor: t.border }]}>
-            <Text style={{ color: t.text, fontSize: 18 }}>−</Text>
+            <Text style={{ color: t.text, fontSize: 18 }}>-</Text>
           </Pressable>
           <Text style={[type.body, { color: t.text, minWidth: 30, textAlign: "center" }]}>
             {item.quantity}

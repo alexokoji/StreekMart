@@ -14,8 +14,12 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../components/Screen";
 import { ProductCard, type ProductCardData } from "../components/ProductCard";
+import { ProductCardSkeleton } from "../components/Skeleton";
+import { OfflineBanner } from "../components/OfflineBanner";
 import { useTheme } from "../state/ThemeContext";
+import { Countdown, endOfTodayMs } from "../components/Countdown";
 import { api } from "../api/client";
+import { getCached } from "../api/cache";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
@@ -26,6 +30,10 @@ type RailItem = ProductCardData;
 type CategoryItem = { name: string; image?: string | null };
 
 type HomeData = {
+  recentlyViewed: RailItem[];
+  buyAgain: RailItem[];
+  following: RailItem[];
+  forYou: RailItem[];
   featured: RailItem[];
   flashSales: RailItem[];
   newArrivals: RailItem[];
@@ -44,34 +52,48 @@ export function HomeScreen() {
     try {
       // The mobile app pulls the same rails the web home page renders.
       // Each list endpoint already shapes product cards correctly.
-      const [featured, flashSales, newArrivals, bestSellers, categories] =
+      const [featured, flashSales, newArrivals, bestSellers, categories, recentlyViewed, buyAgainResp, followingResp, recsResp] =
         await Promise.all([
-          api.get<{ items: RailItem[] }>("/api/products/list", {
-            rail: "featured",
-            limit: 8,
-          }).catch(() => ({ items: [] })),
-          api.get<{ items: RailItem[] }>("/api/products/list", {
-            rail: "flash-sales",
-            limit: 8,
-          }).catch(() => ({ items: [] })),
-          api.get<{ items: RailItem[] }>("/api/products/list", {
-            rail: "new-arrivals",
-            limit: 8,
-          }).catch(() => ({ items: [] })),
-          api.get<{ items: RailItem[] }>("/api/products/list", {
-            rail: "best-sellers",
-            limit: 8,
-          }).catch(() => ({ items: [] })),
+          getCached("home:featured", () => api.get<{ items: RailItem[] }>("/api/products/list", { rail: "featured", limit: 8 })).catch(() => ({ items: [] })),
+          getCached("home:flash-sales", () => api.get<{ items: RailItem[] }>("/api/products/list", { rail: "flash-sales", limit: 8 })).catch(() => ({ items: [] })),
+          getCached("home:new-arrivals", () => api.get<{ items: RailItem[] }>("/api/products/list", { rail: "new-arrivals", limit: 8 })).catch(() => ({ items: [] })),
+          getCached("home:best-sellers", () => api.get<{ items: RailItem[] }>("/api/products/list", { rail: "best-sellers", limit: 8 })).catch(() => ({ items: [] })),
           api
             .get<{ categories: Array<{ name: string }> }>("/api/categories")
             .catch(() => ({ categories: [] })),
+          api
+            .get<{ items: RailItem[] }>("/api/recently-viewed")
+            .catch(() => ({ items: [] })),
+          api
+            .get<{ items: RailItem[] }>("/api/me/buy-again")
+            .catch(() => ({ items: [] })),
+          api
+            .get<{ items: RailItem[] }>("/api/me/following-feed")
+            .catch(() => ({ items: [] })),
+          api
+            .get<{ items: Array<{ kind: string; id: string; reason: string; data: { name: string; price: number; image: string | null; seller: string } }> }>("/api/ai/recommendations")
+            .catch(() => ({ items: [] })),
         ]);
 
+      const recsItems: RailItem[] = (recsResp.items ?? [])
+        .filter((i: { kind: string; data?: { name: string; price: number; image: string | null; seller: string } }) => i.kind === "product" && i.data)
+        .map((i) => ({
+          id: i.id,
+          name: i.data!.name,
+          price: i.data!.price,
+          salePrice: null,
+          image: i.data!.image,
+          sellerName: i.data!.seller,
+        }));
       setData({
         featured: featured.items ?? [],
         flashSales: flashSales.items ?? [],
         newArrivals: newArrivals.items ?? [],
         bestSellers: bestSellers.items ?? [],
+        recentlyViewed: recentlyViewed.items ?? [],
+        buyAgain: buyAgainResp.items ?? [],
+        following: followingResp.items ?? [],
+        forYou: recsItems,
         categories: (categories.categories ?? []).slice(0, 10).map((c) => ({
           name: c.name,
         })),
@@ -88,9 +110,21 @@ export function HomeScreen() {
 
   if (loading && !data) {
     return (
-      <Screen padding={false}>
-        <View style={styles.centered}>
-          <ActivityIndicator color={t.cta} size="large" />
+      <Screen padding={false} scroll contentStyle={{ padding: 16, gap: 12 }}>
+        <View style={{ height: 42, backgroundColor: t.border, borderRadius: 999, marginBottom: 4, opacity: 0.5 }} />
+        <View style={{ height: 100, backgroundColor: t.border, borderRadius: 16, opacity: 0.5 }} />
+        <View style={{ height: 18 }} />
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <ProductCardSkeleton compact />
+          <ProductCardSkeleton compact />
+        </View>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <ProductCardSkeleton compact />
+          <ProductCardSkeleton compact />
+        </View>
+        <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+          <ProductCardSkeleton />
+          <ProductCardSkeleton />
         </View>
       </Screen>
     );
@@ -112,6 +146,7 @@ export function HomeScreen() {
         />
       }
     >
+      <OfflineBanner />
       {/* Search trigger */}
       <View style={[styles.searchBar, { backgroundColor: t.bgElevated, borderColor: t.border }]}>
         <Pressable
@@ -145,7 +180,7 @@ export function HomeScreen() {
             {data.categories.map((c) => (
               <Pressable
                 key={c.name}
-                onPress={() => nav.navigate("Search")}
+                onPress={() => nav.navigate("Categories")}
                 style={[styles.catChip, { backgroundColor: t.bgElevated, borderColor: t.border }]}
               >
                 <Text style={[type.small, { color: t.text, fontWeight: "600" }]}>{c.name}</Text>
@@ -159,7 +194,7 @@ export function HomeScreen() {
       {data && data.flashSales.length > 0 && (
         <Rail
           title="🔥 Flash sales"
-          subtitle="Limited-time discounts"
+          subtitleNode={<Countdown targetMs={endOfTodayMs()} label="ends in" />}
           items={data.flashSales}
           onPressItem={(id) => nav.navigate("ProductDetail", { id })}
         />
@@ -198,6 +233,46 @@ export function HomeScreen() {
         />
       )}
 
+      {/* Recently viewed */}
+      {data && data.recentlyViewed.length > 0 && (
+        <Rail
+          title="Recently viewed"
+          subtitle="Pick up where you left off"
+          items={data.recentlyViewed}
+          onPressItem={(id) => nav.navigate("ProductDetail", { id })}
+        />
+      )}
+
+      {/* Buy it again */}
+      {data && data.buyAgain.length > 0 && (
+        <Rail
+          title="Buy it again"
+          subtitle="From your past orders"
+          items={data.buyAgain}
+          onPressItem={(id) => nav.navigate("ProductDetail", { id })}
+        />
+      )}
+
+      {/* Stores you follow */}
+      {data && data.following.length > 0 && (
+        <Rail
+          title="From stores you follow"
+          subtitle="Latest from sellers you follow"
+          items={data.following}
+          onPressItem={(id) => nav.navigate("ProductDetail", { id })}
+        />
+      )}
+
+      {/* For you */}
+      {data && data.forYou.length > 0 && (
+        <Rail
+          title="For you"
+          subtitle="Personalized picks"
+          items={data.forYou}
+          onPressItem={(id) => nav.navigate("ProductDetail", { id })}
+        />
+      )}
+
       {/* Best sellers */}
       {data && data.bestSellers.length > 0 && (
         <Rail
@@ -224,11 +299,13 @@ function SectionHeader({ title, action }: { title: string; action?: React.ReactN
 function Rail({
   title,
   subtitle,
+  subtitleNode,
   items,
   onPressItem,
 }: {
   title: string;
   subtitle?: string;
+  subtitleNode?: React.ReactNode;
   items: RailItem[];
   onPressItem: (id: string) => void;
 }) {
@@ -241,6 +318,7 @@ function Rail({
           {subtitle && (
             <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>{subtitle}</Text>
           )}
+          {subtitleNode && <View style={{ marginTop: 2 }}>{subtitleNode}</View>}
         </View>
       </View>
       <ScrollView

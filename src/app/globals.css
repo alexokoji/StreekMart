@@ -129,3 +129,24 @@ body { overscroll-behavior-y: none; }
 .glow-violet {
   box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.18), 0 12px 40px -12px rgba(124, 58, 237, 0.5);
 }
+
+/* ---- Skeleton shimmer ---------------------------------------------------
+   Used by src/components/Skeleton.tsx. Pure CSS so it works in server
+   components without hydration drift. The gradient sweeps a translucent
+   white band across the muted background.                                */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  100% { transform: translateX(100%); }
+}

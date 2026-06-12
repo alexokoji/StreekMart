@@ -15,14 +15,46 @@ import { ProductDetailScreen } from "../screens/ProductDetailScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { ForgotPasswordScreen } from "../screens/ForgotPasswordScreen";
+import { AddressesScreen } from "../screens/AddressesScreen";
+import { AddressFormScreen } from "../screens/AddressFormScreen";
+import { CheckoutScreen } from "../screens/CheckoutScreen";
+import { OrdersScreen } from "../screens/OrdersScreen";
+import { OrderDetailScreen } from "../screens/OrderDetailScreen";
+import { SellerDashboardScreen } from "../screens/SellerDashboardScreen";
+import { DesignerDashboardScreen } from "../screens/DesignerDashboardScreen";
+import { AdminDashboardScreen } from "../screens/AdminDashboardScreen";
+import { WishlistScreen } from "../screens/WishlistScreen";
+import { CategoriesScreen } from "../screens/CategoriesScreen";
+import { NotificationsScreen } from "../screens/NotificationsScreen";
+import { PaymentMethodsScreen } from "../screens/PaymentMethodsScreen";
+import { ChatsScreen } from "../screens/ChatsScreen";
+import { ChatScreen } from "../screens/ChatScreen";
+import { CouponsScreen } from "../screens/CouponsScreen";
 
 export type RootStackParamList = {
   Tabs: undefined;
   ProductDetail: { id: string };
   Login: undefined;
   Register: undefined;
+  ForgotPassword: undefined;
   Settings: undefined;
   Search: undefined;
+  Addresses: undefined;
+  AddressForm: { id?: string };
+  Checkout: undefined;
+  Orders: undefined;
+  OrderDetail: { id: string };
+  SellerDashboard: undefined;
+  DesignerDashboard: undefined;
+  AdminDashboard: undefined;
+  Wishlist: undefined;
+  Categories: undefined;
+  Notifications: undefined;
+  PaymentMethods: undefined;
+  Chats: undefined;
+  Chat: { id: string; counterpartName?: string };
+  Coupons: undefined;
 };
 
 export type TabParamList = {
@@ -52,7 +84,23 @@ const linking: LinkingOptions<RootStackParamList> = {
       ProductDetail: "products/:id",
       Login: "login",
       Register: "register",
+      ForgotPassword: "forgot-password",
       Settings: "settings",
+      Addresses: "account/addresses",
+      AddressForm: "account/addresses/edit",
+      Checkout: "checkout",
+      Orders: "account/orders",
+      OrderDetail: "account/orders/:id",
+      SellerDashboard: "seller",
+      DesignerDashboard: "designer",
+      AdminDashboard: "admin",
+      Wishlist: "wishlist",
+      Categories: "categories",
+      Notifications: "account/notifications",
+      PaymentMethods: "account/payment-methods",
+      Chats: "messages",
+      Chat: "messages/:id",
+      Coupons: "account/coupons",
     },
   },
 };
@@ -76,61 +124,25 @@ function Tabs() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="home" />,
-        }}
-      />
-      <Tab.Screen
-        name="Feed"
-        component={FeedScreen}
-        options={{
-          tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="feed" />,
-        }}
-      />
-      <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="search" />,
-        }}
-      />
-      <Tab.Screen
-        name="Cart"
-        component={CartScreen}
-        options={{
-          tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="cart" />,
-        }}
-      />
-      <Tab.Screen
-        name="Account"
-        component={AccountScreen}
-        options={{
-          tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="me" />,
-        }}
-      />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="home" /> }} />
+      <Tab.Screen name="Feed" component={FeedScreen} options={{ tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="feed" /> }} />
+      <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="search" /> }} />
+      <Tab.Screen name="Cart" component={CartScreen} options={{ tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="cart" /> }} />
+      <Tab.Screen name="Account" component={AccountScreen} options={{ tabBarIcon: ({ color }) => <TabGlyph color={color} glyph="me" /> }} />
     </Tab.Navigator>
   );
 }
 
-// Tiny emoji-based tab glyphs — keeps the icon set dep-free. Easy to swap
-// to `@expo/vector-icons` later without touching the screen registration.
 function TabGlyph({ color, glyph }: { color: string; glyph: "home" | "feed" | "search" | "cart" | "me" }) {
   const ch =
-    glyph === "home"
-      ? "⌂"
-      : glyph === "feed"
-        ? "≡"
-        : glyph === "search"
-          ? "⌕"
-          : glyph === "cart"
-            ? "🛒"
-            : "◉";
+    glyph === "home" ? "[H]"
+    : glyph === "feed" ? "[F]"
+    : glyph === "search" ? "[S]"
+    : glyph === "cart" ? "[C]"
+    : "[M]";
   return (
     <View style={styles.glyphWrap}>
-      <Text style={{ color, fontSize: 22, lineHeight: 24 }}>{ch}</Text>
+      <Text style={{ color, fontSize: 14, lineHeight: 20, fontWeight: "700" }}>{ch}</Text>
     </View>
   );
 }
@@ -138,8 +150,7 @@ function TabGlyph({ color, glyph }: { color: string; glyph: "home" | "feed" | "s
 export function RootNav() {
   const t = useTheme();
   const { user } = useAuth();
-  void user; // tabs are public — auth gates happen per-screen
-
+  void user;
   const navTheme = t.scheme === "dark" ? DarkTheme : DefaultTheme;
 
   return (
@@ -168,37 +179,37 @@ export function RootNav() {
           }}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
-          <Stack.Screen
-            name="ProductDetail"
-            component={ProductDetailScreen}
-            options={{ title: "Product" }}
-          />
+          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} options={{ title: "Product" }} />
           <Stack.Screen name="Search" component={SearchScreen} options={{ title: "Search" }} />
           <Stack.Screen name="Login" component={LoginScreen} options={{ title: "Sign in" }} />
           <Stack.Screen name="Register" component={RegisterScreen} options={{ title: "Create account" }} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Forgot password" }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: "Settings" }} />
+          <Stack.Screen name="Addresses" component={AddressesScreen} options={{ title: "Addresses" }} />
+          <Stack.Screen name="AddressForm" component={AddressFormScreen} options={{ title: "Address" }} />
+          <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: "Checkout" }} />
+          <Stack.Screen name="Orders" component={OrdersScreen} options={{ title: "My orders" }} />
+          <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: "Order" }} />
+          <Stack.Screen name="SellerDashboard" component={SellerDashboardScreen} options={{ title: "Seller" }} />
+          <Stack.Screen name="DesignerDashboard" component={DesignerDashboardScreen} options={{ title: "Designer" }} />
+          <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: "Admin" }} />
+          <Stack.Screen name="Wishlist" component={WishlistScreen} options={{ title: "Wishlist" }} />
+          <Stack.Screen name="Categories" component={CategoriesScreen} options={{ title: "Categories" }} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Notifications" }} />
+          <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ title: "Payment methods" }} />
+          <Stack.Screen name="Chats" component={ChatsScreen} options={{ title: "Messages" }} />
+          <Stack.Screen name="Chat" component={ChatScreen} options={{ title: "Chat" }} />
+          <Stack.Screen name="Coupons" component={CouponsScreen} options={{ title: "Coupons" }} />
         </Stack.Navigator>
       </NavigationContainer>
     </>
   );
 }
 
-// Cheap "+" floating action button rendered above the tab bar on the Home
-// screen — exported for screens that want to spawn the universal create
-// affordance (left for a future iteration).
-export function FloatingActionButton({
-  label,
-  onPress,
-}: {
-  label: string;
-  onPress: () => void;
-}) {
+export function FloatingActionButton({ label, onPress }: { label: string; onPress: () => void }) {
   const t = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.fab, { backgroundColor: t.cta }]}
-    >
+    <Pressable onPress={onPress} style={[styles.fab, { backgroundColor: t.cta }]}>
       <Text style={{ color: t.ctaText, fontWeight: "700" }}>{label}</Text>
     </Pressable>
   );

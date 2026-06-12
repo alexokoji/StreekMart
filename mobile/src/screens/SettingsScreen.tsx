@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import * as Notifications from "expo-notifications";
+import { promptBiometric, readBiometricState, setBiometricEnabled, type BiometricState } from "../state/biometric";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Screen } from "../components/Screen";
@@ -20,6 +21,21 @@ export function SettingsScreen() {
   const { preference, setPreference } = useThemePreference();
 
   const [pushBusy, setPushBusy] = useState(false);
+  const [biometricState, setBiometricState] = React.useState<BiometricState | null>(null);
+  React.useEffect(() => {
+    readBiometricState().then(setBiometricState);
+  }, []);
+  async function toggleBiometric(next: boolean) {
+    if (!biometricState) return;
+    if (next) {
+      // Verify before persisting -- prevents locking the user out if their
+      // biometric is broken at the moment they tick the box.
+      const ok = await promptBiometric(`Confirm ${biometricState.friendlyName} works`);
+      if (!ok) return;
+    }
+    await setBiometricEnabled(next);
+    setBiometricState({ ...biometricState, userOptedIn: next });
+  }
 
   async function checkPush() {
     if (!user) {
@@ -73,6 +89,18 @@ export function SettingsScreen() {
           </View>
         )}
       </Section>
+
+      {biometricState?.hardwareAvailable && (
+        <Section title="Security">
+          <Row label={`Unlock with ${biometricState.friendlyName}`} desc="Require biometric authentication every time you open the app.">
+            <Switch
+              value={biometricState.userOptedIn}
+              onValueChange={toggleBiometric}
+              trackColor={{ true: t.cta, false: t.border }}
+            />
+          </Row>
+        </Section>
+      )}
 
       <Section title="Notifications">
         <Row
