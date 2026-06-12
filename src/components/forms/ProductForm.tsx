@@ -55,13 +55,16 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
   // NGN is the canonical currency. Sellers type Naira amounts and we store
   // them as-is. Multi-currency entry is a future feature; for now both the
   // display and the storage values match 1:1.
-  const initialLocalPrice = initial?.price ? roundCents(initial.price) : 0;
+  // Empty when no initial price so the input renders blank and the
+  // placeholder "0" is visible. Avoids the "delete the 0 before you can
+  // type" trap.
+  const initialLocalPrice = initial?.price ? roundCents(initial.price) : "";
   const initialLocalSale =
     typeof initial?.salePrice === "number" ? roundCents(initial.salePrice) : "";
 
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
-  const [price, setPrice] = useState<number>(initialLocalPrice);
+  const [price, setPrice] = useState<number | "">(initialLocalPrice);
   const [salePrice, setSalePrice] = useState<number | "">(initialLocalSale);
   // Categories come from the live admin-managed list at /api/categories.
   // We hydrate with the seed list so the first render isn't empty, then
@@ -139,6 +142,10 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    if (price === "" || Number(price) <= 0) {
+      setErr("Enter a price greater than 0.");
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
@@ -317,10 +324,11 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
               type="number"
               min={0}
               step="0.01"
+              placeholder="0"
               className="input pl-8"
               required
               value={price}
-              onChange={(e) => setPrice(Number(e.target.value))}
+              onChange={(e) => setPrice(e.target.value === "" ? "" : Number(e.target.value))}
             />
           </div>
           <p className="mt-1 text-[11px] text-ink-500">
@@ -355,6 +363,7 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
               type="number"
               min={0}
               step="0.01"
+              placeholder="0"
               className="input pl-8"
               value={salePrice}
               onChange={(e) => setSalePrice(e.target.value === "" ? "" : Number(e.target.value))}
