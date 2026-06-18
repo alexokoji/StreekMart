@@ -13,7 +13,18 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     where: { id: params.id },
     include: {
       seller: {
-        select: { id: true, name: true, bio: true, avatarUrl: true, isSeller: true, isDesigner: true, sellerVerified: true, designerVerified: true },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          businessName: true,
+          bio: true,
+          avatarUrl: true,
+          isSeller: true,
+          isDesigner: true,
+          sellerVerified: true,
+          designerVerified: true,
+        },
       },
     },
   });

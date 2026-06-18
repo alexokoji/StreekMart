@@ -1,11 +1,15 @@
 import React, { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Screen } from "../components/Screen";
-import { Button } from "../components/Button";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { Input, PasswordInput } from "../components/Input";
+import { BrandMark } from "../components/BrandMark";
+import { SocialButton } from "../components/SocialButton";
+import { useOAuthSignIn } from "../state/useOAuthSignIn";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
@@ -15,79 +19,134 @@ export function LoginScreen() {
   const t = useTheme();
   const nav = useNavigation<Nav>();
   const { loginWithPassword, signingIn } = useAuth();
+  const { signIn: signInWithOAuth, busy: oauthBusy, appleSupported } = useOAuthSignIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   async function submit() {
     try {
       await loginWithPassword(email.trim(), password);
-      nav.goBack();
+      nav.reset({ index: 0, routes: [{ name: "Tabs" }] });
     } catch (err) {
       Alert.alert("Sign-in failed", err instanceof Error ? err.message : "Try again.");
     }
   }
 
+  const disabled = signingIn || !email.trim() || !password;
+
   return (
-    <Screen keyboard>
-      <Text style={[type.display, { color: t.text }]}>Welcome back</Text>
-      <Text style={[type.body, { color: t.textMuted, marginTop: 4 }]}>
-        Sign in to keep shopping where you left off.
-      </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
+      >
+        <BrandMark style={{ marginBottom: 28 }} />
 
-      <View style={styles.field}>
-        <Text style={[type.small, { color: t.textMuted }]}>Email</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder="you@example.com"
-          placeholderTextColor={t.textFaint}
-          style={[styles.input, { backgroundColor: t.bgElevated, borderColor: t.border, color: t.text }]}
-        />
-      </View>
-
-      <View style={styles.field}>
-        <Text style={[type.small, { color: t.textMuted }]}>Password</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          autoCapitalize="none"
-          secureTextEntry
-          placeholder="Your password"
-          placeholderTextColor={t.textFaint}
-          style={[styles.input, { backgroundColor: t.bgElevated, borderColor: t.border, color: t.text }]}
-        />
-      </View>
-
-      <Pressable onPress={() => nav.navigate("ForgotPassword")} style={{ marginTop: 8, alignItems: "flex-end" }}>
-        <Text style={[type.small, { color: t.accent, fontWeight: "600" }]}>Forgot your password?</Text>
-      </Pressable>
-      <Button
-        label="Sign in"
-        loading={signingIn}
-        disabled={!email.trim() || !password}
-        onPress={submit}
-        style={{ marginTop: 16 }}
-      />
-
-      <Pressable onPress={() => nav.replace("Register")} style={{ marginTop: 16, alignItems: "center" }}>
-        <Text style={[type.small, { color: t.textMuted }]}>
-          Don't have an account? <Text style={{ color: t.accent, fontWeight: "600" }}>Create one</Text>
+        <Text style={[styles.headline, { color: t.text }]}>Welcome back</Text>
+        <Text style={[type.body, { color: t.textMuted, marginTop: 6 }]}>
+          Sign in to pick up where you left off.
         </Text>
-      </Pressable>
-    </Screen>
+
+        <View style={{ marginTop: 28, gap: 14 }}>
+          <Input
+            leftIcon={<Ionicons name="mail-outline" size={18} color={t.textMuted} />}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            placeholder="Email"
+          />
+          <PasswordInput
+            leftIcon={<Ionicons name="lock-closed-outline" size={18} color={t.textMuted} />}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+          />
+        </View>
+
+        <Pressable
+          onPress={() => nav.navigate("ForgotPassword")}
+          hitSlop={8}
+          style={{ alignSelf: "flex-end", marginTop: 10 }}
+        >
+          <Text style={[type.small, { color: t.cta, fontWeight: "700" }]}>Forgot password?</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={submit}
+          disabled={disabled}
+          style={({ pressed }) => [
+            styles.cta,
+            { backgroundColor: t.cta, opacity: disabled ? 0.55 : pressed ? 0.9 : 1 },
+          ]}
+        >
+          <Text style={[type.bodyStrong, { color: t.ctaText, fontSize: 16 }]}>
+            {signingIn ? "Signing in…" : "Sign in"}
+          </Text>
+        </Pressable>
+
+        <View style={styles.dividerRow}>
+          <View style={[styles.dividerLine, { backgroundColor: t.border }]} />
+          <Text style={[type.small, { color: t.textMuted, marginHorizontal: 12 }]}>
+            or continue with
+          </Text>
+          <View style={[styles.dividerLine, { backgroundColor: t.border }]} />
+        </View>
+
+        <View style={styles.socials}>
+          <SocialButton
+            provider="google"
+            loading={oauthBusy === "google"}
+            disabled={oauthBusy !== null && oauthBusy !== "google"}
+            onPress={() => signInWithOAuth("google")}
+          />
+          {appleSupported ? (
+            <SocialButton
+              provider="apple"
+              loading={oauthBusy === "apple"}
+              disabled={oauthBusy !== null && oauthBusy !== "apple"}
+              onPress={() => signInWithOAuth("apple")}
+            />
+          ) : null}
+          <SocialButton
+            provider="facebook"
+            loading={oauthBusy === "facebook"}
+            disabled={oauthBusy !== null && oauthBusy !== "facebook"}
+            onPress={() => signInWithOAuth("facebook")}
+          />
+        </View>
+
+        <View style={styles.footerRow}>
+          <Text style={[type.body, { color: t.textMuted }]}>New here? </Text>
+          <Pressable onPress={() => nav.navigate("Register")} hitSlop={6}>
+            <Text style={[type.body, { color: t.cta, fontWeight: "700" }]}>Create an account</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  field: { marginTop: 16, gap: 6 },
-  input: {
-    height: 48,
-    paddingHorizontal: 14,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    fontSize: 15,
+  scroll: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 32 },
+  headline: { fontSize: 30, fontWeight: "800" },
+  cta: {
+    marginTop: 24,
+    height: 56,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  dividerRow: { flexDirection: "row", alignItems: "center", marginTop: 30, marginBottom: 18 },
+  dividerLine: { height: 1, flex: 1 },
+  socials: { flexDirection: "row", justifyContent: "center", gap: 18 },
+  footerRow: { flexDirection: "row", justifyContent: "center", marginTop: 28 },
 });

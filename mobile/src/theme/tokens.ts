@@ -116,13 +116,44 @@ export const darkTheme: Theme = {
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 36 };
 export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 };
+
+// Brand font — Nunito. Trebuchet MS isn't available on iOS/Android by
+// default, so we use Nunito (humanist sans, similar character, free via
+// Google Fonts). React Native ignores fontWeight when a custom
+// fontFamily is set, so each variant points at the specific weight
+// build. App.tsx loads the family and monkey-patches Text so even raw
+// `<Text style={{ fontWeight: "700" }}>` resolves to Nunito_700Bold.
+export const fontFamily = {
+  regular: "Nunito_400Regular",
+  medium: "Nunito_500Medium",
+  semibold: "Nunito_600SemiBold",
+  bold: "Nunito_700Bold",
+  extrabold: "Nunito_800ExtraBold",
+  black: "Nunito_900Black",
+} as const;
+
+// Map a fontWeight value to its specific family name so the bold
+// glyphs actually render bold. Exported because App.tsx's Text render
+// override uses the same mapping.
+export function nunitoFamilyFor(weight: number | string | undefined): string {
+  if (weight == null) return fontFamily.regular;
+  const n = typeof weight === "string" ? Number(weight) : weight;
+  if (Number.isNaN(n)) return fontFamily.regular;
+  if (n >= 900) return fontFamily.black;
+  if (n >= 800) return fontFamily.extrabold;
+  if (n >= 700) return fontFamily.bold;
+  if (n >= 600) return fontFamily.semibold;
+  if (n >= 500) return fontFamily.medium;
+  return fontFamily.regular;
+}
+
 export const type = {
-  display: { fontSize: 28, fontWeight: "800" as const },
-  h1: { fontSize: 22, fontWeight: "700" as const },
-  h2: { fontSize: 18, fontWeight: "700" as const },
-  bodyLg: { fontSize: 16, fontWeight: "400" as const },
-  body: { fontSize: 14, fontWeight: "400" as const },
-  bodyStrong: { fontSize: 14, fontWeight: "600" as const },
-  small: { fontSize: 12, fontWeight: "400" as const },
-  micro: { fontSize: 10, fontWeight: "600" as const },
+  display: { fontSize: 28, fontFamily: fontFamily.extrabold, fontWeight: "800" as const },
+  h1: { fontSize: 22, fontFamily: fontFamily.bold, fontWeight: "700" as const },
+  h2: { fontSize: 18, fontFamily: fontFamily.bold, fontWeight: "700" as const },
+  bodyLg: { fontSize: 16, fontFamily: fontFamily.regular, fontWeight: "400" as const },
+  body: { fontSize: 14, fontFamily: fontFamily.regular, fontWeight: "400" as const },
+  bodyStrong: { fontSize: 14, fontFamily: fontFamily.semibold, fontWeight: "600" as const },
+  small: { fontSize: 12, fontFamily: fontFamily.regular, fontWeight: "400" as const },
+  micro: { fontSize: 10, fontFamily: fontFamily.semibold, fontWeight: "600" as const },
 };

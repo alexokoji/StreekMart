@@ -28,7 +28,33 @@ export async function GET() {
   const cart = await getOrCreateCart(guard.session.sub);
   const items = await prisma.cartItem.findMany({
     where: { cartId: cart.id },
-    include: { product: { include: { seller: { select: { id: true, name: true } } } } },
+    include: {
+      product: {
+        include: {
+          seller: {
+            select: {
+              id: true,
+              name: true,
+              businessName: true,
+              // streekmartAffiliated drives the preset delivery fee. Only
+              // affiliated sellers expose a preset price; non-affiliated
+              // sellers get a courier quote at checkout (Shipbubble).
+              streekmartAffiliated: true,
+              deliveryWithinCityCents: true,
+              deliveryOutsideCityCents: true,
+              deliveryOutsideCountryCents: true,
+              // Pickup location — Shipbubble needs the seller's
+              // city/state/country to quote rates. Same fields the web
+              // checkout passes to /api/logistics/rates.
+              city: true,
+              region: true,
+              country: true,
+              sellerVerified: true,
+            },
+          },
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 

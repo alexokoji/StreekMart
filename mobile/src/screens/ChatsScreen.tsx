@@ -2,8 +2,8 @@ import React, { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Screen } from "../components/Screen";
-import { Button } from "../components/Button";
+import { Ionicons } from "@expo/vector-icons";
+import { BackHeader } from "../components/BackHeader";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
 import { api } from "../api/client";
@@ -19,6 +19,27 @@ type ChatRow = {
   counterpart: Counterpart | null;
   lastMessage: { body: string | null; createdAt: string; senderId: string } | null;
 };
+
+function timeAgo(iso: string): string {
+  const now = Date.now();
+  const then = new Date(iso).getTime();
+  const diff = Math.max(0, now - then);
+  const m = Math.floor(diff / 60_000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d`;
+  return new Date(iso).toLocaleDateString("en-NG", { month: "short", day: "numeric" });
+}
+
+function avatarColor(seed: string, t: ReturnType<typeof useTheme>) {
+  const colors = [t.cta, t.promo, t.premium, t.accent, t.success.fg];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return colors[Math.abs(h) % colors.length];
+}
 
 export function ChatsScreen() {
   const t = useTheme();
@@ -48,77 +69,127 @@ export function ChatsScreen() {
 
   if (!user) {
     return (
-      <Screen>
-        <Text style={[type.body, { color: t.text }]}>Sign in to see your messages.</Text>
-        <Button label="Sign in" style={{ marginTop: 12 }} onPress={() => nav.navigate("Login")} />
-      </Screen>
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <BackHeader title="Messages" />
+        <View style={styles.empty}>
+          <Text style={[type.body, { color: t.textMuted, textAlign: "center" }]}>
+            Sign in to chat with sellers and designers.
+          </Text>
+          <Pressable
+            onPress={() => nav.navigate("Login")}
+            style={({ pressed }) => [
+              styles.pill,
+              { backgroundColor: t.cta, opacity: pressed ? 0.9 : 1, marginTop: 16 },
+            ]}
+          >
+            <Text style={{ color: t.ctaText, fontWeight: "700" }}>Sign in</Text>
+          </Pressable>
+        </View>
+      </View>
     );
   }
   if (loading) {
     return (
-      <Screen padding={false}>
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <BackHeader title="Messages" />
         <View style={styles.centered}><ActivityIndicator color={t.cta} size="large" /></View>
-      </Screen>
+      </View>
     );
   }
 
   return (
-    <Screen padding={false}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <BackHeader title="Messages" />
       <FlatList
         data={chats}
         keyExtractor={(c) => c.id}
-        contentContainerStyle={{ padding: 16, gap: 8 }}
-        ListHeaderComponent={
-          <Text style={[type.h1, { color: t.text, marginBottom: 8 }]}>Messages</Text>
-        }
+        contentContainerStyle={{ padding: 16, gap: 4 }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={[type.body, { color: t.textMuted, textAlign: "center" }]}>
-              No conversations yet. Open a product and tap "Message seller" to start one.
+            <Ionicons name="chatbubbles-outline" size={40} color={t.textMuted} />
+            <Text style={[type.bodyStrong, { color: t.text, marginTop: 10 }]}>
+              No conversations yet
+            </Text>
+            <Text style={[type.small, { color: t.textMuted, marginTop: 4, textAlign: "center" }]}>
+              Open a product and tap "Message seller" to start chatting.
             </Text>
           </View>
         }
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.cta} onRefresh={() => { setRefreshing(true); load(); }} />}
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => nav.navigate("Chat", { id: item.id, counterpartName: item.counterpart?.name ?? "Chat" })}
-            style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}
-          >
-            <View style={[styles.avatar, { backgroundColor: t.accent }]}>
-              <Text style={{ color: t.ctaText, fontWeight: "800", fontSize: 14 }}>
-                {(item.counterpart?.name ?? "?").slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={[type.bodyStrong, { color: t.text }]} numberOfLines={1}>
-                  {item.counterpart?.name ?? "Unknown"}
-                </Text>
-                <Text style={[type.small, { color: t.textMuted }]}>
-                  {new Date(item.updatedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} tintColor={t.cta} onRefresh={() => { setRefreshing(true); load(); }} />
+        }
+        renderItem={({ item }) => {
+          const name = item.counterpart?.name ?? "Unknown";
+          const role = item.counterpart?.isSeller
+            ? "Seller"
+            : item.counterpart?.isDesigner
+              ? "Designer"
+              : null;
+          const initial = name.slice(0, 1).toUpperCase();
+          const last = item.lastMessage?.body ?? "No messages yet";
+          return (
+            <Pressable
+              onPress={() => nav.navigate("Chat", { id: item.id, counterpartName: name })}
+              style={({ pressed }) => [
+                styles.row,
+                { borderBottomColor: t.border, opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <View style={[styles.avatar, { backgroundColor: avatarColor(name, t) }]}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{initial}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.rowHead}>
+                  <View style={{ flexDirection: "row", alignItems: "center", flex: 1, gap: 6 }}>
+                    <Text style={[type.bodyStrong, { color: t.text }]} numberOfLines={1}>
+                      {name}
+                    </Text>
+                    {role ? (
+                      <View style={[styles.roleChip, { backgroundColor: t.accentSoft }]}>
+                        <Text style={{ color: t.accent, fontSize: 10, fontWeight: "800" }}>
+                          {role.toUpperCase()}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text style={[type.small, { color: t.textMuted, marginLeft: 8 }]}>
+                    {timeAgo(item.updatedAt)}
+                  </Text>
+                </View>
+                <Text style={[type.small, { color: t.textMuted, marginTop: 4 }]} numberOfLines={1}>
+                  {last}
                 </Text>
               </View>
-              <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]} numberOfLines={1}>
-                {item.lastMessage?.body ?? "No messages yet"}
-              </Text>
-            </View>
-          </Pressable>
-        )}
+            </Pressable>
+          );
+        }}
       />
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   empty: { padding: 32, alignItems: "center" },
+  pill: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: radius.pill },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 12,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  avatar: { width: 40, height: 40, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowHead: { flexDirection: "row", alignItems: "center" },
+  roleChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
 });

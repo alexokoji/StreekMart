@@ -1,16 +1,17 @@
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Screen } from "../components/Screen";
-import { ProductCardSkeleton, Skeleton } from "../components/Skeleton";
-import { Button } from "../components/Button";
+import { BackHeader } from "../components/BackHeader";
+import { ProductCardSkeleton } from "../components/Skeleton";
 import { ProductCard, type ProductCardData } from "../components/ProductCard";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
 import { api } from "../api/client";
-import { type } from "../theme/tokens";
+import { sellerDisplayName } from "../lib/sellerName";
+import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
+import { goToTab } from "../navigation/goToTab";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -28,6 +29,8 @@ type FavoriteResp = {
     } | null;
   }>;
 };
+
+const FAB_CLEARANCE = 110;
 
 export function WishlistScreen() {
   const t = useTheme();
@@ -61,7 +64,8 @@ export function WishlistScreen() {
             price: p.price,
             salePrice: p.salePrice,
             image,
-            sellerName: p.seller.businessName ?? p.seller.name,
+            sellerName: sellerDisplayName(p.seller),
+            saved: true,
           };
         });
       setItems(products);
@@ -75,58 +79,110 @@ export function WishlistScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  async function unsave(productId: string) {
+    const prev = items;
+    setItems((cur) => cur.filter((c) => c.id !== productId));
+    try {
+      await api.post("/api/favorites", { kind: "product", id: productId });
+    } catch (err) {
+      setItems(prev);
+      Alert.alert("Couldn't remove", err instanceof Error ? err.message : "Try again.");
+    }
+  }
+
   if (!user) {
     return (
-      <Screen>
-        <Text style={[type.body, { color: t.text }]}>Sign in to see your saved items.</Text>
-        <Button label="Sign in" style={{ marginTop: 12 }} onPress={() => nav.navigate("Login")} />
-      </Screen>
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <BackHeader title="Wishlist" />
+        <View style={styles.empty}>
+          <Text style={[type.body, { color: t.textMuted, textAlign: "center" }]}>
+            Sign in to save items to your wishlist.
+          </Text>
+          <Pressable
+            onPress={() => nav.navigate("Login")}
+            style={({ pressed }) => [
+              styles.pill,
+              { backgroundColor: t.cta, opacity: pressed ? 0.9 : 1, marginTop: 16 },
+            ]}
+          >
+            <Text style={{ color: t.ctaText, fontWeight: "700" }}>Sign in</Text>
+          </Pressable>
+        </View>
+      </View>
     );
   }
-  if (loading) {
-    return (
-      <Screen padding={false} scroll contentStyle={{ padding: 12, gap: 12 }}>
-        <View style={{ flexDirection: "row", gap: 12 }}><ProductCardSkeleton /><ProductCardSkeleton /></View>
-        <View style={{ flexDirection: "row", gap: 12 }}><ProductCardSkeleton /><ProductCardSkeleton /></View>
-        <View style={{ flexDirection: "row", gap: 12 }}><ProductCardSkeleton /><ProductCardSkeleton /></View>
-      </Screen>
-    );
-  }
+
   return (
-    <Screen padding={false}>
-      <FlatList
-        data={items}
-        keyExtractor={(p) => p.id}
-        numColumns={2}
-        contentContainerStyle={{ padding: 12, gap: 12 }}
-        columnWrapperStyle={{ gap: 12 }}
-        ListHeaderComponent={
-          <View style={{ paddingHorizontal: 4, paddingBottom: 12 }}>
-            <Text style={[type.h1, { color: t.text }]}>Saved items</Text>
-            <Text style={[type.small, { color: t.textMuted, marginTop: 4 }]}>
-              Tap the heart on any product to save it here.
-            </Text>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={[type.body, { color: t.textMuted }]}>
-              Nothing saved yet.
-            </Text>
-          </View>
-        }
-        refreshControl={<RefreshControl refreshing={refreshing} tintColor={t.cta} onRefresh={() => { setRefreshing(true); load(); }} />}
-        renderItem={({ item }) => (
-          <View style={{ flex: 1 }}>
-            <ProductCard product={item} onPress={() => nav.navigate("ProductDetail", { id: item.id })} />
-          </View>
-        )}
-      />
-    </Screen>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <BackHeader title={items.length === 0 ? "Wishlist" : `Wishlist · ${items.length}`} />
+      {loading ? (
+        <FlatList
+          data={Array.from({ length: 6 })}
+          keyExtractor={(_, i) => String(i)}
+          numColumns={2}
+          contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: FAB_CLEARANCE }}
+          columnWrapperStyle={{ gap: 12 }}
+          renderItem={() => (
+            <View style={{ flex: 1 }}>
+              <ProductCardSkeleton />
+            </View>
+          )}
+        />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(p) => p.id}
+          numColumns={2}
+          contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: FAB_CLEARANCE }}
+          columnWrapperStyle={{ gap: 12 }}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={[type.body, { color: t.textMuted, textAlign: "center" }]}>
+                Tap the heart on any product to save it here.
+              </Text>
+              <Pressable
+                onPress={() => goToTab(nav, "Home")}
+                style={({ pressed }) => [
+                  styles.pill,
+                  { backgroundColor: t.cta, opacity: pressed ? 0.9 : 1, marginTop: 16 },
+                ]}
+              >
+                <Text style={{ color: t.ctaText, fontWeight: "700" }}>Browse products</Text>
+              </Pressable>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              tintColor={t.cta}
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+            />
+          }
+          renderItem={({ item }) => (
+            <View style={{ flex: 1 }}>
+              <ProductCard
+                product={item}
+                onPress={() => nav.navigate("ProductDetail", { id: item.id })}
+                onToggleSave={() => unsave(item.id)}
+              />
+            </View>
+          )}
+        />
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+  headline: { fontSize: 24, fontWeight: "800" },
   empty: { padding: 32, alignItems: "center" },
+  pill: {
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+  },
 });

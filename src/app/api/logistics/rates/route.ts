@@ -52,10 +52,14 @@ function expandStateCode(code?: string | null): string {
 const Body = z.object({
   provider: z.enum(["SHIPBUBBLE", "KWIK"]).default("SHIPBUBBLE"),
   sellerId: z.string().optional(),
-  pickupCity: z.string(),
+  // Pickup fields are optional when sellerId is supplied — the server
+  // backfills missing pieces from the seller's User row + default
+  // pickup Address. Lets mobile clients that haven't received a cart
+  // payload with the seller's city still quote rates.
+  pickupCity: z.string().optional().default(""),
   pickupState: z.string().optional(),
   pickupPostalCode: z.string().optional(),
-  pickupCountry: z.string(),
+  pickupCountry: z.string().optional().default(""),
   deliveryCity: z.string(),
   deliveryState: z.string().optional(),
   deliveryPostalCode: z.string().optional(),
@@ -121,11 +125,21 @@ export async function POST(req: Request) {
       longitude?: number;
       phone?: string;
     } | null = null;
+    // Seller's own city/state/country, used to backfill any pickup
+    // field the caller didn't supply.
+    let sellerLocation: { city: string | null; region: string | null; country: string | null } = {
+      city: null,
+      region: null,
+      country: null,
+    };
     if (parsed.data.sellerId) {
       const seller = await prisma.user.findUnique({
         where: { id: parsed.data.sellerId },
         select: {
           phone: true,
+          city: true,
+          region: true,
+          country: true,
           addresses: {
             where: { kind: "PICKUP", isDefault: true },
             take: 1,
@@ -133,6 +147,11 @@ export async function POST(req: Request) {
         },
       });
       if (seller?.phone) sellerPhone = seller.phone;
+      sellerLocation = {
+        city: seller?.city ?? null,
+        region: seller?.region ?? null,
+        country: seller?.country ?? null,
+      };
       const pickup = seller?.addresses?.[0];
       if (pickup) {
         sellerPickup = {
@@ -155,9 +174,12 @@ export async function POST(req: Request) {
     const deliveryCity = parsed.data.deliveryCity || me.city;
     const deliveryState = expandStateCode(parsed.data.deliveryState || me.region);
     const deliveryCountry = parsed.data.deliveryCountry || me.country || "NG";
-    const pickupCity = parsed.data.pickupCity;
-    const pickupState = expandStateCode(parsed.data.pickupState);
-    const pickupCountry = parsed.data.pickupCountry || "NG";
+    // Backfill missing pickup fields from the seller's User record.
+    // Clients that don't have the seller's city in their cart payload
+    // (e.g. older mobile builds) will send "" — we resolve here.
+    const pickupCity = parsed.data.pickupCity || sellerLocation.city || "";
+    const pickupState = expandStateCode(parsed.data.pickupState || sellerLocation.region || "");
+    const pickupCountry = parsed.data.pickupCountry || sellerLocation.country || "NG";
 
     console.log("Processed location values:", {
       pickupCity,

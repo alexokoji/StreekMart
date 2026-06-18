@@ -4,23 +4,42 @@
 // registered), request the Expo push token and POST it to
 // /api/push/register so server-side fan-outs reach this install.
 //
-// Re-runs the registration when the user changes (e.g. after logout/login)
-// so a logged-in user always has their own row associated with the token.
+// SDK 53+ caveat: Expo removed remote push functionality from Expo Go
+// entirely. The `expo-notifications` module crashes at import time
+// inside Expo Go because internal initialization calls the push API.
+// To keep Expo Go previews working, we lazy-require the module only
+// when running outside Expo Go (dev / production builds).
 
 import { useEffect } from "react";
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { api } from "../api/client";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+// Lazy-loaded notifications module. Stays undefined inside Expo Go.
+type NotificationsModule = typeof import("expo-notifications");
+let _Notifications: NotificationsModule | null = null;
+
+function getNotifications(): NotificationsModule | null {
+  if (isExpoGo) return null;
+  if (_Notifications) return _Notifications;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  _Notifications = require("expo-notifications") as NotificationsModule;
+  _Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      // SDK 53+: shouldShowAlert was split into shouldShowBanner +
+      // shouldShowList. Set both to true to preserve the prior behavior.
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+  return _Notifications;
+}
 
 let registeredForUser: string | null = null;
 
@@ -35,7 +54,10 @@ export function usePushRegistration(userId: string | undefined) {
 
     (async () => {
       try {
+        const Notifications = getNotifications();
+        if (!Notifications) return; // Expo Go — skip silently.
         if (!Device.isDevice) return; // simulators don't get push
+
         const { status: existing } = await Notifications.getPermissionsAsync();
         let status = existing;
         if (existing !== "granted") {
@@ -79,6 +101,8 @@ export function usePushRegistration(userId: string | undefined) {
 export async function refreshPushRegistration(userId: string): Promise<
   "registered" | "denied" | "unsupported"
 > {
+  const Notifications = getNotifications();
+  if (!Notifications) return "unsupported";
   if (!Device.isDevice) return "unsupported";
   const res = await Notifications.requestPermissionsAsync();
   if (res.status !== "granted") return "denied";

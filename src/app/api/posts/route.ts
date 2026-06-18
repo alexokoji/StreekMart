@@ -5,10 +5,11 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { resolveActingOwner } from "@/lib/managersServer";
 
-// GET /api/posts?mine=1
+// GET /api/posts?mine=1&authorId=&q=
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const mine = url.searchParams.get("mine");
+  const authorId = url.searchParams.get("authorId") ?? undefined;
   const q = url.searchParams.get("q");
 
   if (mine) {
@@ -22,8 +23,31 @@ export async function GET(req: Request) {
   }
 
   const posts = await prisma.post.findMany({
-    where: q ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] } : undefined,
-    include: { author: { select: { id: true, name: true, exposureScore: true } } },
+    where: {
+      ...(authorId ? { authorId } : {}),
+      ...(q
+        ? { OR: [{ title: { contains: q } }, { body: { contains: q } }] }
+        : {}),
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          businessName: true,
+          bio: true,
+          avatarUrl: true,
+          coverImageUrl: true,
+          isSeller: true,
+          isDesigner: true,
+          sellerVerified: true,
+          designerVerified: true,
+          exposureScore: true,
+          createdAt: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -16,13 +16,16 @@ import * as Sharing from "expo-sharing";
 import type { RouteProp } from "@react-navigation/native";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Screen } from "../components/Screen";
-import { Button } from "../components/Button";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
+import { BackHeader } from "../components/BackHeader";
+import { Chip } from "../components/Chip";
 import { api } from "../api/client";
+import { sellerDisplayName } from "../lib/sellerName";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
+import { goToTab } from "../navigation/goToTab";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,13 +40,43 @@ type Product = {
   salePrice: number | null;
   category: string;
   status: string;
-  images: string[];
+  // Server sends *Json string fields; some endpoints normalise. Accept both.
+  images?: string[];
+  imagesJson?: string;
+  sizes?: string[];
+  sizesJson?: string;
   attributesJson?: string;
   seller: { id: string; name: string; businessName?: string | null };
-  sizes?: string[];
   ratingAvg?: number;
   ratingCount?: number;
 };
+
+// Build the carousel image list from either field, swallowing parse errors.
+function imagesFor(product: Product): string[] {
+  if (product.images && product.images.length > 0) return product.images;
+  if (product.imagesJson) {
+    try {
+      const arr = JSON.parse(product.imagesJson);
+      if (Array.isArray(arr)) return arr.filter((s): s is string => typeof s === "string");
+    } catch {
+      /* fall through */
+    }
+  }
+  return [];
+}
+
+function sizesFor(product: Product): string[] {
+  if (product.sizes && product.sizes.length > 0) return product.sizes;
+  if (product.sizesJson) {
+    try {
+      const arr = JSON.parse(product.sizesJson);
+      if (Array.isArray(arr)) return arr.filter((s): s is string => typeof s === "string");
+    } catch {
+      /* fall through */
+    }
+  }
+  return [];
+}
 
 type Review = {
   id: string;
@@ -60,7 +93,8 @@ type ReviewsResp = {
   myReview: { rating: number; body: string | null } | null;
 };
 
-const { width } = Dimensions.get("window");
+const { width: SCREEN_W } = Dimensions.get("window");
+const FAB_CLEARANCE = 110;
 
 export function ProductDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "ProductDetail">>();
@@ -71,15 +105,15 @@ export function ProductDetailScreen() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [adding, setAdding] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [zoomIndex, setZoomIndex] = useState<number | null>(null);
   const [saved, setSaved] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
-  // Variant picker state
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedAttrs, setSelectedAttrs] = useState<Record<string, string>>({});
 
-  // Reviews
   const [reviews, setReviews] = useState<ReviewsResp | null>(null);
   const [writingReview, setWritingReview] = useState(false);
   const [rating, setRating] = useState(5);
@@ -90,27 +124,81 @@ export function ProductDetailScreen() {
     if (!product?.attributesJson) return [];
     try {
       const parsed = JSON.parse(product.attributesJson);
-      if (Array.isArray(parsed)) {
-        return parsed.map((g: { id?: string; label?: string; options?: Array<{ id?: string; label?: string }> }, i: number) => ({
-          id: g.id ?? `g${i}`,
-          label: g.label ?? "Option",
-          options: (g.options ?? []).map((o, j) => ({ id: o.id ?? `o${j}`, label: o.label ?? "" })),
-        }));
-      }
+      if (!Array.isArray(parsed)) return [];
+
+      // The server / seller might send the variation options in a few
+      // different shapes — handle all of them so chips don't render
+      // blank:
+      //   1. [{ id, label, options: [{ id, label }] }]
+      //   2. [{ id, label, options: ["Red", "Blue"] }]
+      //   3. [{ id, label, values: [...] }]    (alt key)
+      //   4. { Color: ["Red", "Blue"], Material: [...] }  (record-style)
+      const normaliseOption = (o: unknown, j: number): AttrOption => {
+        if (typeof o === "string") return { id: o || `o${j}`, label: o };
+        if (o && typeof o === "object") {
+          const obj = o as { id?: string; label?: string; value?: string; name?: string };
+          const label = obj.label ?? obj.value ?? obj.name ?? "";
+          return { id: obj.id ?? label ?? `o${j}`, label };
+        }
+        return { id: `o${j}`, label: String(o ?? "") };
+      };
+
+      const out: AttrGroup[] = parsed
+        .map((g: unknown, i: number): AttrGroup | null => {
+          if (typeof g !== "object" || g === null) return null;
+          const raw = g as {
+            id?: string;
+            label?: string;
+            name?: string;
+            options?: unknown[];
+            values?: unknown[];
+          };
+          const label = raw.label ?? raw.name ?? `Option ${i + 1}`;
+          const rawOptions = raw.options ?? raw.values ?? [];
+          const options = rawOptions
+            .map(normaliseOption)
+            .filter((o) => o.label.length > 0);
+          return {
+            id: raw.id ?? label.toLowerCase().replace(/\s+/g, "-") ?? `g${i}`,
+            label,
+            options,
+          };
+        })
+        .filter((g): g is AttrGroup => g !== null && g.options.length > 0);
+
+      return out;
     } catch {
       return [];
     }
-    return [];
   }, [product]);
 
   const loadProduct = useCallback(async () => {
     try {
       const data = await api.get<{ product: Product }>(`/api/products/${id}`);
-      setProduct(data.product);
-      // Track recently-viewed for logged-in users.
-      if (user) {
-        api.post("/api/recently-viewed", { productId: id }).catch(() => {});
+      let p = data.product;
+      // If the product endpoint hasn't been redeployed with the widened
+      // seller select, businessName won't be on the row. /api/search
+      // resolves seller.name to `businessName?.trim() || name` already,
+      // so use it as a fallback display source.
+      const business = (p.seller?.businessName ?? "").trim();
+      if (!business) {
+        try {
+          const r = await api.post<{
+            results: Array<{ id: string; seller: { id: string; name: string } }>;
+          }>("/api/search", { query: p.name });
+          const hit = (r.results ?? []).find(
+            (h) => h.id === p.id || h.seller?.id === p.seller?.id,
+          );
+          const resolved = hit?.seller?.name?.trim();
+          if (resolved && resolved !== p.seller?.name) {
+            p = { ...p, seller: { ...p.seller, businessName: resolved } };
+          }
+        } catch {
+          /* ignore */
+        }
       }
+      setProduct(p);
+      if (user) api.post("/api/recently-viewed", { productId: id }).catch(() => {});
     } catch {
       setProduct(null);
     } finally {
@@ -137,15 +225,17 @@ export function ProductDetailScreen() {
       const data = await api.get<{ favorites: Array<{ productId: string | null }> }>("/api/favorites");
       setSaved((data.favorites ?? []).some((f) => f.productId === id));
     } catch {
-      // ignore
+      /* ignore */
     }
   }, [user, id]);
 
-  useFocusEffect(useCallback(() => {
-    loadProduct();
-    loadReviews();
-    loadSaved();
-  }, [loadProduct, loadReviews, loadSaved]));
+  useFocusEffect(
+    useCallback(() => {
+      loadProduct();
+      loadReviews();
+      loadSaved();
+    }, [loadProduct, loadReviews, loadSaved]),
+  );
 
   async function toggleSave() {
     if (!user) {
@@ -153,38 +243,12 @@ export function ProductDetailScreen() {
       return;
     }
     const prev = saved;
-    setSaved(!prev); // optimistic
+    setSaved(!prev);
     try {
       const res = await api.post<{ saved: boolean }>("/api/favorites", { kind: "product", id });
       setSaved(res.saved);
     } catch {
-      setSaved(prev); // rollback
-    }
-  }
-
-  async function addToCart() {
-    if (!user) {
-      Alert.alert("Sign in", "You need an account to add items to the cart.");
-      return;
-    }
-    if (!product) return;
-    // Check required variants picked
-    for (const g of attrGroups) {
-      if (g.options.length > 0 && !selectedAttrs[g.id]) {
-        Alert.alert("Pick options", `Choose a ${g.label.toLowerCase()} before adding to cart.`);
-        return;
-      }
-    }
-    setAdding(true);
-    try {
-      const body: Record<string, unknown> = { productId: product.id, quantity: 1 };
-      if (Object.keys(selectedAttrs).length > 0) body.attributesSelection = selectedAttrs;
-      await api.post("/api/cart", body);
-      Alert.alert("Added", `${product.name} is in your cart.`);
-    } catch (err) {
-      Alert.alert("Couldn't add", err instanceof Error ? err.message : "Try again.");
-    } finally {
-      setAdding(false);
+      setSaved(prev);
     }
   }
 
@@ -196,7 +260,7 @@ export function ProductDetailScreen() {
     }
     try {
       const r = await api.post<{ chat: { id: string } }>("/api/chats", { withUserId: product.seller.id });
-      nav.navigate("Chat", { id: r.chat.id, counterpartName: product.seller.businessName ?? product.seller.name });
+      nav.navigate("Chat", { id: r.chat.id, counterpartName: sellerDisplayName(product.seller) });
     } catch (err) {
       Alert.alert("Could not open chat", err instanceof Error ? err.message : "Try again.");
     }
@@ -212,18 +276,87 @@ export function ProductDetailScreen() {
     try {
       await Sharing.shareAsync(url, { dialogTitle: product.name });
     } catch {
-      // user cancelled -- silent
+      /* user cancelled */
+    }
+  }
+
+  function validatedAddPayload(): Record<string, unknown> | null {
+    if (!product) return null;
+    const availableSizes = sizesFor(product);
+    if (availableSizes.length > 0 && !selectedSize) {
+      Alert.alert("Pick a size", "Choose a size before adding to your cart.");
+      return null;
+    }
+    // Server-side AttributeSelection is `Record<groupName, optionLabel>`
+    // (see src/lib/productAttributes.ts on the web). Build the same shape
+    // here so the /api/cart POST validates instead of bouncing back with
+    // "Please choose a <name>" for every group.
+    const selectionByGroupName: Record<string, string> = {};
+    for (const g of attrGroups) {
+      const picked = selectedAttrs[g.label];
+      if (g.options.length > 0 && !picked) {
+        Alert.alert("Pick options", `Choose a ${g.label.toLowerCase()} first.`);
+        return null;
+      }
+      if (picked) {
+        // Translate the picked option's id back to its canonical label.
+        const opt = g.options.find((o) => o.id === picked);
+        if (opt) selectionByGroupName[g.label] = opt.label;
+      }
+    }
+    const payload: Record<string, unknown> = { productId: product.id, quantity: 1 };
+    if (selectedSize) payload.size = selectedSize;
+    // The /api/cart POST contract uses `selectedAttributes`, not
+    // `attributesSelection` — match the web exactly.
+    if (Object.keys(selectionByGroupName).length > 0) {
+      payload.selectedAttributes = selectionByGroupName;
+    }
+    return payload;
+  }
+
+  async function addToCart() {
+    if (!user) {
+      Alert.alert("Sign in", "You need an account to add items to the cart.");
+      return;
+    }
+    const payload = validatedAddPayload();
+    if (!payload) return;
+    setAdding(true);
+    try {
+      await api.post("/api/cart", payload);
+      Alert.alert("Added", `${product!.name} is in your cart.`);
+    } catch (err) {
+      Alert.alert("Couldn't add", err instanceof Error ? err.message : "Try again.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function buyNow() {
+    if (!user) {
+      Alert.alert("Sign in", "You need an account to check out.");
+      return;
+    }
+    const payload = validatedAddPayload();
+    if (!payload) return;
+    setAdding(true);
+    try {
+      await api.post("/api/cart", payload);
+      nav.navigate("Checkout");
+    } catch (err) {
+      Alert.alert("Couldn't continue", err instanceof Error ? err.message : "Try again.");
+    } finally {
+      setAdding(false);
     }
   }
 
   async function submitReview() {
     setSubmittingReview(true);
     try {
-      const r = await api.post(`/api/products/${id}/reviews`, {
+      await api.post(`/api/products/${id}/reviews`, {
         rating,
         body: reviewBody || undefined,
       });
-      void r;
       setWritingReview(false);
       await loadReviews();
     } catch (err) {
@@ -235,159 +368,312 @@ export function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <Screen padding={false}>
-        <View style={styles.centered}><ActivityIndicator color={t.cta} size="large" /></View>
-      </Screen>
+      <View style={{ flex: 1, backgroundColor: t.bg, alignItems: "center", justifyContent: "center" }}>
+        <ActivityIndicator color={t.cta} size="large" />
+      </View>
     );
   }
   if (!product) {
     return (
-      <Screen>
-        <Text style={[type.body, { color: t.text }]}>Product not found.</Text>
-      </Screen>
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <BackHeader />
+        <View style={styles.centered}>
+          <Text style={[type.body, { color: t.text }]}>Product not found.</Text>
+        </View>
+      </View>
     );
   }
 
   const effective = product.salePrice ?? product.price;
   const hasDiscount = product.salePrice != null && product.salePrice < product.price;
-  const images = product.images?.length ? product.images : [null];
+  const discountPct = hasDiscount
+    ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
+    : 0;
+  const parsedImages = imagesFor(product);
+  const images: Array<string | null> = parsedImages.length > 0 ? parsedImages : [null];
+  const sizes = sizesFor(product);
 
   return (
-    <Screen padding={false} scroll edges={[]}>
-      {/* Image carousel - tap to zoom */}
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) =>
-          setActiveImage(Math.round(e.nativeEvent.contentOffset.x / width))
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <BackHeader
+        rightAction={
+          <Pressable onPress={() => goToTab(nav, "Cart")} hitSlop={8}>
+            <Ionicons name="bag-handle-outline" size={22} color={t.text} />
+          </Pressable>
         }
-      >
-        {images.map((img, i) => (
-          <Pressable
-            key={i}
-            onPress={() => img && setZoomIndex(i)}
-            style={{ width, aspectRatio: 1, backgroundColor: t.bgElevated }}
+      />
+      <ScrollView contentContainerStyle={{ paddingBottom: FAB_CLEARANCE + 40 }}>
+        {/* Image carousel */}
+        <View>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) =>
+              setActiveImage(Math.round(e.nativeEvent.contentOffset.x / SCREEN_W))
+            }
           >
-            {img && (
-              <Image source={{ uri: img }} style={styles.heroImage} contentFit="cover" transition={150} />
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>
-      {images.length > 1 && (
-        <View style={styles.dotsRow}>
-          {images.map((_, i) => (
-            <View
-              key={i}
-              style={[styles.dot, { backgroundColor: i === activeImage ? t.cta : t.border }]}
-            />
-          ))}
-        </View>
-      )}
-
-      <View style={styles.content}>
-        <View style={styles.headerRow}>
-          <Text style={[type.h1, { color: t.text, flex: 1 }]}>{product.name}</Text>
-          <Pressable onPress={shareProduct} hitSlop={10} style={styles.iconBtn}>
-            <Text style={{ color: t.accent, fontSize: 18 }}>↗</Text>
-          </Pressable>
-          <Pressable onPress={toggleSave} hitSlop={10} style={styles.iconBtn}>
-            <Text style={{ color: saved ? t.promo : t.textMuted, fontSize: 22 }}>
-              {saved ? "♥" : "♡"}
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.priceRow}>
-          <Text style={[type.display, { color: t.cta }]}>
-            ₦{Math.round(effective).toLocaleString("en-NG")}
-          </Text>
-          {hasDiscount && (
-            <Text style={[type.body, { color: t.textMuted, textDecorationLine: "line-through", marginLeft: 10 }]}>
-              ₦{Math.round(product.price).toLocaleString("en-NG")}
-            </Text>
-          )}
-        </View>
-
-        {reviews && reviews.ratingCount > 0 && (
-          <Text style={[type.small, { color: t.premium, marginTop: 4 }]}>
-            ★ {reviews.ratingAvg.toFixed(1)} ({reviews.ratingCount} review{reviews.ratingCount === 1 ? "" : "s"})
-          </Text>
-        )}
-
-        <View style={[styles.sellerCard, { backgroundColor: t.card, borderColor: t.border }]}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <View>
-              <Text style={[type.small, { color: t.textMuted }]}>Sold by</Text>
-              <Text style={[type.bodyStrong, { color: t.text, marginTop: 2 }]}>
-                {product.seller.businessName ?? product.seller.name}
-              </Text>
+            {images.map((img, i) => (
+              <Pressable
+                key={i}
+                onPress={() => img && setZoomIndex(i)}
+                style={{ width: SCREEN_W, aspectRatio: 1, backgroundColor: t.bgElevated }}
+              >
+                {img ? (
+                  <Image source={{ uri: img }} style={styles.heroImage} contentFit="cover" transition={150} />
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+          {images.length > 1 ? (
+            <View style={styles.dotsRow}>
+              {images.map((_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    {
+                      backgroundColor: i === activeImage ? t.cta : t.border,
+                      width: i === activeImage ? 16 : 8,
+                    },
+                  ]}
+                />
+              ))}
             </View>
-            <Pressable onPress={messageSeller} style={styles.msgBtn}>
-              <Text style={{ color: t.accent, fontWeight: "600", fontSize: 13 }}>Message</Text>
+          ) : null}
+          <Pressable
+            onPress={toggleSave}
+            hitSlop={8}
+            style={[styles.heartFab, { backgroundColor: "rgba(255,255,255,0.92)" }]}
+          >
+            <Ionicons
+              name={saved ? "heart" : "heart-outline"}
+              size={20}
+              color={saved ? t.promo : t.textMuted}
+            />
+          </Pressable>
+        </View>
+
+        {/* Title, seller, rating, price */}
+        <View style={styles.block}>
+          <Text style={[type.h1, { color: t.text }]}>{product.name}</Text>
+          <View style={styles.sellerLine}>
+            <Pressable
+              onPress={() =>
+                nav.navigate("SellerProfile", {
+                  id: product.seller.id,
+                  name: product.seller.name,
+                  businessName: product.seller.businessName ?? null,
+                })
+              }
+              hitSlop={6}
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text style={[type.bodyStrong, { color: t.cta, marginTop: 6 }]}>
+                {sellerDisplayName(product.seller)}
+              </Text>
+            </Pressable>
+            <Text style={[type.small, { color: t.textMuted, marginTop: 6 }]}> · </Text>
+            <Pressable onPress={messageSeller} hitSlop={6}>
+              <Text style={[type.small, { color: t.textMuted, marginTop: 6 }]}>Message</Text>
             </Pressable>
           </View>
+
+          {(reviews?.ratingCount ?? 0) > 0 ? (
+            <View style={styles.ratingRow}>
+              <StarRow value={reviews?.ratingAvg ?? 0} size={16} />
+              <Text style={[type.small, { color: t.textMuted, marginLeft: 8 }]}>
+                {(reviews?.ratingAvg ?? 0).toFixed(1)} · {(reviews?.ratingCount ?? 0).toLocaleString("en-NG")} reviews
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.priceRow}>
+            <Text style={[type.display, { color: t.text, fontSize: 28 }]}>
+              ₦{Math.round(effective).toLocaleString("en-NG")}
+            </Text>
+            {hasDiscount ? (
+              <>
+                <Text style={[type.body, { color: t.textMuted, textDecorationLine: "line-through", marginLeft: 10 }]}>
+                  ₦{Math.round(product.price).toLocaleString("en-NG")}
+                </Text>
+                <Text style={[type.bodyStrong, { color: t.promo, marginLeft: 10 }]}>{discountPct}% off</Text>
+              </>
+            ) : null}
+          </View>
         </View>
 
-        {/* Variant picker */}
-        {attrGroups.length > 0 && (
-          <View style={{ marginTop: 16 }}>
-            {attrGroups.map((g) => (
-              <View key={g.id} style={{ marginBottom: 12 }}>
-                <Text style={[type.bodyStrong, { color: t.text }]}>{g.label}</Text>
-                <View style={styles.chipRow}>
-                  {g.options.map((opt) => {
-                    const sel = selectedAttrs[g.id] === opt.id;
-                    return (
-                      <Pressable
-                        key={opt.id}
-                        onPress={() => setSelectedAttrs((cur) => ({ ...cur, [g.id]: opt.id }))}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: sel ? t.cta : t.card,
-                            borderColor: sel ? t.cta : t.border,
-                          },
-                        ]}
-                      >
-                        <Text style={{ color: sel ? t.ctaText : t.text, fontWeight: "600" }}>
-                          {opt.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
+        {/* Variant pickers — Size + any attribute groups, all grouped
+            into one "Choose options" card so it's obvious the buyer
+            has to make these selections before adding to cart. */}
+        {sizes.length > 0 || attrGroups.length > 0 ? (
+          <View style={styles.block}>
+            <Text style={[type.h2, { color: t.text, marginBottom: 12 }]}>Choose options</Text>
+            <View style={[styles.variantCard, { backgroundColor: t.card, borderColor: t.border }]}>
+              {sizes.length > 0 ? (
+                <View style={{ marginBottom: attrGroups.length > 0 ? 14 : 0 }}>
+                  <View style={styles.variantHead}>
+                    <Text style={[type.bodyStrong, { color: t.text }]}>Size</Text>
+                    {selectedSize ? (
+                      <Text style={[type.small, { color: t.cta, fontWeight: "700" }]}>{selectedSize} selected</Text>
+                    ) : (
+                      <Text style={[type.small, { color: t.danger.fg, fontWeight: "700" }]}>Required</Text>
+                    )}
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.variantRow}>
+                    {sizes.map((s) => (
+                      <Chip
+                        key={s}
+                        label={s}
+                        selected={selectedSize === s}
+                        onPress={() => setSelectedSize(s)}
+                      />
+                    ))}
+                  </ScrollView>
                 </View>
-              </View>
-            ))}
+              ) : null}
+            {attrGroups.map((g, i) => {
+              const selOpt = g.options.find((o) => o.id === selectedAttrs[g.label]);
+              return (
+                <View key={g.label} style={{ marginBottom: i < attrGroups.length - 1 ? 14 : 0 }}>
+                  <View style={styles.variantHead}>
+                    <Text style={[type.bodyStrong, { color: t.text }]}>{g.label}</Text>
+                    {selOpt ? (
+                      <Text style={[type.small, { color: t.cta, fontWeight: "700" }]}>{selOpt.label} selected</Text>
+                    ) : (
+                      <Text style={[type.small, { color: t.danger.fg, fontWeight: "700" }]}>Required</Text>
+                    )}
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.variantRow}>
+                    {g.options.map((opt) => (
+                      <Chip
+                        key={opt.id}
+                        label={opt.label}
+                        selected={selectedAttrs[g.label] === opt.id}
+                        onPress={() => setSelectedAttrs((cur) => ({ ...cur, [g.label]: opt.id }))}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              );
+            })}
+            </View>
           </View>
-        )}
+        ) : null}
 
-        <Text style={[type.h2, { color: t.text, marginTop: 20 }]}>Description</Text>
-        <Text style={[type.body, { color: t.textMuted, marginTop: 6, lineHeight: 22 }]}>
-          {product.description}
-        </Text>
+        {/* Description with collapse/expand */}
+        <View style={styles.block}>
+          <Text style={[type.bodyStrong, { color: t.text, marginBottom: 6 }]}>Product details</Text>
+          <Text
+            style={[type.body, { color: t.textMuted, lineHeight: 22 }]}
+            numberOfLines={showFullDescription ? undefined : 4}
+          >
+            {product.description}
+          </Text>
+          {product.description.length > 200 ? (
+            <Pressable onPress={() => setShowFullDescription((s) => !s)} hitSlop={6}>
+              <Text style={[type.small, { color: t.cta, fontWeight: "700", marginTop: 6 }]}>
+                {showFullDescription ? "Show less" : "...Read more"}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
 
-        <Button label={adding ? "Adding..." : "Add to cart"} onPress={addToCart} loading={adding} style={{ marginTop: 16 }} />
+        {/* Badge chips */}
+        <View style={[styles.block, { flexDirection: "row", flexWrap: "wrap", gap: 8 }]}>
+          <BadgeChip label="Verified seller" />
+          <BadgeChip label="Secure checkout" />
+          <BadgeChip label="Return policy" />
+        </View>
+
+        {/* Primary actions: Add to cart + Buy now */}
+        <View style={[styles.block, { flexDirection: "row", gap: 12 }]}>
+          <Pressable
+            onPress={addToCart}
+            disabled={adding}
+            style={({ pressed }) => [
+              styles.ctaPill,
+              { backgroundColor: t.cta, opacity: pressed || adding ? 0.85 : 1 },
+            ]}
+          >
+            <View style={styles.ctaInner}>
+              <Ionicons name="bag-handle" size={18} color={t.ctaText} />
+              <Text style={{ color: t.ctaText, fontSize: 16, fontWeight: "700" }}>Add to cart</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={buyNow}
+            disabled={adding}
+            style={({ pressed }) => [
+              styles.ctaPill,
+              { backgroundColor: t.success.fg, opacity: pressed || adding ? 0.85 : 1 },
+            ]}
+          >
+            <View style={styles.ctaInner}>
+              <Ionicons name="flash" size={18} color="#fff" />
+              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Buy now</Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Delivery info card */}
+        <View style={styles.block}>
+          <View style={[styles.deliveryCard, { backgroundColor: "rgba(217,70,239,0.10)", borderColor: t.promo }]}>
+            <Text style={[type.small, { color: t.textMuted }]}>Delivery</Text>
+            <Text style={[type.bodyStrong, { color: t.text, marginTop: 2 }]}>3–5 business days</Text>
+          </View>
+        </View>
+
+        {/* Secondary actions */}
+        <View style={[styles.block, { flexDirection: "row", gap: 12 }]}>
+          <Pressable
+            onPress={shareProduct}
+            style={({ pressed }) => [
+              styles.outlinedBtn,
+              { borderColor: t.border, opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <View style={styles.ctaInner}>
+              <Ionicons name="share-outline" size={16} color={t.text} />
+              <Text style={{ color: t.text, fontWeight: "700" }}>Share</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => nav.navigate("Trending" as never)}
+            style={({ pressed }) => [
+              styles.outlinedBtn,
+              { borderColor: t.border, opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <View style={styles.ctaInner}>
+              <Ionicons name="eye-outline" size={16} color={t.text} />
+              <Text style={{ color: t.text, fontWeight: "700" }}>View similar</Text>
+            </View>
+          </Pressable>
+        </View>
 
         {/* Reviews */}
-        <View style={{ marginTop: 24 }}>
+        <View style={styles.block}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
             <Text style={[type.h2, { color: t.text }]}>Reviews</Text>
-            {reviews && reviews.ratingCount > 0 && (
+            {(reviews?.ratingCount ?? 0) > 0 ? (
               <Text style={[type.small, { color: t.textMuted }]}>
-                {reviews.ratingAvg.toFixed(1)} / 5 · {reviews.ratingCount}
+                {(reviews?.ratingAvg ?? 0).toFixed(1)} / 5 · {reviews?.ratingCount}
               </Text>
-            )}
+            ) : null}
           </View>
 
           {writingReview ? (
             <View style={[styles.reviewForm, { backgroundColor: t.card, borderColor: t.border }]}>
               <Text style={[type.small, { color: t.textMuted }]}>Your rating</Text>
-              <View style={[styles.chipRow, { marginTop: 6 }]}>
+              <View style={{ flexDirection: "row", marginTop: 6, gap: 4 }}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <Pressable key={n} onPress={() => setRating(n)} hitSlop={4}>
-                    <Text style={{ fontSize: 26, color: n <= rating ? t.premium : t.textFaint }}>★</Text>
+                    <Ionicons
+                      name={n <= rating ? "star" : "star-outline"}
+                      size={28}
+                      color={n <= rating ? t.premium : t.textFaint}
+                    />
                   </Pressable>
                 ))}
               </View>
@@ -395,13 +681,26 @@ export function ProductDetailScreen() {
                 multiline
                 value={reviewBody}
                 onChangeText={setReviewBody}
-                placeholder="What did you love, what could be better?"
+                placeholder="What worked, what didn't?"
                 placeholderTextColor={t.textFaint}
                 style={[styles.reviewInput, { color: t.text, backgroundColor: t.bg, borderColor: t.border }]}
               />
-              <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                <Button label="Save" loading={submittingReview} onPress={submitReview} style={{ flex: 1 }} />
-                <Button label="Cancel" variant="secondary" onPress={() => setWritingReview(false)} style={{ flex: 1 }} />
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                <Pressable
+                  onPress={submitReview}
+                  disabled={submittingReview}
+                  style={[styles.smallCta, { backgroundColor: t.cta, opacity: submittingReview ? 0.6 : 1 }]}
+                >
+                  <Text style={{ color: t.ctaText, fontWeight: "700" }}>
+                    {submittingReview ? "Saving..." : "Save"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setWritingReview(false)}
+                  style={[styles.smallCta, { backgroundColor: t.card, borderWidth: 1, borderColor: t.border }]}
+                >
+                  <Text style={{ color: t.text, fontWeight: "700" }}>Cancel</Text>
+                </Pressable>
               </View>
             </View>
           ) : reviews?.myReview ? (
@@ -410,21 +709,26 @@ export function ProductDetailScreen() {
               style={[styles.reviewForm, { backgroundColor: t.card, borderColor: t.border }]}
             >
               <Text style={[type.small, { color: t.textMuted }]}>Your review</Text>
-              <Text style={[type.bodyStrong, { color: t.premium, marginTop: 2 }]}>
-                {"★".repeat(reviews.myReview.rating)}{"☆".repeat(5 - reviews.myReview.rating)}
-              </Text>
-              {reviews.myReview.body && (
+              <View style={{ flexDirection: "row", marginTop: 4 }}>
+                <StarRow value={reviews.myReview.rating} size={16} />
+              </View>
+              {reviews.myReview.body ? (
                 <Text style={[type.body, { color: t.text, marginTop: 4 }]}>{reviews.myReview.body}</Text>
-              )}
-              <Text style={[type.small, { color: t.accent, marginTop: 6, fontWeight: "600" }]}>Edit</Text>
+              ) : null}
+              <Text style={[type.small, { color: t.cta, marginTop: 6, fontWeight: "700" }]}>Edit</Text>
             </Pressable>
           ) : (
-            <Button label="Write a review" variant="secondary" onPress={() => setWritingReview(true)} style={{ marginTop: 10 }} />
+            <Pressable
+              onPress={() => setWritingReview(true)}
+              style={[styles.smallCta, { backgroundColor: t.card, borderWidth: 1, borderColor: t.cta, marginTop: 12, alignSelf: "flex-start" }]}
+            >
+              <Text style={{ color: t.cta, fontWeight: "700" }}>Write a review</Text>
+            </Pressable>
           )}
 
-          {reviews && reviews.reviews.length > 0 && (
+          {(reviews?.reviews.length ?? 0) > 0 ? (
             <View style={{ marginTop: 12, gap: 8 }}>
-              {reviews.reviews.map((r) => (
+              {reviews!.reviews.map((r) => (
                 <View key={r.id} style={[styles.reviewItem, { backgroundColor: t.card, borderColor: t.border }]}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={[type.bodyStrong, { color: t.text }]}>{r.author.name}</Text>
@@ -432,50 +736,153 @@ export function ProductDetailScreen() {
                       {new Date(r.createdAt).toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" })}
                     </Text>
                   </View>
-                  <Text style={[type.small, { color: t.premium, marginTop: 2 }]}>
-                    {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}
-                  </Text>
-                  {r.body && <Text style={[type.body, { color: t.text, marginTop: 6 }]}>{r.body}</Text>}
+                  <View style={{ marginTop: 4 }}>
+                    <StarRow value={r.rating} size={14} />
+                  </View>
+                  {r.body ? <Text style={[type.body, { color: t.text, marginTop: 6 }]}>{r.body}</Text> : null}
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
         </View>
-      </View>
+      </ScrollView>
 
-      {/* Zoom modal -- expo-image with contentFit=contain on a black bg */}
+      {/* Zoom modal */}
       <Modal visible={zoomIndex !== null} transparent animationType="fade" onRequestClose={() => setZoomIndex(null)}>
         <Pressable onPress={() => setZoomIndex(null)} style={styles.zoomBackdrop}>
-          {zoomIndex !== null && images[zoomIndex] && (
-            <Image
-              source={{ uri: images[zoomIndex]! }}
-              style={{ width: width, height: width }}
-              contentFit="contain"
-            />
-          )}
+          {zoomIndex !== null && images[zoomIndex] ? (
+            <Image source={{ uri: images[zoomIndex]! }} style={{ width: SCREEN_W, height: SCREEN_W }} contentFit="contain" />
+          ) : null}
           <Text style={styles.zoomHint}>Tap to close</Text>
         </Pressable>
       </Modal>
-    </Screen>
+    </View>
+  );
+}
+
+function BadgeChip({ label }: { label: string }) {
+  const t = useTheme();
+  return (
+    <View style={[styles.badge, { borderColor: t.border, backgroundColor: t.card }]}>
+      <Text style={[type.small, { color: t.textMuted, fontWeight: "600" }]}>{label}</Text>
+    </View>
+  );
+}
+
+// Five-star rating display, filled per the value rounded to nearest int.
+function StarRow({ value, size = 14 }: { value: number; size?: number }) {
+  const t = useTheme();
+  const rounded = Math.max(0, Math.min(5, Math.round(value)));
+  return (
+    <View style={{ flexDirection: "row", gap: 2 }}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Ionicons
+          key={n}
+          name={n <= rounded ? "star" : "star-outline"}
+          size={size}
+          color={n <= rounded ? t.premium : t.textFaint}
+        />
+      ))}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+  centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   heroImage: { width: "100%", height: "100%" },
-  dotsRow: { flexDirection: "row", justifyContent: "center", gap: 6, paddingVertical: 8 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  content: { padding: 16, gap: 8, paddingBottom: 32 },
-  headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  iconBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  priceRow: { flexDirection: "row", alignItems: "baseline", marginTop: 4 },
-  sellerCard: { padding: 14, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, marginTop: 12 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth },
-  reviewForm: { padding: 12, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, marginTop: 10 },
-  reviewInput: { minHeight: 80, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, fontSize: 14, marginTop: 10, textAlignVertical: "top" },
-  reviewItem: { padding: 12, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
-  msgBtn: { paddingHorizontal: 12, paddingVertical: 8 },
-  zoomBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.95)", alignItems: "center", justifyContent: "center" },
+  dotsRow: {
+    position: "absolute",
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 5,
+  },
+  dot: { height: 6, borderRadius: 3 },
+  heartFab: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  block: { paddingHorizontal: 16, paddingTop: 14 },
+  ratingRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  priceRow: { flexDirection: "row", alignItems: "baseline", marginTop: 10 },
+  ctaPill: {
+    flex: 1,
+    height: 54,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaInner: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sellerLine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  variantHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  variantRow: { gap: 8, paddingVertical: 2, paddingRight: 16 },
+  variantCard: {
+    padding: 14,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  deliveryCard: {
+    padding: 14,
+    borderRadius: radius.md,
+    borderLeftWidth: 4,
+  },
+  outlinedBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  reviewForm: {
+    padding: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    marginTop: 12,
+  },
+  reviewInput: {
+    minHeight: 80,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    fontSize: 14,
+    marginTop: 10,
+    textAlignVertical: "top",
+  },
+  reviewItem: {
+    padding: 12,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  smallCta: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+  },
+  zoomBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   zoomHint: { position: "absolute", bottom: 60, color: "#999", fontSize: 12 },
 });

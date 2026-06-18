@@ -5,6 +5,7 @@ import React from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  type RefreshControlProps,
   ScrollView,
   StyleSheet,
   View,
@@ -24,7 +25,7 @@ export function Screen({
 }: {
   children: React.ReactNode;
   scroll?: boolean;
-  refreshControl?: React.ReactElement;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
   contentStyle?: ViewStyle;
   edges?: Array<"top" | "bottom" | "left" | "right">;
   keyboard?: boolean;

@@ -16,11 +16,30 @@ export type CurrentUser = {
   slug?: string | null;
   isSeller: boolean;
   isDesigner: boolean;
-  isAdmin?: boolean;
   emailVerifiedAt?: string | null;
   avatarUrl?: string | null;
   pointsBalance?: number;
   referralCode?: string | null;
+};
+
+export type OAuthProvider = "google" | "apple" | "facebook";
+
+// Payload posted to /api/auth/oauth/{provider}. Mirrors the field set
+// produced by each provider's SDK so the server can pick what it needs.
+//   - google:    { idToken } (preferred — verifies on Google's JWKs)
+//   - apple:     { identityToken, authorizationCode, fullName?, email? }
+//                fullName + email arrive only on the FIRST sign-in.
+//   - facebook:  { accessToken }
+// The server is expected to verify the token with the provider, look up
+// or create the user, and return { token, user } the same way the
+// password flow does.
+export type OAuthPayload = {
+  idToken?: string;
+  accessToken?: string;
+  identityToken?: string;
+  authorizationCode?: string;
+  email?: string | null;
+  fullName?: { givenName?: string | null; familyName?: string | null } | null;
 };
 
 type Ctx = {
@@ -28,6 +47,7 @@ type Ctx = {
   ready: boolean;
   signingIn: boolean;
   loginWithPassword: (email: string, password: string) => Promise<void>;
+  loginWithOAuth: (provider: OAuthProvider, payload: OAuthPayload) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -105,6 +125,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [finishLogin],
   );
 
+  // OAuth exchange. Client obtains the provider token via the SDK
+  // (expo-auth-session for Google/Facebook, expo-apple-authentication
+  // for Apple) and POSTs it here. Server contract the backend needs
+  // to implement:
+  //
+  //   POST /api/auth/oauth/google
+  //     body: { idToken: string }
+  //   POST /api/auth/oauth/apple
+  //     body: { identityToken: string, authorizationCode: string,
+  //             email?: string, fullName?: { givenName, familyName } }
+  //   POST /api/auth/oauth/facebook
+  //     body: { accessToken: string }
+  //
+  // For each, the server:
+  //   1. Verifies the token with the provider's JWKs / Graph API.
+  //   2. Finds or creates the user (link by verified email if matching).
+  //   3. Returns { token, user } — same shape as /api/auth/login.
+  //
+  // Apple `email` + `fullName` are only present on the very first
+  // sign-in; persist them then so future sign-ins (which won't include
+  // them) still resolve to the same account.
+  const loginWithOAuth = useCallback(
+    async (provider: OAuthProvider, payload: OAuthPayload) => {
+      setSigningIn(true);
+      try {
+        const resp = await api.post<LoginResponse>(
+          `/api/auth/oauth/${provider}`,
+          payload,
+          { noAuth: true },
+        );
+        await finishLogin(resp);
+      } finally {
+        setSigningIn(false);
+      }
+    },
+    [finishLogin],
+  );
+
   const register = useCallback(
     async (input: RegisterInput) => {
       setSigningIn(true);
@@ -131,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, ready, signingIn, loginWithPassword, register, logout, refresh }}
+      value={{ user, ready, signingIn, loginWithPassword, loginWithOAuth, register, logout, refresh }}
     >
       {children}
     </AuthContext.Provider>

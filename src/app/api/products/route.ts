@@ -9,10 +9,11 @@ import { AttributesSchema } from "@/lib/productAttributes";
 import { buildFashionValidatorSystem, chat, isAiEnabled } from "@/lib/ai";
 import { isValidCategory, kindForCategoryAsync } from "@/lib/categories";
 
-// GET /api/products?mine=1&category=&q=&kind=MATERIAL|PRODUCT
+// GET /api/products?mine=1&sellerId=&category=&q=&kind=MATERIAL|PRODUCT
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const mine = url.searchParams.get("mine");
+  const sellerId = url.searchParams.get("sellerId") ?? undefined;
   const category = url.searchParams.get("category") ?? undefined;
   const q = url.searchParams.get("q") ?? undefined;
   const kind = url.searchParams.get("kind") ?? undefined;
@@ -41,13 +42,34 @@ export async function GET(req: Request) {
   const products = await prisma.product.findMany({
     where: {
       status: ProductStatus.ACTIVE,
+      ...(sellerId ? { sellerId } : {}),
       ...(category ? { category } : {}),
       ...(kind ? { kind } : {}),
       ...(q
         ? { OR: [{ name: { contains: q } }, { description: { contains: q } }] }
         : {}),
     },
-    include: { seller: { select: { id: true, name: true, exposureScore: true, sellerVerified: true, designerVerified: true } } },
+    include: {
+      seller: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          businessName: true,
+          bio: true,
+          avatarUrl: true,
+          coverImageUrl: true,
+          isSeller: true,
+          isDesigner: true,
+          sellerVerified: true,
+          designerVerified: true,
+          sellerRatingAvg: true,
+          sellerRatingCount: true,
+          exposureScore: true,
+          createdAt: true,
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

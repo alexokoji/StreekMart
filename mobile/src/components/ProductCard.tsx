@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../state/ThemeContext";
 import { radius, type } from "../theme/tokens";
 
@@ -77,9 +78,11 @@ export function ProductCard({
             hitSlop={8}
             style={styles.heartBtn}
           >
-            <Text style={{ fontSize: 18, color: product.saved ? t.promo : t.textMuted }}>
-              {product.saved ? "♥" : "♡"}
-            </Text>
+            <Ionicons
+              name={product.saved ? "heart" : "heart-outline"}
+              size={18}
+              color={product.saved ? t.promo : t.textMuted}
+            />
           </Pressable>
         )}
       </View>

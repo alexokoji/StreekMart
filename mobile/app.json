@@ -7,16 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "streekmart",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "dark": {
-        "image": "./assets/splash.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#0b0b10"
-      }
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -37,6 +27,7 @@
       "entitlements": {
         "aps-environment": "production"
       },
+      "usesAppleSignIn": true,
       "associatedDomains": [
         "applinks:streekmart.online"
       ]
@@ -44,6 +35,7 @@
     "android": {
       "package": "com.streekmart.app",
       "versionCode": 2,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
@@ -79,6 +71,12 @@
     },
     "extra": {
       "apiUrl": "https://www.streekmart.online",
+      "oauth": {
+        "googleIosClientId": "",
+        "googleAndroidClientId": "",
+        "googleWebClientId": "",
+        "facebookAppId": ""
+      },
       "eas": {
         "projectId": "97a68bcd-daf5-4f86-9600-5b682e28f1e1"
       }
@@ -112,7 +110,8 @@
           "color": "#7c3aed",
           "sounds": []
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     "owner": "alecblaq"
   }

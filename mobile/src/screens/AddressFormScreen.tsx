@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import type { RouteProp } from "@react-navigation/native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Screen } from "../components/Screen";
-import { Button } from "../components/Button";
+import { Ionicons } from "@expo/vector-icons";
+import { BackHeader } from "../components/BackHeader";
+import { Input } from "../components/Input";
 import { useTheme } from "../state/ThemeContext";
 import { api } from "../api/client";
 import { radius, type } from "../theme/tokens";
@@ -13,8 +14,6 @@ import type { Address } from "./AddressesScreen";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-// Add/edit screen. Reached from AddressesScreen via the "+ Add" button or
-// the per-row "Edit" link. `id` is undefined when creating a new address.
 export function AddressFormScreen() {
   const t = useTheme();
   const nav = useNavigation<Nav>();
@@ -54,7 +53,7 @@ export function AddressFormScreen() {
 
   async function save() {
     if (!formattedAddress.trim()) {
-      Alert.alert("Missing info", "Enter an address.");
+      Alert.alert("Missing info", "Enter the street address.");
       return;
     }
     setBusy(true);
@@ -83,71 +82,135 @@ export function AddressFormScreen() {
   }
 
   return (
-    <Screen keyboard>
-      <ScrollView keyboardShouldPersistTaps="handled">
-        <Text style={[type.h1, { color: t.text }]}>{id ? "Edit address" : "New address"}</Text>
-        {loading ? (
-          <Text style={[type.body, { color: t.textMuted, marginTop: 12 }]}>Loading...</Text>
-        ) : (
-          <>
-            <Field t={t} label="Label (Home, Office)" value={label} onChange={setLabel} />
-            <Field t={t} label="Phone (optional)" value={phone} onChange={setPhone} keyboardType="phone-pad" />
-            <View style={styles.field}>
-              <Text style={[type.small, { color: t.textMuted }]}>Street, area, city, postcode</Text>
-              <TextInput
-                multiline
-                value={formattedAddress}
-                onChangeText={setFormattedAddress}
-                placeholderTextColor={t.textFaint}
-                style={[styles.input, styles.textarea, { backgroundColor: t.bgElevated, borderColor: t.border, color: t.text }]}
-              />
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <BackHeader title={id ? "Edit address" : "New address"} />
+      {loading ? (
+        <View style={styles.centered}><ActivityIndicator color={t.cta} size="large" /></View>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+          style={{ flex: 1 }}
+        >
+        <ScrollView
+          contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
+          <Text style={[type.small, { color: t.textMuted, marginBottom: 16 }]}>
+            We use this for delivery and seller receipts.
+          </Text>
+
+          <Field label="Label">
+            <Input
+              leftIcon={<Ionicons name="pricetag-outline" size={18} color={t.textMuted} />}
+              value={label}
+              onChangeText={setLabel}
+              placeholder="Home, Office, Mum's place"
+            />
+          </Field>
+
+          <Field label="Phone">
+            <Input
+              leftIcon={<Ionicons name="call-outline" size={18} color={t.textMuted} />}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholder="0800 000 0000"
+            />
+          </Field>
+
+          <Field label="Street address">
+            <Input
+              leftIcon={<Ionicons name="location-outline" size={18} color={t.textMuted} />}
+              value={formattedAddress}
+              onChangeText={setFormattedAddress}
+              placeholder="Street, area, postcode"
+              multiline
+              containerStyle={{ height: 84, alignItems: "flex-start", paddingTop: 14 }}
+            />
+          </Field>
+
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Field label="City">
+                <Input value={city} onChangeText={setCity} placeholder="Lagos" />
+              </Field>
             </View>
-            <Field t={t} label="City" value={city} onChange={setCity} />
-            <Field t={t} label="Region / state" value={region} onChange={setRegion} />
-            <Field t={t} label="Country code (e.g. NG)" value={country} onChange={(v) => setCountry(v.toUpperCase())} />
-            <View style={[styles.field, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
-              <Text style={[type.body, { color: t.text }]}>Make default</Text>
-              <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: t.cta, false: t.border }} />
+            <View style={{ flex: 1 }}>
+              <Field label="Region">
+                <Input value={region} onChangeText={setRegion} placeholder="LA" />
+              </Field>
             </View>
-            <Button label={id ? "Save changes" : "Add address"} loading={busy} onPress={save} style={{ marginTop: 24 }} />
-          </>
-        )}
-      </ScrollView>
-    </Screen>
+          </View>
+
+          <Field label="Country code">
+            <Input
+              value={country}
+              onChangeText={(v) => setCountry(v.toUpperCase())}
+              autoCapitalize="characters"
+              placeholder="NG"
+              maxLength={2}
+            />
+          </Field>
+
+          <View style={[styles.toggleRow, { backgroundColor: t.card, borderColor: t.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.body, { color: t.text }]}>Set as default</Text>
+              <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>
+                Use this address by default at checkout.
+              </Text>
+            </View>
+            <Switch value={isDefault} onValueChange={setIsDefault} trackColor={{ true: t.cta, false: t.border }} />
+          </View>
+
+          <Pressable
+            onPress={busy ? undefined : save}
+            style={({ pressed }) => [
+              styles.cta,
+              {
+                backgroundColor: busy ? t.accentSoft : t.cta,
+                opacity: pressed || busy ? 0.85 : 1,
+                marginTop: 28,
+              },
+            ]}
+          >
+            <Text style={{ color: t.ctaText, fontWeight: "800", fontSize: 16 }}>
+              {busy ? "Saving…" : id ? "Save changes" : "Add address"}
+            </Text>
+          </Pressable>
+        </ScrollView>
+        </KeyboardAvoidingView>
+      )}
+    </View>
   );
 }
 
-function Field({
-  t, label, value, onChange, keyboardType,
-}: {
-  t: ReturnType<typeof useTheme>;
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  keyboardType?: "default" | "phone-pad";
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const t = useTheme();
   return (
-    <View style={styles.field}>
-      <Text style={[type.small, { color: t.textMuted }]}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        keyboardType={keyboardType ?? "default"}
-        placeholderTextColor={t.textFaint}
-        style={[styles.input, { backgroundColor: t.bgElevated, borderColor: t.border, color: t.text }]}
-      />
+    <View style={{ marginBottom: 14 }}>
+      <Text style={[type.small, { color: t.textMuted, marginBottom: 6 }]}>{label}</Text>
+      {children}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  field: { marginTop: 14, gap: 6 },
-  input: {
-    height: 48,
-    paddingHorizontal: 14,
+  centered: { flex: 1, alignItems: "center", justifyContent: "center" },
+  toggleRow: {
+    marginTop: 8,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
-    fontSize: 15,
+    gap: 12,
   },
-  textarea: { height: 80, paddingVertical: 10, textAlignVertical: "top" },
+  cta: {
+    height: 56,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

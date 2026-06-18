@@ -52,6 +52,14 @@ export class ApiError extends Error {
   }
 }
 
+// Common across dashboard list screens: endpoints that don't exist yet
+// should render an empty state, not an error state. Anything else
+// (server down, auth refused, malformed payload) is still a real error
+// the user should see.
+export function isNotFound(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 404;
+}
+
 type RequestOpts = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
