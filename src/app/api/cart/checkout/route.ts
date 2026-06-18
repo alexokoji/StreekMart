@@ -318,10 +318,10 @@ export async function POST(req: Request) {
         where: { paymentReference },
         data: { status: OrderStatus.CANCELLED },
       });
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : "Could not start payment." },
-        { status: 502 },
-      );
+      const raw = err instanceof Error ? err.message : String(err ?? "");
+      const friendly = friendlyGatewayError(raw);
+      console.error("[checkout] gateway init failed:", raw);
+      return NextResponse.json({ error: friendly }, { status: 502 });
     }
   }
 
@@ -349,4 +349,38 @@ function buildRedirectUrl(req: Request, paymentReference: string): string {
   const origin =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? new URL(req.url).origin;
   return `${origin}/cart/checkout/return?ref=${encodeURIComponent(paymentReference)}`;
+}
+
+// Translate gateway error blobs (often raw JSON from Korapay) into a
+// short, user-readable line for the checkout UI. The full message is
+// already in `console.error` for the operator's logs — what the buyer
+// sees should be actionable, not a stack trace.
+function friendlyGatewayError(raw: string): string {
+  // Try to pull the JSON payload Korapay sometimes appends after a
+  // hyphen ("Korapay init failed: 409 - { ... }"). Fall back to the
+  // whole string when there's no embedded JSON.
+  let parsed: { code?: string; message?: string } | null = null;
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart >= 0) {
+    try {
+      parsed = JSON.parse(raw.slice(jsonStart));
+    } catch {
+      parsed = null;
+    }
+  }
+  const code = parsed?.code;
+  const gatewayMessage = parsed?.message;
+
+  // Known Korapay error codes worth special-casing.
+  if (code === "AA021") {
+    return "Payments are temporarily unavailable — the merchant account has hit its daily limit. Please try again later or pick a different payment method.";
+  }
+  if (gatewayMessage) {
+    // Use the gateway's own message but drop the wrapper noise.
+    return gatewayMessage;
+  }
+  if (/(network|timeout|fetch)/i.test(raw)) {
+    return "Couldn't reach the payment provider. Check your connection and try again.";
+  }
+  return "Couldn't start the payment. Please try again in a moment.";
 }
