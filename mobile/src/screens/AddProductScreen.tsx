@@ -18,6 +18,7 @@ import { BackHeader } from "../components/BackHeader";
 import { Input } from "../components/Input";
 import { Chip } from "../components/Chip";
 import { CategoryPicker } from "../components/CategoryPicker";
+import { SelectField, type SelectOption } from "../components/SelectField";
 import { useTheme } from "../state/ThemeContext";
 import { api } from "../api/client";
 import { pickImages, uploadImage } from "../lib/imagePicker";
@@ -27,6 +28,28 @@ import type { RootStackParamList } from "../navigation/RootNav";
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free size"];
+
+// Same list as src/lib/units.ts on the web. Mobile mirrors the order
+// and labels so the picker matches the web's pricing-unit dropdown.
+const UNIT_OPTIONS: SelectOption[] = [
+  { value: "piece", label: "Piece", hint: "Ready-to-wear, accessories — default" },
+  { value: "yard", label: "Yard", hint: "Fabric sold per yard (0.5 step)" },
+  { value: "meter", label: "Meter", hint: "Fabric sold per metre (0.5 step)" },
+  { value: "foot", label: "Foot", hint: "Trim / cord per foot (0.5 step)" },
+  { value: "pack", label: "Pack" },
+  { value: "set", label: "Set" },
+  { value: "bundle", label: "Bundle" },
+  { value: "kilogram", label: "Kilogram", hint: "Bulk materials (0.5 step)" },
+  { value: "liter", label: "Liter", hint: "Bulk liquids (0.5 step)" },
+];
+
+// Same enum as src/lib/enums.ts ProductStatus.
+const STATUS_OPTIONS: SelectOption[] = [
+  { value: "ACTIVE", label: "Active", hint: "Visible to buyers and searchable" },
+  { value: "DRAFT", label: "Draft", hint: "Saved but not listed yet" },
+  { value: "SOLD_OUT", label: "Sold out", hint: "Visible but flagged as unavailable" },
+  { value: "ARCHIVED", label: "Archived", hint: "Hidden from the catalogue" },
+];
 
 // Custom attribute groups the seller defines (e.g. Color, Material).
 // Each saves to `attributesJson` as
@@ -57,6 +80,8 @@ export function AddProductScreen() {
   const [price, setPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
   const [category, setCategory] = useState("");
+  const [unit, setUnit] = useState("piece");
+  const [status, setStatus] = useState("ACTIVE");
   const [stockCount, setStockCount] = useState("");
   const [sizes, setSizes] = useState<string[]>([]);
   const [variants, setVariants] = useState<VariantGroup[]>([]);
@@ -146,28 +171,37 @@ export function AddProductScreen() {
     }
     setBusy(true);
     try {
-      // Serialise variants to the JSON shape ProductDetail expects.
-      const attributesJson = variants.length > 0
-        ? JSON.stringify(
-            variants.map((g) => ({
-              id: g.id,
-              label: g.label,
-              options: g.options.map((o) => ({ id: slugify(o), label: o })),
-            })),
-          )
-        : undefined;
-      const body = {
+      // Web /api/products POST contract (src/app/api/products/route.ts):
+      //   attributes is Array<{ name, options: string[], required }>;
+      //   NOT a JSON-stringified attributesJson field, and NOT the old
+      //   ProductDetail option-id shape. The cart-add validator on the
+      //   web reads `selectedAttributes[group.name]` against
+      //   `group.options`, so name + canonical option strings are what
+      //   has to land on the row.
+      const attributes = variants
+        .filter((g) => g.options.length > 0)
+        .map((g) => ({
+          name: g.label,
+          options: g.options,
+          required: true,
+        }));
+      const body: Record<string, unknown> = {
         name: name.trim(),
         description: description.trim(),
         price: Number(price),
         salePrice: salePrice ? Number(salePrice) : null,
         category: category.trim(),
-        stockCount: stockCount ? Number(stockCount) : 0,
+        // stock (not stockCount); unit + status are required by the
+        // web's seller form and now exposed here for parity.
+        stock: stockCount ? Number(stockCount) : 0,
+        unit,
+        status,
         sizes,
-        attributesJson,
         images,
       };
-      await api.post("/api/seller/products", body);
+      if (attributes.length > 0) body.attributes = attributes;
+      // Same endpoint as the web's ProductForm POST.
+      await api.post("/api/products", body);
       Alert.alert("Listed", `${name} is now visible to buyers.`, [
         { text: "OK", onPress: () => nav.goBack() },
       ]);
@@ -278,6 +312,29 @@ export function AddProductScreen() {
         <Section label="Category">
           <CategoryPicker value={category} onChange={setCategory} />
         </Section>
+
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Section label="Pricing unit">
+              <SelectField
+                value={unit}
+                onChange={setUnit}
+                options={UNIT_OPTIONS}
+                title="Pick a pricing unit"
+              />
+            </Section>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Section label="Status">
+              <SelectField
+                value={status}
+                onChange={setStatus}
+                options={STATUS_OPTIONS}
+                title="Listing status"
+              />
+            </Section>
+          </View>
+        </View>
 
         <Section label="Stock count">
           <Input
