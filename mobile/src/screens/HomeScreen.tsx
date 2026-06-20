@@ -37,7 +37,7 @@ type Item = {
   sellerName?: string;
 };
 
-type CategoryItem = { name: string };
+type CategoryItem = { name: string; productCount?: number; displayOrder?: number };
 
 type DesignerItem = {
   id: string;
@@ -82,7 +82,7 @@ export function HomeScreen() {
           getCached("home:flash-sales", () => api.get<{ items: Item[] }>("/api/products/list", { rail: "flash-sales", limit: 8 })).catch(() => ({ items: [] })),
           getCached("home:new-arrivals", () => api.get<{ items: Item[] }>("/api/products/list", { rail: "new-arrivals", limit: 10 })).catch(() => ({ items: [] })),
           getCached("home:best-sellers", () => api.get<{ items: Item[] }>("/api/products/list", { rail: "best-sellers", limit: 10 })).catch(() => ({ items: [] })),
-          api.get<{ categories: Array<{ name: string }> }>("/api/categories").catch(() => ({ categories: [] })),
+          api.get<{ categories: CategoryItem[] }>("/api/categories", { counts: 1 }).catch(() => ({ categories: [] })),
           api.get<{ items: Item[] }>("/api/recently-viewed").catch(() => ({ items: [] })),
           api.get<{ items: Item[] }>("/api/me/buy-again").catch(() => ({ items: [] })),
           api.get<{ items: Item[] }>("/api/me/following-feed").catch(() => ({ items: [] })),
@@ -110,7 +110,18 @@ export function HomeScreen() {
         buyAgain: buyAgainResp.items ?? [],
         following: followingResp.items ?? [],
         forYou,
-        categories: (categories.categories ?? []).slice(0, 8),
+        // Most-popular-first: sort by ACTIVE product count when the
+        // server returned it (counts=1), fall back to admin
+        // displayOrder. Trim to a sensible rail length afterwards.
+        categories: (categories.categories ?? [])
+          .slice()
+          .sort((a, b) => {
+            const ca = a.productCount ?? -1;
+            const cb = b.productCount ?? -1;
+            if (ca !== cb) return cb - ca;
+            return (a.displayOrder ?? 9999) - (b.displayOrder ?? 9999);
+          })
+          .slice(0, 8),
         designers: designersResp.designers ?? [],
       });
     } finally {
@@ -365,21 +376,42 @@ type IconRef =
 
 function categoryIcon(name: string): IconRef {
   const k = name.toLowerCase();
-  if (/cloth|apparel|wear|dress|shirt|fashion/.test(k)) return { lib: "material", name: "tshirt-crew" };
-  if (/material|fabric|cloth|textile/.test(k)) return { lib: "material", name: "palette-swatch" };
-  if (/access/.test(k)) return { lib: "material", name: "bag-personal" };
-  if (/beauty|cosmetic|makeup/.test(k)) return { lib: "material", name: "lipstick" };
-  if (/shoe|foot|sneaker|boot/.test(k)) return { lib: "material", name: "shoe-heel" };
-  if (/jewel|ring|necklace/.test(k)) return { lib: "ionicons", name: "diamond-outline" };
-  if (/kid|child|baby|toy/.test(k)) return { lib: "material", name: "teddy-bear" };
-  if (/home|furniture|decor/.test(k)) return { lib: "ionicons", name: "home-outline" };
-  if (/trad|ankara|aso|culture/.test(k)) return { lib: "material", name: "flower" };
-  if (/bag|handbag|purse|backpack/.test(k)) return { lib: "material", name: "bag-personal-outline" };
-  if (/watch|time/.test(k)) return { lib: "ionicons", name: "watch-outline" };
-  if (/electro|gadget|phone|tech/.test(k)) return { lib: "ionicons", name: "phone-portrait-outline" };
-  if (/sport|fit|gym/.test(k)) return { lib: "ionicons", name: "barbell-outline" };
+  // Order matters: most specific matches first so e.g. "men's shoes"
+  // resolves to the shoe icon, not the generic mens-clothing icon.
+  if (/shoe|foot|sneaker|boot|heel|sandal|loafer/.test(k)) return { lib: "material", name: "shoe-heel" };
+  if (/jewel|ring|necklace|earring|bracelet|pendant|bangle/.test(k)) return { lib: "ionicons", name: "diamond-outline" };
+  if (/watch|wristband|timepiece/.test(k)) return { lib: "ionicons", name: "watch-outline" };
+  if (/bag|handbag|purse|backpack|tote|clutch|satchel|wallet/.test(k)) return { lib: "material", name: "bag-personal-outline" };
+  if (/hat|cap|beanie|fedora|headwear/.test(k)) return { lib: "material", name: "hat-fedora" };
+  if (/scarf|shawl|gele|head\s*wrap/.test(k)) return { lib: "material", name: "tshirt-v-outline" };
+  if (/glass|sunglass|eyewear|optical/.test(k)) return { lib: "material", name: "sunglasses" };
+  if (/perfume|cologne|fragrance|scent/.test(k)) return { lib: "material", name: "spray-bottle" };
+  if (/lipstick|makeup|cosmetic|lip|nail/.test(k)) return { lib: "material", name: "lipstick" };
+  if (/beauty|skin|skincare|lotion|moisturiser|moisturizer/.test(k)) return { lib: "material", name: "lotion-plus" };
+  if (/hair|wig|extension|braid|weave/.test(k)) return { lib: "material", name: "hair-dryer" };
+  if (/under(wear)?|lingerie|bra|brief|boxer|sleep\s*wear|pj|pyjam/.test(k)) return { lib: "material", name: "tshirt-v" };
+  if (/swim|bikini|trunks?/.test(k)) return { lib: "ionicons", name: "water-outline" };
+  if (/jacket|coat|outer\s*wear|hoodie|sweater|cardigan|sweatshirt/.test(k)) return { lib: "material", name: "hanger" };
+  if (/jean|trouser|pant|short|skirt|legging/.test(k)) return { lib: "material", name: "tshirt-crew-outline" };
+  if (/shirt|tee|t-?shirt|polo|top|blouse/.test(k)) return { lib: "material", name: "tshirt-crew" };
+  if (/dress|gown|kaftan|abaya/.test(k)) return { lib: "material", name: "human-female" };
+  if (/suit|tux|tuxedo|blazer/.test(k)) return { lib: "material", name: "human-male" };
+  if (/agbada|kaftan|babariga|senator|dashiki/.test(k)) return { lib: "material", name: "human-male-board" };
+  if (/ankara|aso|adire|cultur|herit|tradi|africa/.test(k)) return { lib: "material", name: "flower" };
+  if (/fabric|textile|material|cloth\b/.test(k)) return { lib: "material", name: "palette-swatch" };
+  if (/men\b|man\b|gentleman|guy/.test(k)) return { lib: "material", name: "human-male" };
+  if (/women\b|woman|lady|ladies|girl/.test(k)) return { lib: "material", name: "human-female" };
+  if (/uni\s*sex|gender\s*neutral/.test(k)) return { lib: "material", name: "human-male-female" };
+  if (/kid|child|baby|infant|toy/.test(k)) return { lib: "material", name: "teddy-bear" };
+  if (/sport|fit|gym|active|athleisure|workout/.test(k)) return { lib: "ionicons", name: "barbell-outline" };
+  if (/bridal|wedding|bride|groom/.test(k)) return { lib: "material", name: "ring" };
+  if (/access(ory|ories)/.test(k)) return { lib: "material", name: "bag-personal" };
+  if (/cloth|apparel|wear|fashion|outfit/.test(k)) return { lib: "material", name: "tshirt-crew" };
+  if (/home|furniture|decor|bedding|cushion/.test(k)) return { lib: "ionicons", name: "home-outline" };
+  if (/electro|gadget|phone|tech|computer|laptop/.test(k)) return { lib: "ionicons", name: "phone-portrait-outline" };
   if (/food|grocer|kitchen/.test(k)) return { lib: "ionicons", name: "restaurant-outline" };
-  return { lib: "ionicons", name: "pricetag-outline" };
+  if (/book|stationery|paper/.test(k)) return { lib: "ionicons", name: "book-outline" };
+  return { lib: "material", name: "tag-outline" };
 }
 
 // Round category tile. Tinted disc with a category-specific icon.

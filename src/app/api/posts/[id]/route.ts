@@ -7,7 +7,23 @@ import { hasManagerPermission } from "@/lib/managersServer";
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const post = await prisma.post.findUnique({
     where: { id: params.id },
-    include: { author: { select: { id: true, name: true, bio: true, avatarUrl: true } } },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          businessName: true,
+          bio: true,
+          avatarUrl: true,
+          coverImageUrl: true,
+          isSeller: true,
+          isDesigner: true,
+          sellerVerified: true,
+          designerVerified: true,
+          slug: true,
+        },
+      },
+    },
   });
   if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
 

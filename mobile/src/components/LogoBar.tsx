@@ -32,11 +32,11 @@ export function LogoBar({
         <Pressable onPress={onMenu} hitSlop={10} style={styles.iconBtn}>
           <Ionicons name="menu" size={26} color={t.text} />
         </Pressable>
-        <View style={styles.brand}>
+        <View style={[styles.brand, { backgroundColor: t.bgElevated, borderColor: t.border }]}>
           <RNImage
             source={require("../../assets/icon.png")}
             style={styles.logo}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         </View>
         <Pressable
@@ -73,8 +73,19 @@ const styles = StyleSheet.create({
     height: 52,
   },
   iconBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  brand: { flexDirection: "row", alignItems: "center" },
-  logo: { width: 120, height: 36 },
+  // Rounded chip around the brand mark — softens the hard-edged
+  // square icon so it reads as a logo lozenge instead of a sticker.
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 36,
+    width: 36,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: "hidden",
+  },
+  logo: { width: 36, height: 36 },
   avatar: { width: 32, height: 32, borderRadius: 16, overflow: "hidden" },
   avatarCenter: { alignItems: "center", justifyContent: "center" },
 });

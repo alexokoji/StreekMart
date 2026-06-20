@@ -55,6 +55,7 @@ import { SellerProfileScreen } from "../screens/SellerProfileScreen";
 import { EditProfileScreen } from "../screens/EditProfileScreen";
 import { VerificationScreen } from "../screens/VerificationScreen";
 import { PaymentScreen } from "../screens/PaymentScreen";
+import { PostDetailScreen } from "../screens/PostDetailScreen";
 
 // Tabs: Home | Feed | Search (centre FAB) | Cart | Account.
 // Feed (designer posts) sits in the primary nav so buyers can pull up
@@ -142,6 +143,11 @@ export type RootStackParamList = {
   // close it ourselves once the WebView navigates to the gateway's
   // /cart/checkout/return?ref=… callback.
   Payment: { url: string; paymentReference?: string };
+
+  // Designer post detail — Instagram-style single post with full
+  // caption + comments thread. Reached from the Feed's comment icon
+  // or "View comments" link.
+  PostDetail: { id: string };
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -303,6 +309,7 @@ export function RootNav({
           <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Verification" component={VerificationScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Payment" component={PaymentScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
     </>

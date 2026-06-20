@@ -41,6 +41,7 @@ import {
 } from "@expo-google-fonts/nunito";
 import { ThemeProvider, useTheme } from "./src/state/ThemeContext";
 import { AuthProvider, useAuth } from "./src/state/AuthContext";
+import { CartProvider } from "./src/state/CartContext";
 import { usePushRegistration } from "./src/state/usePush";
 import { promptBiometric, readBiometricState } from "./src/state/biometric";
 import { RootNav } from "./src/navigation/RootNav";
@@ -70,7 +71,9 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeProvider>
           <AuthProvider>
-            <AppInner />
+            <CartProvider>
+              <AppInner />
+            </CartProvider>
           </AuthProvider>
         </ThemeProvider>
       </SafeAreaProvider>

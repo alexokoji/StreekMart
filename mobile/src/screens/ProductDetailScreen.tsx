@@ -23,6 +23,8 @@ import { BackHeader } from "../components/BackHeader";
 import { Chip } from "../components/Chip";
 import { api } from "../api/client";
 import { sellerDisplayName } from "../lib/sellerName";
+import { CartIcon } from "../components/CartIcon";
+import { useCart } from "../state/CartContext";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 import { goToTab } from "../navigation/goToTab";
@@ -102,6 +104,7 @@ export function ProductDetailScreen() {
   const t = useTheme();
   const nav = useNavigation<Nav>();
   const { user } = useAuth();
+  const { bumpCart } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -324,6 +327,8 @@ export function ProductDetailScreen() {
     setAdding(true);
     try {
       await api.post("/api/cart", payload);
+      // Refresh the global cart count so every cart icon updates.
+      bumpCart().catch(() => {});
       Alert.alert("Added", `${product!.name} is in your cart.`);
     } catch (err) {
       Alert.alert("Couldn't add", err instanceof Error ? err.message : "Try again.");
@@ -342,6 +347,7 @@ export function ProductDetailScreen() {
     setAdding(true);
     try {
       await api.post("/api/cart", payload);
+      bumpCart().catch(() => {});
       nav.navigate("Checkout");
     } catch (err) {
       Alert.alert("Couldn't continue", err instanceof Error ? err.message : "Try again.");
@@ -398,7 +404,7 @@ export function ProductDetailScreen() {
       <BackHeader
         rightAction={
           <Pressable onPress={() => goToTab(nav, "Cart")} hitSlop={8}>
-            <Ionicons name="bag-handle-outline" size={22} color={t.text} />
+            <CartIcon />
           </Pressable>
         }
       />

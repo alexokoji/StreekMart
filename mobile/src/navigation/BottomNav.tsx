@@ -1,8 +1,10 @@
 import React from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../state/ThemeContext";
+import { useCart } from "../state/CartContext";
 
 // Custom 5-slot bottom nav with a raised circular FAB at the centre.
 // Order: Home | Wishlist | [Search FAB] | Cart | Account. Replaces the
@@ -10,9 +12,21 @@ import { useTheme } from "../state/ThemeContext";
 // item floats above the bar and uses the brand violet.
 export function BottomNav({ state, descriptors, navigation }: BottomTabBarProps) {
   const t = useTheme();
+  const { itemCount } = useCart();
+  // Respect the device's gesture / nav bar — phones with a gesture
+  // pill (modern Android + every iPhone since X) report a non-zero
+  // bottom inset. Without it, the tab bar tucks under the system bar
+  // and the bottom row of labels gets clipped.
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 8);
 
   return (
-    <View style={[styles.barWrap, { backgroundColor: t.bgElevated, borderTopColor: t.border }]}>
+    <View
+      style={[
+        styles.barWrap,
+        { backgroundColor: t.bgElevated, borderTopColor: t.border, paddingBottom: bottomPadding },
+      ]}
+    >
       <View style={styles.row}>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
@@ -55,9 +69,19 @@ export function BottomNav({ state, descriptors, navigation }: BottomTabBarProps)
           }
 
           const color = focused ? t.cta : t.textMuted;
+          const showCartBadge = route.name === "Cart" && itemCount > 0;
           return (
             <Pressable key={route.key} onPress={onPress} style={styles.tab}>
-              <Ionicons name={iconFor(route.name, focused)} size={22} color={color} />
+              <View>
+                <Ionicons name={iconFor(route.name, focused)} size={22} color={color} />
+                {showCartBadge ? (
+                  <View style={[styles.badge, { backgroundColor: t.cta, borderColor: t.bgElevated }]}>
+                    <Text style={[styles.badgeText, { color: t.ctaText }]} numberOfLines={1}>
+                      {itemCount > 99 ? "99+" : itemCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Text
                 style={[
                   styles.label,
@@ -100,7 +124,6 @@ const styles = StyleSheet.create({
   barWrap: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 6,
-    paddingBottom: Platform.OS === "ios" ? 22 : 8,
   },
   row: { flexDirection: "row", alignItems: "flex-end", height: 62 },
   tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 },
@@ -118,4 +141,17 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: { fontSize: 9, fontWeight: "800", lineHeight: 11 },
 });

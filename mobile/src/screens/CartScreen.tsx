@@ -17,6 +17,7 @@ import { firstImage } from "../lib/productImage";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
 import { api } from "../api/client";
+import { useCart } from "../state/CartContext";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 import { goToTab } from "../navigation/goToTab";
@@ -58,6 +59,7 @@ export function CartScreen() {
   const t = useTheme();
   const nav = useNavigation<Nav>();
   const { user } = useAuth();
+  const { bumpCart } = useCart();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function CartScreen() {
       } else {
         await api.patch(`/api/cart/items/${id}`, { quantity: qty });
       }
-      await load();
+      await Promise.all([load(), bumpCart()]);
     } catch (err) {
       Alert.alert("Couldn't update", err instanceof Error ? err.message : "Try again.");
     } finally {
