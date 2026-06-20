@@ -241,6 +241,17 @@ export function RootNav({
             headerTintColor: t.text,
             headerTitleStyle: { fontWeight: "700" },
             contentStyle: { backgroundColor: t.bg },
+            // Default native-stack on Android leaves the container
+            // transparent during the pop animation, which reads as a
+            // white flash on dark mode. Picking an explicit slide gives
+            // both platforms a continuous animated transition and
+            // forces the container to render the theme background
+            // straight through the gesture.
+            animation: "slide_from_right",
+            animationDuration: 250,
+            animationTypeForReplace: "push",
+            navigationBarColor: t.bg,
+            statusBarTranslucent: false,
           }}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
