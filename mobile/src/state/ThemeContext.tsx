@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SystemUI from "expo-system-ui";
 import { darkTheme, lightTheme, type Theme } from "../theme/tokens";
 
 export type ThemePreference = "system" | "light" | "dark";
@@ -43,6 +44,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const effective = preference === "system" ? system ?? "light" : preference;
     return effective === "dark" ? darkTheme : lightTheme;
   }, [preference, system]);
+
+  // Paint the native window background with the theme so the Android
+  // Activity (and iOS root view) doesn't flash its default white in
+  // between stack screens during the pop animation. Without this,
+  // contentStyle on the navigator only covers the JS view tree — any
+  // gap during the slide animation reveals the system default.
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(theme.bg).catch(() => {});
+  }, [theme.bg]);
 
   // Don't render children until hydration — prevents a one-frame flash of
   // the wrong theme on cold start.
