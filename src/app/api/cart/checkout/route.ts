@@ -6,7 +6,6 @@ import { requireApiUser } from "@/lib/auth";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
-import { getServerCurrencyContext } from "@/lib/currencyServer";
 import { CheckoutBodySchema } from "@/lib/schemas/checkout";
 
 // POST /api/cart/checkout — converts cart items into Orders (one per
@@ -102,9 +101,6 @@ export async function POST(req: Request) {
   // sibling order and finalise them together.
   const paymentReference = `UPCLO_${randomBytes(8).toString("hex").toUpperCase()}`;
 
-  // Get current currency context to lock in today's exchange rate
-  const currencyCtx = await getServerCurrencyContext();
-
   // Resolve a delivery quote for every distinct seller in the cart. We do
   // this BEFORE creating any Order rows so an international / unsupported-
   // city blocker rejects the whole checkout with a clean error instead of
@@ -156,15 +152,20 @@ export async function POST(req: Request) {
 
   const orders = await prisma.$transaction(
     live.map((it) => {
-      const unitPriceUsd = it.product.salePrice ?? it.product.price;
-      const unitPrice = unitPriceUsd * currencyCtx.rate;
+      // Product prices are now stored in NGN — see the canonicalisation
+      // comment in /api/products. The legacy USD→localized round-trip
+      // (unitPriceUsd * currencyCtx.rate) inflated every NGN-stored
+      // price by the NGN-per-USD rate before sending the total to the
+      // gateway, which is what surfaced as Korapay AA021 "daily pay-in
+      // limit NGN1000000 exceeded" on otherwise tiny orders.
+      const unitPrice = it.product.salePrice ?? it.product.price;
       const quote = quoteBySellerId.get(it.product.seller.id)!;
       const sellerKey = it.product.seller.id;
       const isFirstFromSeller = !sellerSeen.has(sellerKey);
       if (isFirstFromSeller) sellerSeen.add(sellerKey);
       const deliveryFeeCents = isFirstFromSeller ? quote.feeCents : 0;
       const itemTotal = unitPrice * it.quantity + deliveryFeeCents / 100;
-      console.log("[checkout] item:", { productId: it.product.id, unitPriceUsd, unitPrice, currency: currencyCtx.code, qty: it.quantity, delivery: deliveryFeeCents, itemTotal });
+      console.log("[checkout] item:", { productId: it.product.id, unitPrice, currency: "NGN", qty: it.quantity, delivery: deliveryFeeCents, itemTotal });
 
       return prisma.order.create({
         data: {
