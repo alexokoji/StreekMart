@@ -99,7 +99,7 @@ export async function POST(req: Request) {
 
   // One reference per checkout group. Used by the webhook to find every
   // sibling order and finalise them together.
-  const paymentReference = `UPCLO_${randomBytes(8).toString("hex").toUpperCase()}`;
+  const paymentReference = `STREEKMART_${randomBytes(8).toString("hex").toUpperCase()}`;
 
   // Resolve a delivery quote for every distinct seller in the cart. We do
   // this BEFORE creating any Order rows so an international / unsupported-
