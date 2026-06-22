@@ -49,7 +49,11 @@ export function RegisterScreen() {
         city: "Lagos",
         referralCode: referralCode.trim() || undefined,
       });
-      nav.reset({ index: 0, routes: [{ name: "Tabs" }] });
+      // /api/auth/register fires the verification email automatically.
+      // Gate the buyer behind VerifyEmail until /api/me reports the
+      // address as verified; the screen self-advances to Tabs as soon
+      // as that flips, so nothing here decides between the two paths.
+      nav.reset({ index: 0, routes: [{ name: "VerifyEmail" }] });
     } catch (err) {
       Alert.alert("Couldn't create account", err instanceof Error ? err.message : "Try again.");
     }

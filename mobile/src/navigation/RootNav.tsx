@@ -56,6 +56,7 @@ import { EditProfileScreen } from "../screens/EditProfileScreen";
 import { VerificationScreen } from "../screens/VerificationScreen";
 import { PaymentScreen } from "../screens/PaymentScreen";
 import { PostDetailScreen } from "../screens/PostDetailScreen";
+import { VerifyEmailScreen } from "../screens/VerifyEmailScreen";
 
 // Tabs: Home | Feed | Search (centre FAB) | Cart | Account.
 // Feed (designer posts) sits in the primary nav so buyers can pull up
@@ -148,6 +149,11 @@ export type RootStackParamList = {
   // caption + comments thread. Reached from the Feed's comment icon
   // or "View comments" link.
   PostDetail: { id: string };
+
+  // Email-verification gate. Reached straight after register, and
+  // after login when the user's emailVerifiedAt is still null. Pops
+  // itself to Tabs once /api/me reports the address as verified.
+  VerifyEmail: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -310,6 +316,11 @@ export function RootNav({
           <Stack.Screen name="Verification" component={VerificationScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Payment" component={PaymentScreen} options={{ headerShown: false }} />
           <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="VerifyEmail"
+            component={VerifyEmailScreen}
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
         </Stack.Navigator>
       </NavigationContainer>
     </>

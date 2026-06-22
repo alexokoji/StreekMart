@@ -10,6 +10,7 @@ import { Input, PasswordInput } from "../components/Input";
 import { BrandMark } from "../components/BrandMark";
 import { SocialButton } from "../components/SocialButton";
 import { useOAuthSignIn } from "../state/useOAuthSignIn";
+import { api } from "../api/client";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
@@ -26,7 +27,18 @@ export function LoginScreen() {
   async function submit() {
     try {
       await loginWithPassword(email.trim(), password);
-      nav.reset({ index: 0, routes: [{ name: "Tabs" }] });
+      // Read the freshly populated user row to decide whether to gate
+      // them behind the email-verification screen. /api/me is the
+      // canonical source — the login response itself doesn't ship
+      // emailVerifiedAt.
+      const me = await api
+        .get<{ user: { emailVerifiedAt?: string | null } | null }>("/api/me")
+        .catch(() => ({ user: null }));
+      const verified = !!me.user?.emailVerifiedAt;
+      nav.reset({
+        index: 0,
+        routes: [{ name: verified ? "Tabs" : "VerifyEmail" }],
+      });
     } catch (err) {
       Alert.alert("Sign-in failed", err instanceof Error ? err.message : "Try again.");
     }
