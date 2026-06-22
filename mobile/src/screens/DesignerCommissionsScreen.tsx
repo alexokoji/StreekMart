@@ -7,24 +7,29 @@ import { useTheme } from "../state/ThemeContext";
 import { api, isNotFound } from "../api/client";
 import { radius, type } from "../theme/tokens";
 
+// Server commission shape (src/lib/commissions.ts).
 type Commission = {
   id: string;
   status: string;
-  brief: string;
-  budget: number;
+  title: string;
+  description: string;
+  budgetCents: number | null;
+  quoteCents: number | null;
   buyer: { id: string; name: string };
+  designer?: { id: string; name: string };
   createdAt: string;
-  deadline: string | null;
+  deadlineAt: string | null;
 };
 
 function statusColors(t: ReturnType<typeof useTheme>, status: string) {
   switch (status.toUpperCase()) {
-    case "OPEN":
-    case "PENDING":
+    case "REQUESTED":
       return { fg: t.warning.fg, bg: t.warning.bg };
+    case "QUOTED":
     case "ACCEPTED":
     case "IN_PROGRESS":
       return { fg: t.accent, bg: t.accentSoft };
+    case "DELIVERED":
     case "COMPLETED":
       return { fg: t.success.fg, bg: t.success.bg };
     case "DECLINED":
@@ -46,7 +51,10 @@ export function DesignerCommissionsScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await api.get<{ commissions: Commission[] }>("/api/designer/commissions");
+      // Same endpoint as the web designer commissions page:
+      // /api/commissions?role=designer returns this designer's
+      // incoming requests in the same shape used across both clients.
+      const data = await api.get<{ commissions: Commission[] }>("/api/commissions", { role: "designer" });
       setItems(data.commissions ?? []);
     } catch (err) {
       if (isNotFound(err)) setItems([]);
@@ -62,7 +70,13 @@ export function DesignerCommissionsScreen() {
   async function decide(id: string, action: "accept" | "decline") {
     setBusy(id);
     try {
-      await api.post(`/api/designer/commissions/${id}/${action}`);
+      // PATCH /api/commissions/:id with the discriminated TRANSITION
+      // payload — same body the web's designer commissions actions
+      // submit. ACCEPTED moves REQUESTED → ACCEPTED; DECLINED ends it.
+      await api.patch(`/api/commissions/${id}`, {
+        kind: "TRANSITION",
+        to: action === "accept" ? "ACCEPTED" : "DECLINED",
+      });
       await load();
     } catch (err) {
       Alert.alert("Couldn't update", err instanceof Error ? err.message : "Try again.");
@@ -88,7 +102,11 @@ export function DesignerCommissionsScreen() {
       emptyMessage="When buyers request a custom piece, it'll show here."
       renderItem={({ item }) => {
         const sc = statusColors(t, item.status);
-        const isPending = item.status.toUpperCase() === "OPEN" || item.status.toUpperCase() === "PENDING";
+        // REQUESTED is the state where Accept/Decline applies (server's
+        // status machine — see canTransition in src/lib/commissions.ts).
+        const isPending = item.status.toUpperCase() === "REQUESTED";
+        const budgetNgn =
+          typeof item.budgetCents === "number" ? item.budgetCents / 100 : null;
         return (
           <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, opacity: busy === item.id ? 0.55 : 1 }]}>
             <View style={styles.head}>
@@ -96,19 +114,24 @@ export function DesignerCommissionsScreen() {
                 <Text style={[type.bodyStrong, { color: t.text }]}>From {item.buyer.name}</Text>
                 <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>
                   {new Date(item.createdAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
-                  {item.deadline ? ` · Deadline ${new Date(item.deadline).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}` : ""}
+                  {item.deadlineAt ? ` · Deadline ${new Date(item.deadlineAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}` : ""}
                 </Text>
               </View>
               <View style={[styles.statusChip, { backgroundColor: sc.bg }]}>
                 <Text style={{ color: sc.fg, fontSize: 11, fontWeight: "800" }}>{item.status}</Text>
               </View>
             </View>
-            <Text style={[type.body, { color: t.text, marginTop: 10 }]} numberOfLines={4}>
-              {item.brief}
+            <Text style={[type.bodyStrong, { color: t.text, marginTop: 10 }]} numberOfLines={1}>
+              {item.title}
             </Text>
-            <Text style={[type.bodyStrong, { color: t.cta, marginTop: 8 }]}>
-              Budget ₦{Math.round(item.budget).toLocaleString("en-NG")}
+            <Text style={[type.body, { color: t.text, marginTop: 4 }]} numberOfLines={4}>
+              {item.description}
             </Text>
+            {budgetNgn != null ? (
+              <Text style={[type.bodyStrong, { color: t.cta, marginTop: 8 }]}>
+                Budget ₦{Math.round(budgetNgn).toLocaleString("en-NG")}
+              </Text>
+            ) : null}
             {isPending ? (
               <View style={styles.actions}>
                 <Pressable

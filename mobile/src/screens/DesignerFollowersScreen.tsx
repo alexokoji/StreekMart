@@ -8,18 +8,22 @@ import { useTheme } from "../state/ThemeContext";
 import { api, isNotFound } from "../api/client";
 import { radius, type } from "../theme/tokens";
 
-type Follower = {
+// /api/follows?role=followers shape — see src/app/api/follows/route.ts.
+type FollowRow = {
   id: string;
-  name: string;
-  email: string;
-  avatarUrl: string | null;
-  followedAt: string;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    businessName: string | null;
+    avatarUrl: string | null;
+  };
 };
 
 type Resp = {
   total: number;
   growthThisWeek: number;
-  followers: Follower[];
+  follows: FollowRow[];
 };
 
 export function DesignerFollowersScreen() {
@@ -32,10 +36,22 @@ export function DesignerFollowersScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const d = await api.get<Resp>("/api/designer/followers");
-      setData(d);
+      // Combine the two endpoints the web already exposes:
+      //   /api/follows?role=followers → the actual list of accounts
+      //   /api/dashboard/designer    → the windowed growth numbers
+      const [list, dash] = await Promise.all([
+        api.get<{ follows: FollowRow[] }>("/api/follows", { role: "followers" }).catch(() => ({ follows: [] })),
+        api
+          .get<{ stats: { newFollowersThisWeek: number } }>("/api/dashboard/designer")
+          .catch(() => ({ stats: { newFollowersThisWeek: 0 } })),
+      ]);
+      setData({
+        total: list.follows?.length ?? 0,
+        growthThisWeek: dash.stats?.newFollowersThisWeek ?? 0,
+        follows: list.follows ?? [],
+      });
     } catch (err) {
-      if (isNotFound(err)) setData({ total: 0, growthThisWeek: 0, followers: [] });
+      if (isNotFound(err)) setData({ total: 0, growthThisWeek: 0, follows: [] });
       else setError(err instanceof Error ? err.message : "Try again.");
     } finally {
       setLoading(false);
@@ -67,9 +83,9 @@ export function DesignerFollowersScreen() {
   ) : null;
 
   return (
-    <ListScaffold<Follower>
+    <ListScaffold<FollowRow>
       title="Followers"
-      data={data?.followers ?? []}
+      data={data?.follows ?? []}
       keyExtractor={(f) => f.id}
       loading={loading}
       refreshing={refreshing}
@@ -83,22 +99,22 @@ export function DesignerFollowersScreen() {
       emptyTitle="No followers yet"
       emptyMessage="When buyers follow your work, they'll appear here."
       renderItem={({ item }) => {
-        const initial = (item.name?.[0] ?? "?").toUpperCase();
+        const display = item.user.businessName?.trim() || item.user.name;
+        const initial = (display?.[0] ?? "?").toUpperCase();
         return (
           <View style={[styles.row, { borderBottomColor: t.border }]}>
-            {item.avatarUrl ? (
-              <Image source={{ uri: item.avatarUrl }} style={styles.avatar} contentFit="cover" />
+            {item.user.avatarUrl ? (
+              <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} contentFit="cover" />
             ) : (
               <View style={[styles.avatar, { backgroundColor: t.accent }]}>
                 <Text style={{ color: t.ctaText, fontWeight: "800", fontSize: 18 }}>{initial}</Text>
               </View>
             )}
             <View style={{ flex: 1 }}>
-              <Text style={[type.bodyStrong, { color: t.text }]}>{item.name}</Text>
-              <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>{item.email}</Text>
+              <Text style={[type.bodyStrong, { color: t.text }]}>{display}</Text>
             </View>
             <Text style={[type.small, { color: t.textMuted }]}>
-              {new Date(item.followedAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
+              {new Date(item.createdAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}
             </Text>
           </View>
         );

@@ -45,6 +45,7 @@ type RawPost = {
   body: string;
   imagesJson?: string | null;
   likeCount: number;
+  commentCount?: number;
   author?: {
     id: string;
     name: string;
@@ -65,6 +66,7 @@ type Post = {
     avatarUrl: string | null;
   } | null;
   likeCount: number;
+  commentCount: number;
   saved?: boolean;
 };
 
@@ -98,6 +100,7 @@ function decodePost(p: RawPost): Post {
         }
       : null,
     likeCount: p.likeCount,
+    commentCount: p.commentCount ?? 0,
   };
 }
 
@@ -367,7 +370,9 @@ function PostCard({
         ) : null}
         <Pressable onPress={openComments} hitSlop={6}>
           <Text style={[type.small, { color: t.textMuted, marginTop: 6 }]}>
-            View comments
+            {post.commentCount > 0
+              ? `View ${post.commentCount === 1 ? "1 comment" : `all ${post.commentCount.toLocaleString("en-NG")} comments`}`
+              : "Add a comment"}
           </Text>
         </Pressable>
       </View>

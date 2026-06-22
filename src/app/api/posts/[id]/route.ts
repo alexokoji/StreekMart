@@ -23,13 +23,15 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           slug: true,
         },
       },
+      _count: { select: { comments: true } },
     },
   });
   if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   prisma.post.update({ where: { id: post.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
 
-  return NextResponse.json({ post });
+  const { _count, ...rest } = post;
+  return NextResponse.json({ post: { ...rest, commentCount: _count.comments } });
 }
 
 const UpdateBody = z.object({

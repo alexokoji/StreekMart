@@ -15,12 +15,25 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Post = {
   id: string;
   title: string;
-  image: string | null;
+  imagesJson?: string | null;
+  image?: string | null;
   likeCount: number;
   viewCount: number;
   saveCount: number;
   createdAt: string;
 };
+
+function firstImageFor(p: Post): string | null {
+  if (p.image) return p.image;
+  if (!p.imagesJson) return null;
+  try {
+    const arr = JSON.parse(p.imagesJson);
+    if (Array.isArray(arr) && typeof arr[0] === "string") return arr[0];
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 export function DesignerPostsScreen() {
   const t = useTheme();
@@ -33,7 +46,10 @@ export function DesignerPostsScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await api.get<{ posts: Post[] }>("/api/designer/posts");
+      // Same endpoint the web designer/posts page uses (via Prisma
+      // server-render). Mobile reads /api/posts?mine=1 — returns the
+      // current user's own posts when they have DESIGNER permission.
+      const data = await api.get<{ posts: Post[] }>("/api/posts", { mine: 1 });
       setItems(data.posts ?? []);
     } catch (err) {
       if (isNotFound(err)) setItems([]);
@@ -56,7 +72,7 @@ export function DesignerPostsScreen() {
           const prev = items;
           setItems((cur) => cur.filter((p) => p.id !== id));
           try {
-            await api.delete(`/api/designer/posts/${id}`);
+            await api.delete(`/api/posts/${id}`);
           } catch (err) {
             setItems(prev);
             Alert.alert("Couldn't delete", err instanceof Error ? err.message : "Try again.");
@@ -88,8 +104,8 @@ export function DesignerPostsScreen() {
       emptyMessage="Share a new design via the + button."
       renderItem={({ item }) => (
         <View style={[styles.row, { backgroundColor: t.card, borderColor: t.border }]}>
-          {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.thumb} contentFit="cover" />
+          {firstImageFor(item) ? (
+            <Image source={{ uri: firstImageFor(item)! }} style={styles.thumb} contentFit="cover" />
           ) : (
             <View style={[styles.thumb, { backgroundColor: t.bg, alignItems: "center", justifyContent: "center" }]}>
               <Ionicons name="image-outline" size={24} color={t.textFaint} />

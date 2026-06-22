@@ -18,8 +18,11 @@ export async function GET(req: Request) {
     const posts = await prisma.post.findMany({
       where: { authorId: guard.session.sub },
       orderBy: { createdAt: "desc" },
+      include: { _count: { select: { comments: true } } },
     });
-    return NextResponse.json({ posts });
+    return NextResponse.json({
+      posts: posts.map(({ _count, ...p }) => ({ ...p, commentCount: _count.comments })),
+    });
   }
 
   const posts = await prisma.post.findMany({
@@ -47,11 +50,17 @@ export async function GET(req: Request) {
           createdAt: true,
         },
       },
+      // Comment counts are derived rather than denormalised on the
+      // row (no Post.commentCount column). Cheap via Prisma _count
+      // and lets mobile feed cards show a number next to likes.
+      _count: { select: { comments: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  return NextResponse.json({ posts });
+  return NextResponse.json({
+    posts: posts.map(({ _count, ...p }) => ({ ...p, commentCount: _count.comments })),
+  });
 }
 
 const Body = z.object({

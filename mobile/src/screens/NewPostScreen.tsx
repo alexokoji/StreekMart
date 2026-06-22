@@ -53,10 +53,14 @@ export function NewPostScreen() {
     }
     setBusy(true);
     try {
-      await api.post("/api/designer/posts", {
+      // /api/posts POST contract: title, body, images (array), tags
+      // (array). Image goes through the upload pipeline first; the
+      // returned URL is pushed onto the images array. Same shape the
+      // web's PostEditor sends.
+      await api.post("/api/posts", {
         title: title.trim(),
         body: body.trim(),
-        image,
+        images: image ? [image] : [],
         tags,
       });
       Alert.alert("Posted", "Your post is live.", [{ text: "OK", onPress: () => nav.goBack() }]);

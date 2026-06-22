@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { BackHeader } from "../components/BackHeader";
@@ -9,26 +9,24 @@ import { api } from "../api/client";
 import { pickImages, uploadImage } from "../lib/imagePicker";
 import { radius, type } from "../theme/tokens";
 
+// Mirrors the editable subset of /api/account/profile — see the web
+// PATCH route for the source of truth. acceptingCommissions, website
+// and instagram aren't first-class user fields, so they don't persist
+// here; the web profile page is the same way.
 type DesignerProfile = {
-  displayName: string;
-  tagline: string | null;
+  name: string;
+  businessName: string | null;
   bio: string | null;
   avatarUrl: string | null;
-  bannerUrl: string | null;
-  website: string | null;
-  instagram: string | null;
-  acceptingCommissions: boolean;
+  coverImageUrl: string | null;
 };
 
 const EMPTY: DesignerProfile = {
-  displayName: "",
-  tagline: null,
+  name: "",
+  businessName: null,
   bio: null,
   avatarUrl: null,
-  bannerUrl: null,
-  website: null,
-  instagram: null,
-  acceptingCommissions: true,
+  coverImageUrl: null,
 };
 
 export function DesignerProfileScreen() {
@@ -40,8 +38,20 @@ export function DesignerProfileScreen() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.get<{ profile: DesignerProfile }>("/api/designer/profile");
-      setProfile(data.profile ?? EMPTY);
+      // Same source the web uses — GET /api/me returns the current
+      // user with every field this screen needs.
+      const data = await api.get<{ user: DesignerProfile | null }>("/api/me");
+      setProfile(
+        data.user
+          ? {
+              name: data.user.name ?? "",
+              businessName: data.user.businessName ?? null,
+              bio: data.user.bio ?? null,
+              avatarUrl: data.user.avatarUrl ?? null,
+              coverImageUrl: data.user.coverImageUrl ?? null,
+            }
+          : EMPTY,
+      );
     } catch {
       setProfile(EMPTY);
     } finally {
@@ -67,7 +77,7 @@ export function DesignerProfileScreen() {
     setUploading(kind);
     try {
       const url = await uploadImage(asset);
-      patch(kind === "avatar" ? "avatarUrl" : "bannerUrl", url);
+      patch(kind === "avatar" ? "avatarUrl" : "coverImageUrl", url);
     } catch (err) {
       Alert.alert("Couldn't upload", err instanceof Error ? err.message : "Try again.");
     } finally {
@@ -77,13 +87,25 @@ export function DesignerProfileScreen() {
 
   async function save() {
     if (!profile) return;
-    if (!profile.displayName.trim()) {
+    if (!profile.name.trim()) {
       Alert.alert("Almost there", "Add a display name.");
       return;
     }
     setSaving(true);
     try {
-      await api.patch("/api/designer/profile", profile);
+      // /api/account/profile is the canonical PATCH route; only the
+      // fields the server schema accepts go on the wire.
+      await api.patch("/api/account/profile", {
+        name: profile.name.trim(),
+        bio: profile.bio ?? "",
+        avatarUrl: profile.avatarUrl ?? "",
+        coverImageUrl: profile.coverImageUrl ?? "",
+        // businessName is server-side locked once set — only send it
+        // when the user actually has a value to commit.
+        ...(profile.businessName?.trim()
+          ? { businessName: profile.businessName.trim() }
+          : {}),
+      });
       Alert.alert("Saved", "Designer profile updated.");
     } catch (err) {
       Alert.alert("Couldn't save", err instanceof Error ? err.message : "Try again.");
@@ -121,8 +143,8 @@ export function DesignerProfileScreen() {
           disabled={uploading !== null}
           style={[styles.banner, { backgroundColor: t.card, borderColor: t.border }]}
         >
-          {profile.bannerUrl ? (
-            <Image source={{ uri: profile.bannerUrl }} style={styles.bannerImg} contentFit="cover" />
+          {profile.coverImageUrl ? (
+            <Image source={{ uri: profile.coverImageUrl }} style={styles.bannerImg} contentFit="cover" />
           ) : (
             <View style={styles.bannerEmpty}>
               <Ionicons name="image-outline" size={32} color={t.textMuted} />
@@ -153,17 +175,23 @@ export function DesignerProfileScreen() {
         <View style={{ marginTop: 16 }}>
           <Field label="Display name">
             <Input
-              value={profile.displayName}
-              onChangeText={(v) => patch("displayName", v)}
+              value={profile.name}
+              onChangeText={(v) => patch("name", v)}
               placeholder="The name on your portfolio"
             />
           </Field>
-          <Field label="Tagline">
+          <Field label="Business name">
             <Input
-              value={profile.tagline ?? ""}
-              onChangeText={(v) => patch("tagline", v)}
-              placeholder="One-line about your work"
+              value={profile.businessName ?? ""}
+              onChangeText={(v) => patch("businessName", v)}
+              placeholder="Brand or shop name"
+              editable={!profile.businessName}
             />
+            {profile.businessName ? (
+              <Text style={[type.small, { color: t.textMuted, marginTop: 4 }]}>
+                Locked. Submit a change request from your shop settings to update it.
+              </Text>
+            ) : null}
           </Field>
           <Field label="Bio">
             <View style={[styles.textarea, { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" }]}>
@@ -177,43 +205,6 @@ export function DesignerProfileScreen() {
               />
             </View>
           </Field>
-
-          <Field label="Website">
-            <Input
-              leftIcon={<Ionicons name="globe-outline" size={18} color={t.textMuted} />}
-              value={profile.website ?? ""}
-              onChangeText={(v) => patch("website", v)}
-              autoCapitalize="none"
-              keyboardType="url"
-              placeholder="yourbrand.com"
-            />
-          </Field>
-          <Field label="Instagram handle">
-            <Input
-              leftIcon={<Ionicons name="logo-instagram" size={18} color={t.textMuted} />}
-              value={profile.instagram ?? ""}
-              onChangeText={(v) => patch("instagram", v.replace(/^@/, ""))}
-              autoCapitalize="none"
-              placeholder="yourbrand"
-            />
-          </Field>
-
-          <View style={[styles.toggleRow, { backgroundColor: t.card, borderColor: t.border }]}>
-            <View style={[styles.toggleIcon, { backgroundColor: t.accentSoft }]}>
-              <Ionicons name="color-palette-outline" size={18} color={t.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[type.body, { color: t.text }]}>Open for commissions</Text>
-              <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>
-                Buyers can request custom pieces from your profile.
-              </Text>
-            </View>
-            <Switch
-              value={profile.acceptingCommissions}
-              onValueChange={(v) => patch("acceptingCommissions", v)}
-              trackColor={{ true: t.cta, false: t.border }}
-            />
-          </View>
 
           <Pressable
             onPress={save}

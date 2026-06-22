@@ -4,6 +4,75 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { sendPush } from "@/lib/notifications";
 
+// GET /api/follows — list the actor's followers (people who follow
+// me) when role=followers; the people they're following when
+// role=following. Used by the mobile DesignerFollowers screen.
+export async function GET(req: Request) {
+  const guard = await requireApiUser();
+  if ("error" in guard) return guard.error;
+
+  const url = new URL(req.url);
+  const role = url.searchParams.get("role") ?? "followers";
+  const me = guard.session.sub;
+
+  if (role === "following") {
+    const rows = await prisma.follow.findMany({
+      where: { followerId: me },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      include: {
+        designer: {
+          select: {
+            id: true,
+            name: true,
+            businessName: true,
+            avatarUrl: true,
+            isDesigner: true,
+            isSeller: true,
+            sellerVerified: true,
+            designerVerified: true,
+          },
+        },
+      },
+    });
+    return NextResponse.json({
+      follows: rows.map((r) => ({
+        id: r.id,
+        createdAt: r.createdAt.toISOString(),
+        user: r.designer,
+      })),
+    });
+  }
+
+  // role=followers (default) — accounts following the actor.
+  const rows = await prisma.follow.findMany({
+    where: { designerId: me },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: {
+      follower: {
+        select: {
+          id: true,
+          name: true,
+          businessName: true,
+          avatarUrl: true,
+          isDesigner: true,
+          isSeller: true,
+          sellerVerified: true,
+          designerVerified: true,
+        },
+      },
+    },
+  });
+  return NextResponse.json({
+    follows: rows.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt.toISOString(),
+      user: r.follower,
+    })),
+  });
+}
+
 // POST /api/follows { designerId } — toggle follow.
 const Body = z.object({ designerId: z.string() });
 
