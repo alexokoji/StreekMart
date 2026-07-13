@@ -4,6 +4,7 @@ import { Logo } from "@/components/Logo";
 import { LogoutButton } from "./LogoutButton";
 import { CartIcon } from "./CartIcon";
 import { AccountChip } from "./AccountChip";
+import { ThemeToggle } from "./ThemeToggle";
 // CurrencySelector hidden for the Nigeria-only launch; re-enable when
 // multi-currency display returns.
 // import { CurrencySelector } from "./CurrencySelector";
@@ -36,7 +37,7 @@ export async function TopNav({ user }: { user: NavUser }) {
   return (
     // `overflow-x-clip` keeps any wide child (account name, currency chip)
     // from making the whole page horizontally scrollable on small phones.
-    <header className="sticky top-0 z-20 overflow-x-clip border-b border-ink-100 bg-white/85 backdrop-blur-xl">
+    <header className="sticky top-0 z-20 overflow-x-clip border-b border-ink-100 bg-white/85 backdrop-blur-xl dark:border-ink-700 dark:bg-ink-900/85">
       <div className="mx-auto flex w-full max-w-[1800px] items-center gap-2 px-3 py-3 sm:gap-3 sm:px-6 lg:px-10">
         {/* Brand — icon-only below sm, full wordmark from sm up. */}
         <Link
@@ -83,7 +84,7 @@ export async function TopNav({ user }: { user: NavUser }) {
           {/* Mobile-only search icon */}
           <Link
             href="/search"
-            className="rounded-lg p-2 text-ink-600 hover:bg-ink-50 hover:text-violet-700 md:hidden"
+            className="rounded-lg p-2 text-ink-600 hover:bg-ink-50 hover:text-violet-700 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-violet-300 md:hidden"
             aria-label="Search"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -108,6 +109,8 @@ export async function TopNav({ user }: { user: NavUser }) {
               Re-enable when multi-currency display is reintroduced. */}
           {/* <CurrencySelector /> */}
 
+          <ThemeToggle />
+
           {user ? (
             <>
               <div className="hidden sm:block">
@@ -130,7 +133,7 @@ export async function TopNav({ user }: { user: NavUser }) {
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Link
                 href="/login"
-                className="rounded-lg px-2 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 hover:text-violet-700 sm:px-3 sm:text-sm"
+                className="rounded-lg px-2 py-1.5 text-xs font-medium text-ink-700 hover:bg-ink-50 hover:text-violet-700 dark:text-ink-200 dark:hover:bg-ink-700 dark:hover:text-violet-300 sm:px-3 sm:text-sm"
               >
                 Log in
               </Link>

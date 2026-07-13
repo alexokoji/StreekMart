@@ -8,8 +8,26 @@ import { Footer } from "@/components/layout/Footer";
 import { FloatingSupport } from "@/components/FloatingSupport";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
+import { ThemeProvider } from "@/state/ThemeContext";
 import { getCurrentUser } from "@/lib/auth";
 import { getServerCurrencyContext } from "@/lib/currencyServer";
+
+// Runs before hydration (inline, blocking) so the `dark` class lands on
+// <html> before first paint — avoids a flash of the wrong theme. Mirrors
+// the preference logic in src/state/ThemeContext.tsx; kept in sync by hand
+// since it must run standalone, before any React/module code exists.
+const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem("streekmart:theme-preference");
+    var pref = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+    var scheme = pref === "system"
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : pref;
+    if (scheme === "dark") document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
 
 // SmartSearch pulls in canvas-based dominant-colour extraction (image
 // search) which is heavy + only used when the buyer opens the search
@@ -71,13 +89,15 @@ export default async function RootLayout({
     getServerCurrencyContext(),
   ]);
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
       {/* `overflow-x-clip` is a global safety net against rogue horizontal
           scroll — a single oversized child (long unbreakable string, a
           wide table, an iframe) would otherwise let the whole page scroll
           sideways on mobile. `clip` (vs `hidden`) doesn't establish a new
           scroll container, so position:sticky inside still works. */}
-      <body className="overflow-x-clip font-sans">
+      <body className="overflow-x-clip font-sans bg-ink-50 text-ink-900 dark:bg-ink-900 dark:text-white" suppressHydrationWarning>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         {/*
           CurrencyProvider seeds the client with the same context the server
           used to render initial prices, so SSR and hydration always agree.
@@ -85,29 +105,31 @@ export default async function RootLayout({
           in the TopNav; that POSTs to /api/currency and a router.refresh()
           re-renders everything with the new context.
         */}
-        <CurrencyProvider ctx={currencyCtx}>
-          {user && !user.emailVerifiedAt && (
-            <EmailVerificationBanner email={user.email} />
-          )}
-          <TopNav user={user} />
-          {/*
-            Full-bleed layout. We add only minimal side padding and cap content
-            at 3xl on enormous screens to keep line-lengths sane. The pb-28 on
-            mobile leaves clearance for the bottom nav + the FAB.
-          */}
-          <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:pb-10">
-            {children}
-          </main>
-          <Footer />
-          <BottomNav user={user} />
-          {/* SmartSearch renders its own desktop launcher (bottom-right) and
-              listens for the "upclo:open-search" event from the BottomNav FAB
-              on mobile. */}
-          <SmartSearch />
-          {/* Discreet help-pill in the bottom-right corner that routes to
-              /support. Stays out of the way until tapped. */}
-          <FloatingSupport />
-        </CurrencyProvider>
+        <ThemeProvider>
+          <CurrencyProvider ctx={currencyCtx}>
+            {user && !user.emailVerifiedAt && (
+              <EmailVerificationBanner email={user.email} />
+            )}
+            <TopNav user={user} />
+            {/*
+              Full-bleed layout. We add only minimal side padding and cap content
+              at 3xl on enormous screens to keep line-lengths sane. The pb-28 on
+              mobile leaves clearance for the bottom nav + the FAB.
+            */}
+            <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:pb-10">
+              {children}
+            </main>
+            <Footer />
+            <BottomNav user={user} />
+            {/* SmartSearch renders its own desktop launcher (bottom-right) and
+                listens for the "upclo:open-search" event from the BottomNav FAB
+                on mobile. */}
+            <SmartSearch />
+            {/* Discreet help-pill in the bottom-right corner that routes to
+                /support. Stays out of the way until tapped. */}
+            <FloatingSupport />
+          </CurrencyProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

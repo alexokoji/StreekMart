@@ -7,6 +7,14 @@
   --foreground: 10 10 20;
 }
 
+/* Dark theme — mirrors mobile/src/theme/tokens.ts darkTheme (bg: ink900,
+   text: white) so the site matches the app when the `dark` class is set
+   on <html> by src/state/ThemeContext.tsx. */
+html.dark {
+  --background: 10 10 20;
+  --foreground: 255 255 255;
+}
+
 html, body {
   height: 100%;
 }
@@ -47,22 +55,22 @@ body { overscroll-behavior-y: none; }
     background-image: linear-gradient(135deg, #f3e6b8 0%, #cf9f32 100%);
   }
   .btn-secondary {
-    @apply btn bg-white border border-ink-200 text-ink-800 hover:border-violet-400 hover:text-violet-700;
+    @apply btn bg-white border border-ink-200 text-ink-800 hover:border-violet-400 hover:text-violet-700 dark:bg-ink-700 dark:border-ink-600 dark:text-white dark:hover:border-violet-400 dark:hover:text-violet-300;
   }
   .btn-ghost {
-    @apply btn bg-transparent text-ink-700 hover:bg-violet-50 hover:text-violet-700;
+    @apply btn bg-transparent text-ink-700 hover:bg-violet-50 hover:text-violet-700 dark:text-ink-200 dark:hover:bg-ink-700 dark:hover:text-violet-300;
   }
   .btn-danger {
     @apply btn bg-burgundy-700 text-white hover:bg-burgundy-500;
   }
   .input {
-    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm transition-all focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-200/60;
+    @apply w-full rounded-xl border border-ink-200 bg-white px-3.5 py-2.5 text-sm transition-all focus:border-violet-500 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:bg-ink-700 dark:border-ink-600 dark:text-white dark:placeholder:text-ink-400 dark:focus:border-violet-400 dark:focus:ring-violet-950/60;
   }
   .label {
-    @apply block text-xs font-semibold uppercase tracking-wide text-ink-600 mb-1.5;
+    @apply block text-xs font-semibold uppercase tracking-wide text-ink-600 mb-1.5 dark:text-ink-300;
   }
   .card {
-    @apply bg-white rounded-2xl border border-ink-100 shadow-sm;
+    @apply bg-white rounded-2xl border border-ink-100 shadow-sm dark:bg-ink-700 dark:border-ink-600;
   }
   .card-glow {
     @apply card shadow-soft;
@@ -71,10 +79,10 @@ body { overscroll-behavior-y: none; }
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold;
   }
   .chip {
-    @apply inline-flex items-center rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-violet-400 hover:text-violet-700;
+    @apply inline-flex items-center rounded-full border border-ink-200 bg-white px-3.5 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-violet-400 hover:text-violet-700 dark:bg-ink-700 dark:border-ink-600 dark:text-ink-200 dark:hover:border-violet-400 dark:hover:text-violet-300;
   }
   .chip-active {
-    @apply chip border-violet-500 bg-violet-50 text-violet-700;
+    @apply chip border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300;
   }
   .product-card {
     @apply card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-soft;
@@ -103,7 +111,7 @@ body { overscroll-behavior-y: none; }
   }
   /* Glassy surface for floating UI */
   .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/40;
+    @apply bg-white/80 backdrop-blur-xl border border-white/40 dark:bg-ink-800/80 dark:border-white/10;
   }
   /* iOS-style safe-area bottom padding for the mobile tab bar */
   .pb-safe {

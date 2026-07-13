@@ -95,7 +95,7 @@ export function BottomNav({ user }: { user: NavUser }) {
       <nav
         role="navigation"
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white pb-safe shadow-[0_-8px_30px_-12px_rgba(76,29,149,0.18)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white pb-safe shadow-[0_-8px_30px_-12px_rgba(76,29,149,0.18)] dark:border-ink-700 dark:bg-ink-800 md:hidden"
         // The mask creates a 30px-radius circular cutout centered at the top.
         // Anything inside the cutout area is transparent — the FAB shows through.
         style={{
@@ -160,7 +160,9 @@ function NavItem({ tab, pathname }: { tab: Tab; pathname: string }) {
         aria-current={active ? "page" : undefined}
         className={cn(
           "relative flex w-full flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
-          active ? "text-violet-700" : "text-ink-500 hover:text-ink-800",
+          active
+            ? "text-violet-700 dark:text-violet-300"
+            : "text-ink-500 hover:text-ink-800 dark:text-ink-400 dark:hover:text-ink-100",
         )}
       >
         <span className="relative">
