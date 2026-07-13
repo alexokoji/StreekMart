@@ -158,3 +158,31 @@ body { overscroll-behavior-y: none; }
 @keyframes skeleton-sweep {
   100% { transform: translateX(100%); }
 }
+
+/* ---- Dark-mode escape hatch ----------------------------------------------
+   Most of the app was written against a fixed light palette — hundreds of
+   components set `bg-white` / `text-ink-900` / `border-ink-100` etc.
+   directly rather than going through the shared .card/.input/.chip classes.
+   Retrofitting every call site individually isn't practical in one pass, so
+   instead we override the handful of light-only utility classes that cause
+   the worst breakage (near-invisible text, glaring white boxes) once here.
+   `html.dark .foo` has higher specificity than the bare Tailwind `.foo`
+   rule, so this wins regardless of source order without touching markup.
+   Remove individual overrides here as call sites get proper `dark:` variants. */
+html.dark .bg-white { background-color: #262630 !important; } /* ink-700 */
+html.dark .bg-ink-50 { background-color: #171720 !important; } /* ink-800 */
+html.dark .bg-gray-50 { background-color: #171720 !important; }
+html.dark .bg-gray-100 { background-color: #262630 !important; }
+
+html.dark .text-ink-900 { color: #ffffff !important; }
+html.dark .text-ink-800 { color: #e4e4e8 !important; } /* ink-100 */
+html.dark .text-ink-700 { color: #cccccf !important; } /* ink-200 */
+html.dark .text-gray-900 { color: #ffffff !important; }
+html.dark .text-gray-800 { color: #e4e4e8 !important; }
+html.dark .text-gray-700 { color: #cccccf !important; }
+html.dark .text-gray-600 { color: #a3a3a8 !important; } /* ink-300 */
+
+html.dark .border-ink-100 { border-color: #404048 !important; } /* ink-600 */
+html.dark .border-ink-200 { border-color: #404048 !important; }
+html.dark .border-gray-100 { border-color: #404048 !important; }
+html.dark .border-gray-200 { border-color: #404048 !important; }
