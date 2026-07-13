@@ -79,20 +79,20 @@ export function PopularCategoryCards({
             <Link
               key={cat.name}
               href={hrefFor(cat.name)}
-              className={`group relative flex shrink-0 snap-center flex-col items-center justify-center rounded-2xl border bg-gradient-to-br p-3 text-center transition-all ${cat.tint} ${
+              className={`group relative flex shrink-0 snap-center flex-col items-center justify-center rounded-2xl border bg-gradient-to-br p-3 text-center transition-all dark:border-ink-700 dark:bg-none dark:bg-ink-800 ${cat.tint} ${
                 isActive
-                  ? "border-violet-500 shadow-md ring-2 ring-violet-300"
-                  : "border-ink-100 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-sm"
+                  ? "border-violet-500 shadow-md ring-2 ring-violet-300 dark:border-violet-400 dark:ring-violet-900"
+                  : "border-ink-100 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-sm dark:hover:border-violet-400"
               } w-[7.5rem] sm:w-auto`}
               aria-label={`Filter by ${cat.name}`}
             >
               <span className="text-3xl leading-none sm:text-4xl" aria-hidden="true">
                 {cat.emoji}
               </span>
-              <span className="mt-1.5 text-xs font-semibold text-ink-800 sm:text-sm">
+              <span className="mt-1.5 text-xs font-semibold text-ink-800 dark:text-white sm:text-sm">
                 {cat.name}
               </span>
-              <span className="mt-0.5 text-[10px] text-ink-500">
+              <span className="mt-0.5 text-[10px] text-ink-500 dark:text-ink-400">
                 {count} {count === 1 ? "item" : "items"}
               </span>
             </Link>
