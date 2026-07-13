@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export function PreorderRequestForm({ postId }: { postId: string }) {
+export function PreorderRequestForm({
+  postId,
+  productId,
+}: {
+  postId?: string;
+  productId?: string;
+}) {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -15,7 +21,7 @@ export function PreorderRequestForm({ postId }: { postId: string }) {
       const res = await fetch("/api/preorders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, notes: notes || undefined }),
+        body: JSON.stringify({ postId, productId, notes: notes || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {

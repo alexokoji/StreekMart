@@ -29,6 +29,9 @@ export default async function EditProductPage({ params }: { params: { id: string
             category: product.category,
             status: product.status,
             images: parseJsonArray(product.imagesJson),
+            preorderEnabled: product.preorderEnabled,
+            preorderPriceCents: product.preorderPriceCents,
+            preorderLeadDays: product.preorderLeadDays,
           }}
         />
       </div>

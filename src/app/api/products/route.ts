@@ -110,6 +110,12 @@ const CreateBody = z.object({
   // Lets a shop manager create listings on the owner's behalf without
   // co-mingling identities (the product still belongs to the owner).
   actAsOwnerId: z.string().optional(),
+  // Preorder configuration — same shape as Post's preorder fields. When
+  // enabled with both price + lead set, buyers can preorder this product
+  // instead of buying it outright. See src/lib/preorders.ts.
+  preorderEnabled: z.boolean().optional(),
+  preorderPriceCents: z.number().int().positive().nullable().optional(),
+  preorderLeadDays: z.number().int().positive().max(120).nullable().optional(),
 });
 
 // POST /api/products — sellers and designers can list products.
@@ -128,7 +134,24 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, description, price, salePrice, category, status, stock, images, unit, sizes, attributes, currency, actAsOwnerId } = parsed.data;
+  const {
+    name,
+    description,
+    price,
+    salePrice,
+    category,
+    status,
+    stock,
+    images,
+    unit,
+    sizes,
+    attributes,
+    currency,
+    actAsOwnerId,
+    preorderEnabled,
+    preorderPriceCents,
+    preorderLeadDays,
+  } = parsed.data;
 
   // Owner = the actor unless they're a manager acting on someone else's behalf.
   const ownerId = await resolveActingOwner(guard.session.sub, actAsOwnerId, "edit_products");
@@ -239,6 +262,9 @@ export async function POST(req: Request) {
       sizesJson: JSON.stringify(sizes ?? []),
       attributesJson: JSON.stringify(attributes ?? []),
       imagesJson: JSON.stringify(images),
+      preorderEnabled: preorderEnabled ?? false,
+      preorderPriceCents: preorderEnabled ? preorderPriceCents ?? null : null,
+      preorderLeadDays: preorderEnabled ? preorderLeadDays ?? null : null,
     },
   });
   return NextResponse.json({ product });

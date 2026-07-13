@@ -7,10 +7,11 @@ import { PreorderStatus } from "@/lib/preorders";
 import { markDesignPaid } from "@/lib/preorderPayment";
 import { sendPush } from "@/lib/notifications";
 
-// POST /api/preorders { postId, notes? }
+// POST /api/preorders { postId | productId, notes? }
 //
-// Buyer requests a preorder of a designer's post-attached piece.
-//   1. Snapshot the post's current price + lead onto the Preorder row.
+// Buyer requests a preorder of either a designer's post-attached piece or
+// a seller's product listing.
+//   1. Snapshot the source's current price + lead onto the Preorder row.
 //   2. Initialise the payment gateway with reference `PREORDER_DESIGN_<id>`.
 //   3. Return the checkout URL — buyer is redirected by the client.
 //   4. The Monnify / Korapay webhook flips the status to AWAITING_READY
@@ -21,10 +22,25 @@ function buildRedirectUrl(req: Request, preorderId: string): string {
   return `${origin}/account/preorders/${preorderId}`;
 }
 
-const Body = z.object({
-  postId: z.string().min(1),
-  notes: z.string().trim().max(2000).optional(),
-});
+const Body = z
+  .object({
+    postId: z.string().min(1).optional(),
+    productId: z.string().min(1).optional(),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .refine((b) => Boolean(b.postId) !== Boolean(b.productId), {
+    message: "Provide exactly one of postId or productId.",
+  });
+
+type Source = {
+  kind: "post" | "product";
+  id: string;
+  title: string;
+  priceCents: number;
+  leadDays: number;
+  fulfillerId: string;
+  fulfillerSuspended: boolean;
+};
 
 export async function POST(req: Request) {
   const guard = await requireApiUser();
@@ -38,41 +54,75 @@ export async function POST(req: Request) {
     );
   }
 
-  const post = await prisma.post.findUnique({
-    where: { id: parsed.data.postId },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          designerVerified: true,
-          designerTier: true,
-          suspendedAt: true,
-        },
+  // Normalise the two possible sources (a Designer's Post or a Seller's
+  // Product) into one shape so the rest of the handler is source-agnostic.
+  let source: Source;
+
+  if (parsed.data.postId) {
+    const post = await prisma.post.findUnique({
+      where: { id: parsed.data.postId },
+      include: {
+        author: { select: { id: true, suspendedAt: true } },
       },
-    },
-  });
-  if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
-  if (
-    !post.preorderEnabled ||
-    typeof post.preorderPriceCents !== "number" ||
-    typeof post.preorderLeadDays !== "number"
-  ) {
+    });
+    if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+    if (
+      !post.preorderEnabled ||
+      typeof post.preorderPriceCents !== "number" ||
+      typeof post.preorderLeadDays !== "number"
+    ) {
+      return NextResponse.json(
+        { error: "This piece isn't accepting preorders right now." },
+        { status: 400 },
+      );
+    }
+    source = {
+      kind: "post",
+      id: post.id,
+      title: post.title,
+      priceCents: post.preorderPriceCents,
+      leadDays: post.preorderLeadDays,
+      fulfillerId: post.author.id,
+      fulfillerSuspended: Boolean(post.author.suspendedAt),
+    };
+  } else {
+    const product = await prisma.product.findUnique({
+      where: { id: parsed.data.productId },
+      include: {
+        seller: { select: { id: true, suspendedAt: true } },
+      },
+    });
+    if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    if (
+      !product.preorderEnabled ||
+      typeof product.preorderPriceCents !== "number" ||
+      typeof product.preorderLeadDays !== "number"
+    ) {
+      return NextResponse.json(
+        { error: "This product isn't accepting preorders right now." },
+        { status: 400 },
+      );
+    }
+    source = {
+      kind: "product",
+      id: product.id,
+      title: product.name,
+      priceCents: product.preorderPriceCents,
+      leadDays: product.preorderLeadDays,
+      fulfillerId: product.seller.id,
+      fulfillerSuspended: Boolean(product.seller.suspendedAt),
+    };
+  }
+
+  if (source.fulfillerSuspended) {
     return NextResponse.json(
-      { error: "This piece isn't accepting preorders right now." },
+      { error: "This seller's account is currently inactive." },
       { status: 400 },
     );
   }
-  if (post.author.suspendedAt) {
+  if (source.fulfillerId === guard.session.sub) {
     return NextResponse.json(
-      { error: "This designer's account is currently inactive." },
-      { status: 400 },
-    );
-  }
-  if (post.author.id === guard.session.sub) {
-    return NextResponse.json(
-      { error: "You can't preorder your own piece." },
+      { error: "You can't preorder your own listing." },
       { status: 400 },
     );
   }
@@ -83,14 +133,17 @@ export async function POST(req: Request) {
   });
   if (!me) return NextResponse.json({ error: "Account not found." }, { status: 404 });
 
+  const fulfillerBase = source.kind === "post" ? "/designer/preorders" : "/seller/preorders";
+
   // Create the preorder row first so we have an id for the payment ref.
   const preorder = await prisma.preorder.create({
     data: {
       buyerId: me.id,
-      designerId: post.author.id,
-      postId: post.id,
-      priceCents: post.preorderPriceCents,
-      leadDays: post.preorderLeadDays,
+      designerId: source.fulfillerId,
+      postId: source.kind === "post" ? source.id : undefined,
+      productId: source.kind === "product" ? source.id : undefined,
+      priceCents: source.priceCents,
+      leadDays: source.leadDays,
       notes: parsed.data.notes,
       status: PreorderStatus.PENDING_PAYMENT,
     },
@@ -102,13 +155,13 @@ export async function POST(req: Request) {
     data: { designPaymentRef: ref },
   });
 
-  // Notify the designer that a new request landed. Push only — they'll
-  // see the order details on /designer/preorders once payment clears.
+  // Notify the fulfiller that a new request landed. Push only — they'll
+  // see the order details on their preorders dashboard once payment clears.
   void sendPush({
-    userId: post.author.id,
+    userId: source.fulfillerId,
     title: "New preorder request",
-    body: `${me.name} wants "${post.title}" · ₦${(post.preorderPriceCents / 100).toLocaleString("en-NG")}`,
-    link: `/designer/preorders/${preorder.id}`,
+    body: `${me.name} wants "${source.title}" · ₦${(source.priceCents / 100).toLocaleString("en-NG")}`,
+    link: `${fulfillerBase}/${preorder.id}`,
     data: { type: "preorder-request", preorderId: preorder.id },
   }).catch((err) =>
     console.error("[push:preorder-request] threw", { preorderId: preorder.id, err }),
@@ -118,10 +171,10 @@ export async function POST(req: Request) {
   const gateway = getGatewaySelector();
   try {
     const init = await gateway.initCheckout({
-      amountCents: post.preorderPriceCents,
+      amountCents: source.priceCents,
       customerEmail: me.email,
       customerName: me.name,
-      description: `Preorder · ${post.title.slice(0, 50)}`,
+      description: `Preorder · ${source.title.slice(0, 50)}`,
       paymentReference: ref,
       redirectUrl: buildRedirectUrl(req, preorder.id),
     });
@@ -152,4 +205,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

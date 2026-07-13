@@ -33,6 +33,9 @@ type ProductFormInitial = {
   sizes?: string[];
   attributes?: AttributeGroup[];
   images?: string[];
+  preorderEnabled?: boolean;
+  preorderPriceCents?: number | null;
+  preorderLeadDays?: number | null;
 };
 
 type Props = {
@@ -116,6 +119,19 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
   );
   const [images, setImages] = useState<string[]>(initial?.images ?? []);
 
+  // Preorder config — when enabled with both price + lead set, buyers can
+  // preorder this product instead of buying it outright. Mirrors the
+  // designer Post preorder block in PostForm.tsx.
+  const [preorderEnabled, setPreorderEnabled] = useState<boolean>(
+    initial?.preorderEnabled ?? false,
+  );
+  const [preorderPriceNgn, setPreorderPriceNgn] = useState<number | "">(
+    initial?.preorderPriceCents ? Math.round(initial.preorderPriceCents / 100) : "",
+  );
+  const [preorderLeadDays, setPreorderLeadDays] = useState<number | "">(
+    initial?.preorderLeadDays ?? "",
+  );
+
   // When the seller picks a different category, switch to the recommended
   // scale and clear any sizes that no longer exist on the new scale.
   function changeCategory(next: string) {
@@ -173,6 +189,15 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
           }))
           .filter((g) => g.name && g.options.length > 0),
         images,
+        // Only send preorder fields when the toggle is on AND both price +
+        // lead are set — mirrors PostForm.tsx.
+        preorderEnabled,
+        preorderPriceCents:
+          preorderEnabled && typeof preorderPriceNgn === "number"
+            ? Math.round(preorderPriceNgn * 100)
+            : null,
+        preorderLeadDays:
+          preorderEnabled && typeof preorderLeadDays === "number" ? preorderLeadDays : null,
       };
 
       const res = await fetch(
@@ -470,6 +495,70 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
       )}
 
       <AttributeEditor value={attributes} onChange={setAttributes} />
+
+      {/* Preorder configuration — when enabled, the product shows a
+          "Preorder this piece" CTA that lets buyers request it directly.
+          Buyer pays the price upfront; the seller makes/preps it within the
+          lead time, then buyer pays delivery separately and seller ships. */}
+      <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4 dark:border-violet-900 dark:bg-violet-950/20">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-violet-700 dark:text-violet-300">
+              Preorder
+            </p>
+            <p className="mt-0.5 text-xs text-ink-500">
+              Let buyers request this product directly. They pay upfront;
+              you prepare it within the lead time, then they pay delivery
+              separately and you ship.
+            </p>
+          </div>
+          <label className="inline-flex shrink-0 items-center gap-2">
+            <input
+              type="checkbox"
+              checked={preorderEnabled}
+              onChange={(e) => setPreorderEnabled(e.target.checked)}
+              className="h-4 w-4"
+            />
+            <span className="text-sm font-medium">Enable</span>
+          </label>
+        </div>
+        {preorderEnabled && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="label">Preorder price (NGN)</label>
+              <input
+                type="number"
+                className="input"
+                min={500}
+                step={500}
+                value={preorderPriceNgn}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPreorderPriceNgn(v === "" ? "" : Number(v));
+                }}
+                placeholder="e.g. 35000"
+                required={preorderEnabled}
+              />
+            </div>
+            <div>
+              <label className="label">Lead time (days)</label>
+              <input
+                type="number"
+                className="input"
+                min={1}
+                max={120}
+                value={preorderLeadDays}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setPreorderLeadDays(v === "" ? "" : Number(v));
+                }}
+                placeholder="e.g. 14"
+                required={preorderEnabled}
+              />
+            </div>
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="label">Images</label>

@@ -48,6 +48,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     include: {
       buyer: { select: { id: true, name: true, email: true } },
       post: { select: { title: true } },
+      product: { select: { name: true } },
     },
   });
   if (!preorder) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -84,7 +85,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       amountCents: parsed.data.feeCents,
       customerEmail: preorder.buyer.email,
       customerName: preorder.buyer.name,
-      description: `Preorder delivery · ${preorder.post?.title?.slice(0, 50) ?? "design"}`,
+      description: `Preorder delivery · ${(preorder.post?.title ?? preorder.product?.name ?? "design").slice(0, 50)}`,
       paymentReference: ref,
       redirectUrl: buildRedirectUrl(req, preorder.id),
     });

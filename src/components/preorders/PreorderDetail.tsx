@@ -32,16 +32,21 @@ export type PreorderShape = {
   buyer: { id: string; name: string };
   designer: { id: string; name: string };
   post: { id: string; title: string; coverUrl: string | null } | null;
+  product?: { id: string; title: string; coverUrl: string | null } | null;
 };
 
-// Shared detail-page renderer. Mounted at /account/preorders/[id] and
-// /designer/preorders/[id]. The `actor` prop drives which actions render.
+// Shared detail-page renderer. Mounted at /account/preorders/[id],
+// /designer/preorders/[id], and /seller/preorders/[id]. The `actor` prop
+// drives which actions render; `backHref` lets each fulfiller dashboard
+// point "All preorders" at its own list.
 export function PreorderDetail({
   initial,
   actor,
+  backHref,
 }: {
   initial: PreorderShape;
   actor: PreorderActor;
+  backHref?: string;
 }) {
   const router = useRouter();
   const [p, setP] = useState(initial);
@@ -125,7 +130,7 @@ export function PreorderDetail({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
-        href={actor === "buyer" ? "/account/preorders" : "/designer/preorders"}
+        href={backHref ?? (actor === "buyer" ? "/account/preorders" : "/designer/preorders")}
         className="text-sm text-violet-700 hover:underline"
       >
         ← All preorders
@@ -140,7 +145,7 @@ export function PreorderDetail({
               {counterpart.name}
             </p>
             <h1 className="mt-1 break-words font-display text-2xl font-bold">
-              {p.post?.title ?? "(post removed)"}
+              {p.post?.title ?? p.product?.title ?? "(listing removed)"}
             </h1>
           </div>
           <span className={`badge ${preorderStatusChipClass(p.status)}`}>

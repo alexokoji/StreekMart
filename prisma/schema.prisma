@@ -581,6 +581,12 @@ model Product {
   attributesJson String @default("[]")
   // DRAFT | ACTIVE | SOLD_OUT | ARCHIVED
   status      String   @default("ACTIVE")
+  // Preorder configuration — same shape as Post.preorderEnabled/etc. When
+  // enabled with both price + lead set, buyers can preorder this product
+  // from its listing page instead of buying it outright.
+  preorderEnabled    Boolean @default(false)
+  preorderPriceCents Int?
+  preorderLeadDays   Int?
   // JSON-encoded array of image URLs (SQLite has no native string[]).
   imagesJson  String   @default("[]")
   // JSON array of dominant hex colors extracted from product images at upload
@@ -612,6 +618,7 @@ model Product {
   reviews    Review[]
   collectionItems CollectionItem[]
   recentlyViewed RecentlyViewed[]
+  preorders  Preorder[]
 }
 
 // -------------------- Posts (Designers) --------------------
@@ -1425,9 +1432,15 @@ model Preorder {
   designerId  String
   designer    User     @relation("DesignerPreorders", fields: [designerId], references: [id], onDelete: Cascade)
   // The post the buyer requested. Nullable so a designer deleting a post
-  // doesn't cascade-wipe in-flight preorders.
+  // doesn't cascade-wipe in-flight preorders. Exactly one of postId /
+  // productId is set — postId for a Designer's Post, productId for a
+  // Seller's Product. `designerId` above holds the fulfilling party's user
+  // id either way (kept as-is rather than renamed to avoid a wide rename
+  // across the payment/notification code that already reads it).
   postId      String?
   post        Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   // Snapshot of the post's config at preorder time. Storing a copy here
   // means a designer raising / lowering the price later doesn't rewrite

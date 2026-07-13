@@ -68,6 +68,10 @@ const UpdateBody = z.object({
   // ISO-4217 — currency the seller typed `price`/`salePrice` in. When
   // present and not USD, the values are converted to USD before storage.
   currency: z.string().length(3).optional(),
+  // Preorder configuration — same shape as Post's preorder fields.
+  preorderEnabled: z.boolean().optional(),
+  preorderPriceCents: z.number().int().positive().nullable().optional(),
+  preorderLeadDays: z.number().int().positive().max(120).nullable().optional(),
 });
 
 export async function PUT(req: Request, { params }: { params: { id: string } }) {

@@ -15,6 +15,12 @@ import { recordSale } from "@/lib/wallet";
 import { sendEmail } from "@/lib/email";
 import { sendPush } from "@/lib/notifications";
 
+// The fulfilling-party dashboard link differs by source: a Post-backed
+// preorder belongs to a Designer, a Product-backed one to a Seller.
+function fulfillerPreorderLink(p: { id: string; productId: string | null }): string {
+  return p.productId ? `/seller/preorders/${p.id}` : `/designer/preorders/${p.id}`;
+}
+
 // Flip a preorder from PENDING_PAYMENT → AWAITING_READY once the buyer's
 // design payment confirms. Idempotent — webhook retries are safe.
 export async function markDesignPaid(
@@ -27,12 +33,14 @@ export async function markDesignPaid(
     include: {
       designer: { select: { designerVerified: true, designerTier: true, name: true, email: true } },
       post: { select: { title: true } },
+      product: { select: { name: true } },
       buyer: { select: { name: true, email: true } },
     },
   });
   if (!p) return;
   if (p.status !== PreorderStatus.PENDING_PAYMENT) return;
 
+  const itemTitle = p.post?.title ?? p.product?.name ?? "your piece";
   const now = new Date();
   const eta = new Date(now.getTime() + p.leadDays * 24 * 60 * 60 * 1000);
 
@@ -57,7 +65,7 @@ export async function markDesignPaid(
   await recordSale({
     sellerId: p.designerId,
     grossCents: p.priceCents,
-    productName: `Preorder · ${p.post?.title ?? "design"}`,
+    productName: `Preorder · ${itemTitle}`,
     orderId: p.id,
     skipHold,
   });
@@ -65,8 +73,8 @@ export async function markDesignPaid(
   void sendPush({
     userId: p.designerId,
     title: "Preorder paid",
-    body: `${p.buyer.name} paid ₦${(p.priceCents / 100).toLocaleString("en-NG")} for "${p.post?.title ?? "your piece"}". Get started!`,
-    link: `/designer/preorders/${p.id}`,
+    body: `${p.buyer.name} paid ₦${(p.priceCents / 100).toLocaleString("en-NG")} for "${itemTitle}". Get started!`,
+    link: fulfillerPreorderLink(p),
     data: { type: "preorder-paid", preorderId: p.id },
   }).catch(() => {});
   void sendPush({
@@ -78,7 +86,7 @@ export async function markDesignPaid(
   }).catch(() => {});
   void sendEmail({
     to: p.designer.email,
-    subject: `Preorder paid — ${p.post?.title ?? "your piece"}`,
+    subject: `Preorder paid — ${itemTitle}`,
     html: `<p>Hi ${p.designer.name},</p><p>${p.buyer.name} paid ₦${(p.priceCents / 100).toLocaleString("en-NG")} for a preorder. Open your dashboard to get started.</p>`,
     text: `${p.buyer.name} paid for a preorder.`,
   }).catch(() => {});
@@ -103,10 +111,13 @@ export async function markDeliveryPaid(
       designer: { select: { id: true, name: true, email: true } },
       buyer: { select: { id: true, name: true, email: true } },
       post: { select: { title: true } },
+      product: { select: { name: true } },
     },
   });
   if (!p) return;
   if (p.status !== PreorderStatus.READY) return;
+
+  const itemTitle = p.post?.title ?? p.product?.name ?? "the design";
 
   await prisma.preorder.update({
     where: { id: p.id },
@@ -121,8 +132,8 @@ export async function markDeliveryPaid(
   void sendPush({
     userId: p.designerId,
     title: "Delivery paid — ship the piece",
-    body: `${p.buyer.name}'s preorder of "${p.post?.title ?? "the design"}" is ready to ship.`,
-    link: `/designer/preorders/${p.id}`,
+    body: `${p.buyer.name}'s preorder of "${itemTitle}" is ready to ship.`,
+    link: fulfillerPreorderLink(p),
     data: { type: "preorder-delivery-paid", preorderId: p.id },
   }).catch(() => {});
   void sendEmail({

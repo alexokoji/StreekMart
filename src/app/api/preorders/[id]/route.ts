@@ -180,7 +180,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 async function notifyCounterparty(
-  preorder: { id: string; buyerId: string; designerId: string },
+  preorder: { id: string; buyerId: string; designerId: string; productId?: string | null },
   to: PreorderActor,
   title: string,
   body: string,
@@ -189,7 +189,9 @@ async function notifyCounterparty(
   const link =
     to === "buyer"
       ? `/account/preorders/${preorder.id}`
-      : `/designer/preorders/${preorder.id}`;
+      : preorder.productId
+        ? `/seller/preorders/${preorder.id}`
+        : `/designer/preorders/${preorder.id}`;
   const recipient = await prisma.user.findUnique({
     where: { id: recipientId },
     select: { email: true, name: true },

@@ -159,6 +159,17 @@ export default async function PublicProductPage({ params }: { params: { id: stri
               Message seller
             </Link>
           )}
+          {product.preorderEnabled &&
+            product.preorderPriceCents != null &&
+            product.preorderLeadDays != null &&
+            !isOwnListing && (
+              <Link
+                href={user ? `/preorder/product/${product.id}` : "/login"}
+                className="btn-primary self-start"
+              >
+                Preorder this piece · ₦{(product.preorderPriceCents / 100).toLocaleString("en-NG")}
+              </Link>
+            )}
         </div>
 
         {isAiEnabled() && (
