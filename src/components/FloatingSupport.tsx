@@ -31,6 +31,8 @@ export function FloatingSupport() {
         opacity-40 backdrop-blur-md transition
         hover:opacity-100 hover:text-violet-700 hover:shadow-md
         active:opacity-100 active:text-violet-800 active:scale-95
+        dark:border-ink-600/80 dark:bg-ink-800/70 dark:text-ink-300
+        dark:hover:text-violet-300 dark:active:text-violet-300
         focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400
         md:bottom-5 md:right-5
         [touch-action:manipulation]

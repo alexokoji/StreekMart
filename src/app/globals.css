@@ -171,8 +171,15 @@ body { overscroll-behavior-y: none; }
    Remove individual overrides here as call sites get proper `dark:` variants. */
 html.dark .bg-white { background-color: #262630 !important; } /* ink-700 */
 html.dark .bg-ink-50 { background-color: #171720 !important; } /* ink-800 */
+html.dark .bg-ink-100 { background-color: #262630 !important; } /* ink-700 */
+html.dark .bg-ink-200 { background-color: #404048 !important; } /* ink-600 */
 html.dark .bg-gray-50 { background-color: #171720 !important; }
 html.dark .bg-gray-100 { background-color: #262630 !important; }
+html.dark .bg-gray-200 { background-color: #404048 !important; }
+html.dark .bg-gray-300 { background-color: #525258 !important; }
+html.dark .bg-gray-400 { background-color: #525258 !important; }
+html.dark .bg-gray-900 { background-color: #171720 !important; }
+html.dark .bg-black { background-color: #0a0a14 !important; }
 
 html.dark .text-ink-900 { color: #ffffff !important; }
 html.dark .text-ink-800 { color: #e4e4e8 !important; } /* ink-100 */
@@ -181,8 +188,27 @@ html.dark .text-gray-900 { color: #ffffff !important; }
 html.dark .text-gray-800 { color: #e4e4e8 !important; }
 html.dark .text-gray-700 { color: #cccccf !important; }
 html.dark .text-gray-600 { color: #a3a3a8 !important; } /* ink-300 */
+html.dark .text-gray-500 { color: #a3a3a8 !important; } /* ink-300 */
+html.dark .text-gray-400 { color: #737378 !important; } /* ink-400 */
+html.dark .text-gray-300 { color: #cccccf !important; } /* ink-200 — rare, usually a light-bg accent */
+html.dark .text-black { color: #ffffff !important; }
 
 html.dark .border-ink-100 { border-color: #404048 !important; } /* ink-600 */
 html.dark .border-ink-200 { border-color: #404048 !important; }
 html.dark .border-gray-100 { border-color: #404048 !important; }
 html.dark .border-gray-200 { border-color: #404048 !important; }
+html.dark .border-gray-300 { border-color: #525258 !important; } /* ink-500 */
+
+/* Tinted info-callout panels (`border-violet-100 bg-violet-50/40` etc.) are
+   used across ~20 forms/dashboards. Tailwind emits a distinct class per
+   opacity value, so each is listed explicitly — a `[class*=]` substring
+   selector would also catch unrelated classes like `bg-violet-500`. */
+html.dark .bg-violet-50,
+html.dark .bg-violet-50\/30,
+html.dark .bg-violet-50\/40,
+html.dark .bg-violet-50\/50,
+html.dark .bg-violet-50\/60 { background-color: rgba(46, 16, 101, 0.25) !important; }
+html.dark .border-violet-100 { border-color: #4c1d95 !important; }
+html.dark .bg-fuchsia-50 { background-color: rgba(112, 26, 117, 0.25) !important; }
+html.dark .bg-gold-50,
+html.dark .bg-gold-50\/50 { background-color: rgba(42, 28, 5, 0.35) !important; }
