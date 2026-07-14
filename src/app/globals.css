@@ -212,3 +212,35 @@ html.dark .border-violet-100 { border-color: #4c1d95 !important; }
 html.dark .bg-fuchsia-50 { background-color: rgba(112, 26, 117, 0.25) !important; }
 html.dark .bg-gold-50,
 html.dark .bg-gold-50\/50 { background-color: rgba(42, 28, 5, 0.35) !important; }
+
+/* Status banners/badges (success, warning, danger, info) across the
+   seller/designer/admin dashboards — same light-50/100-bg + dark-700/800-
+   text pattern as the violet callouts above. Alpha-tinted dark backgrounds
+   + light foreground text mirror mobile's dark theme (see
+   mobile/src/theme/tokens.ts darkTheme.success/warning/danger). */
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.15) !important; }
+html.dark .border-emerald-200 { border-color: rgba(16, 185, 129, 0.4) !important; }
+html.dark .text-emerald-600,
+html.dark .text-emerald-700,
+html.dark .text-emerald-800 { color: #86efac !important; }
+
+html.dark .bg-amber-50,
+html.dark .bg-amber-100 { background-color: rgba(217, 119, 6, 0.15) !important; }
+html.dark .border-amber-200,
+html.dark .border-amber-300 { border-color: rgba(217, 119, 6, 0.4) !important; }
+html.dark .text-amber-700,
+html.dark .text-amber-800 { color: #e9d089 !important; }
+
+html.dark .bg-yellow-100 { background-color: rgba(217, 119, 6, 0.15) !important; }
+html.dark .text-yellow-800 { color: #e9d089 !important; }
+
+html.dark .bg-red-50 { background-color: rgba(107, 26, 42, 0.25) !important; }
+html.dark .border-red-200 { border-color: rgba(107, 26, 42, 0.5) !important; }
+html.dark .text-red-500,
+html.dark .text-red-600,
+html.dark .text-red-700 { color: #fda4af !important; }
+
+html.dark .bg-sky-50,
+html.dark .bg-sky-100 { background-color: rgba(14, 165, 233, 0.15) !important; }
+html.dark .text-sky-700 { color: #7dd3fc !important; }
