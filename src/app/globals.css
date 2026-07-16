@@ -244,3 +244,15 @@ html.dark .text-red-700 { color: #fda4af !important; }
 html.dark .bg-sky-50,
 html.dark .bg-sky-100 { background-color: rgba(14, 165, 233, 0.15) !important; }
 html.dark .text-sky-700 { color: #7dd3fc !important; }
+
+/* `hover:`/`focus:` pseudo-class variants are separate selectors
+   (`.hover\:bg-ink-50:hover`) from the bare utility above, so none of the
+   overrides above touch them — every sidebar/nav hover state was still
+   flashing near-white. Same treatment, scoped to :hover. */
+html.dark .hover\:bg-white:hover,
+html.dark .hover\:bg-ink-50:hover,
+html.dark .hover\:bg-gray-50:hover { background-color: #262630 !important; } /* ink-700 */
+html.dark .hover\:bg-violet-50:hover { background-color: rgba(46, 16, 101, 0.35) !important; }
+html.dark .hover\:text-ink-900:hover,
+html.dark .hover\:text-ink-800:hover,
+html.dark .hover\:text-gray-900:hover { color: #ffffff !important; }

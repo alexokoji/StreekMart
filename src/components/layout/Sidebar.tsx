@@ -70,13 +70,13 @@ export function Sidebar({
     <>
       {/* Mobile trigger — sticky bar that sits just below the TopNav and
           contains the hamburger + the current page name as a breadcrumb hint. */}
-      <div className="sticky top-[3.4rem] z-20 -mx-4 mb-3 flex items-center justify-between border-b border-ink-100 bg-white/90 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 md:hidden">
+      <div className="sticky top-[3.4rem] z-20 -mx-4 mb-3 flex items-center justify-between border-b border-ink-100 bg-white/90 px-4 py-2 backdrop-blur-xl dark:border-ink-700 dark:bg-ink-900/90 sm:-mx-6 sm:px-6 md:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label={`Open ${title} menu`}
           aria-expanded={open}
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold text-ink-800 hover:bg-ink-50"
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-semibold text-ink-800 hover:bg-ink-50 dark:hover:bg-ink-700"
         >
           <HamburgerIcon className="h-4 w-4" />
           <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-500">
