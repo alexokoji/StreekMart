@@ -746,13 +746,13 @@ function Section({
     <section>
       <div className="mb-4 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-lg font-semibold sm:text-xl">{title}</h2>
-          {subtitle && <p className="text-xs text-ink-500">{subtitle}</p>}
+          <h2 className="font-display text-xl font-bold sm:text-2xl">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-ink-500 sm:text-sm">{subtitle}</p>}
         </div>
         {href && (
           <Link
             href={href}
-            className="shrink-0 whitespace-nowrap text-xs text-gold-700 hover:underline sm:text-sm"
+            className="shrink-0 whitespace-nowrap rounded-full border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-violet-400 hover:text-violet-700 dark:border-ink-600 dark:text-ink-200 dark:hover:border-violet-400 dark:hover:text-violet-300 sm:text-sm"
           >
             See all →
           </Link>

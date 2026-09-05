@@ -94,7 +94,6 @@ export async function SmartSuggestions() {
       <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {picks.slice(0, 8).map((p) => {
           const img = parseJsonArray(p.imagesJson)[0] ?? null;
-          const handle = p.seller.slug ?? p.seller.id;
           return (
             <li key={p.id} className="overflow-hidden rounded-xl border border-ink-100 bg-white">
               <Link href={`/products/${p.id}`} className="block">
@@ -106,10 +105,12 @@ export async function SmartSuggestions() {
                 </div>
                 <div className="p-3">
                   <p className="line-clamp-1 text-sm font-medium">{p.name}</p>
+                  {/* Plain text, not a nested <Link> — an <a> inside the
+                      card's wrapping <Link> is invalid HTML and breaks
+                      hydration. The whole card already routes to the
+                      product; the seller name is informational only here. */}
                   <p className="text-[11px] text-ink-500">
-                    <Link href={`/u/${handle}`} className="hover:underline">
-                      {displaySellerName(p.seller)}
-                    </Link>
+                    {displaySellerName(p.seller)}
                     {p.seller.sellerVerified && <span className="ml-1 text-emerald-accent">✓</span>}
                   </p>
                   <p className="mt-1 text-sm font-semibold">

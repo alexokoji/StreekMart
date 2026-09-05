@@ -2,8 +2,10 @@ import type { Metadata, Viewport } from "next";
 import dynamic from "next/dynamic";
 import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
+import { TopPromoStrip } from "@/components/layout/TopPromoStrip";
 import { TopNav } from "@/components/layout/TopNav";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { NewsletterBar } from "@/components/layout/NewsletterBar";
 import { Footer } from "@/components/layout/Footer";
 import { FloatingSupport } from "@/components/FloatingSupport";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
@@ -107,6 +109,7 @@ export default async function RootLayout({
         */}
         <ThemeProvider>
           <CurrencyProvider ctx={currencyCtx}>
+            <TopPromoStrip />
             {user && !user.emailVerifiedAt && (
               <EmailVerificationBanner email={user.email} />
             )}
@@ -119,6 +122,7 @@ export default async function RootLayout({
             <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:pb-10">
               {children}
             </main>
+            <NewsletterBar />
             <Footer />
             <BottomNav user={user} />
             {/* SmartSearch renders its own desktop launcher (bottom-right) and

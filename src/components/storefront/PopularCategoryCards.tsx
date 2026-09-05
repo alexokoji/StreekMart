@@ -48,13 +48,13 @@ export function PopularCategoryCards({
 
   return (
     <section>
-      <div className="mb-3 flex items-end justify-between gap-3">
+      <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
             Shop by category
           </p>
-          <h2 className="font-display text-lg font-semibold sm:text-xl">
-            What are you in the mood for?
+          <h2 className="font-display text-xl font-bold sm:text-2xl">
+            Find your style
           </h2>
         </div>
         {activeCategory && (
@@ -67,11 +67,10 @@ export function PopularCategoryCards({
         )}
       </div>
 
-      {/* Horizontal scroll on mobile (snap), grid on desktop — both surface
-          every card without needing the user to expand a section. */}
-      <div
-        className="flex gap-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory pb-1 sm:grid sm:snap-none sm:grid-cols-4 sm:gap-3 lg:grid-cols-8"
-      >
+      {/* Circular avatar-style pickers — image (or tinted emoji fallback)
+          in a round frame, label underneath. Horizontal scroll on mobile
+          (snap), even row on desktop. */}
+      <div className="flex gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory pb-1 sm:grid sm:snap-none sm:grid-cols-4 sm:gap-4 lg:grid-cols-8">
         {POPULAR.map((cat) => {
           const count = categoryCounts.get(cat.name) ?? 0;
           const isActive = activeCategory === cat.name;
@@ -79,20 +78,23 @@ export function PopularCategoryCards({
             <Link
               key={cat.name}
               href={hrefFor(cat.name)}
-              className={`group relative flex shrink-0 snap-center flex-col items-center justify-center rounded-2xl border bg-gradient-to-br p-3 text-center transition-all dark:border-ink-700 dark:bg-none dark:bg-ink-800 ${cat.tint} ${
-                isActive
-                  ? "border-violet-500 shadow-md ring-2 ring-violet-300 dark:border-violet-400 dark:ring-violet-900"
-                  : "border-ink-100 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-sm dark:hover:border-violet-400"
-              } w-[7.5rem] sm:w-auto`}
+              className="group flex shrink-0 snap-center flex-col items-center gap-2 text-center w-20 sm:w-auto"
               aria-label={`Filter by ${cat.name}`}
             >
-              <span className="text-3xl leading-none sm:text-4xl" aria-hidden="true">
+              <span
+                className={`flex h-16 w-16 items-center justify-center rounded-full border bg-gradient-to-br text-2xl transition-all sm:h-20 sm:w-20 sm:text-3xl dark:border-ink-700 dark:bg-none dark:bg-ink-800 ${cat.tint} ${
+                  isActive
+                    ? "border-violet-500 shadow-md ring-2 ring-violet-300 dark:border-violet-400 dark:ring-violet-900"
+                    : "border-ink-100 group-hover:-translate-y-0.5 group-hover:border-violet-300 group-hover:shadow-sm dark:hover:border-violet-400"
+                }`}
+                aria-hidden="true"
+              >
                 {cat.emoji}
               </span>
-              <span className="mt-1.5 text-xs font-semibold text-ink-800 dark:text-white sm:text-sm">
+              <span className="text-xs font-semibold text-ink-800 dark:text-white sm:text-sm">
                 {cat.name}
               </span>
-              <span className="mt-0.5 text-[10px] text-ink-500 dark:text-ink-400">
+              <span className="text-[10px] text-ink-500 dark:text-ink-400">
                 {count} {count === 1 ? "item" : "items"}
               </span>
             </Link>
