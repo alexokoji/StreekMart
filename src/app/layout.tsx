@@ -5,7 +5,6 @@ import "./globals.css";
 import { TopPromoStrip } from "@/components/layout/TopPromoStrip";
 import { TopNav } from "@/components/layout/TopNav";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { NewsletterBar } from "@/components/layout/NewsletterBar";
 import { LegalStrip } from "@/components/layout/LegalStrip";
 import { FloatingSupport } from "@/components/FloatingSupport";
 import { CursorGlow } from "@/components/motion/CursorGlow";
@@ -123,7 +122,6 @@ export default async function RootLayout({
             <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:pb-10">
               {children}
             </main>
-            <NewsletterBar />
             <LegalStrip />
             <BottomNav user={user} />
             {/* SmartSearch renders its own desktop launcher (bottom-right) and
