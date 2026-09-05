@@ -640,15 +640,15 @@ export default async function HomePage({
           obviously pointless once the user IS in the app. */}
       <section
         data-app-hide
-        className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-10 text-center"
+        className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-10 text-center dark:border-ink-700 dark:from-ink-800 dark:via-ink-900 dark:to-violet-950"
       >
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-fuchsia-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-violet-300/30 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-fuchsia-200/40 blur-3xl dark:bg-fuchsia-700/20" />
+        <div className="pointer-events-none absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-violet-300/30 blur-3xl dark:bg-violet-700/20" />
         <div className="relative">
           <h2 className="font-display text-3xl font-bold sm:text-4xl">
             Sell or design on <span className="h-italic-gold">StreekMart.</span>
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-ink-600 sm:text-base">
+          <p className="mx-auto mt-3 max-w-xl text-sm text-ink-600 dark:text-ink-300 sm:text-base">
             Open your storefront in minutes. Sellers list materials and ready-to-wear; designers publish portfolio posts and use the Sketch Studio. AI tools help you write listings and posts.
           </p>
           <div className="mt-6 flex justify-center gap-3">
@@ -674,40 +674,40 @@ export default async function HomePage({
               app the entire CTA section is hidden via the [data-app-hide]
               attribute on the parent <section>. */}
           <div className="mt-10">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-ink-400">
               Or get the app
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
                 href="/streekmart.apk"
                 download
-                className="inline-flex items-center gap-2.5 rounded-2xl bg-ink-900 px-5 py-3 text-left text-white shadow-sm transition hover:bg-ink-800"
+                className="inline-flex items-center gap-2.5 rounded-2xl bg-ink-900 px-5 py-3 text-left text-white shadow-sm transition hover:bg-ink-800 dark:bg-violet-600 dark:hover:bg-violet-500"
               >
                 <AndroidGlyph />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-300">Download</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-300 dark:text-violet-100">Download</span>
                   <span className="text-sm font-semibold">Android APK</span>
                 </span>
               </a>
               <span
                 aria-disabled="true"
                 title="Listing in review — launching soon"
-                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm"
+                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm dark:border-ink-600 dark:bg-ink-700 dark:text-ink-300"
               >
                 <GooglePlayGlyph />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-400">Coming soon</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-400 dark:text-ink-400">Coming soon</span>
                   <span className="text-sm font-semibold">Google Play</span>
                 </span>
               </span>
               <span
                 aria-disabled="true"
                 title="Listing in review — launching soon"
-                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm"
+                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm dark:border-ink-600 dark:bg-ink-700 dark:text-ink-300"
               >
                 <AppStoreGlyph />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-400">Coming soon</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-400 dark:text-ink-400">Coming soon</span>
                   <span className="text-sm font-semibold">App Store</span>
                 </span>
               </span>

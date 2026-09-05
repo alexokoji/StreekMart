@@ -72,12 +72,16 @@ function Banner({ banner }: { banner: PromoBanner }) {
           </div>
         </div>
 
-        <div className="relative min-h-[190px] overflow-hidden sm:min-h-[220px]">
+        {/* The image is absolutely positioned so it always covers the exact
+            height the copy column establishes — no min-height floor, so the
+            banner can never end up taller than its content with a strip of
+            dead space under a short image. */}
+        <div className="relative overflow-hidden">
           {banner.image ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={banner.image} alt="" className="h-full w-full object-cover" />
+            <img src={banner.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
           ) : (
-            <div className={`h-full w-full ${dark ? "bg-ink-800" : "bg-violet-100 dark:bg-ink-700"}`} />
+            <div className={`absolute inset-0 ${dark ? "bg-ink-800" : "bg-violet-100 dark:bg-ink-700"}`} />
           )}
           <p
             className={`pointer-events-none absolute bottom-4 right-4 text-right font-display text-sm font-bold italic leading-tight drop-shadow-[0_2px_6px_rgba(0,0,0,0.55)] sm:text-base ${
