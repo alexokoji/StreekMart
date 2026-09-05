@@ -12,7 +12,8 @@ import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
 import { type ProductCardData } from "@/components/storefront/ProductCard";
 import { CardGrid } from "@/components/storefront/CardGrid";
-import { CategoryRail } from "@/components/storefront/CategoryRail";
+import { HomeHero, type HeroImage } from "@/components/storefront/HomeHero";
+import { PromoBannerDuo, type PromoBanner } from "@/components/storefront/PromoBannerDuo";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
 import { PopularCategoryCards } from "@/components/storefront/PopularCategoryCards";
 import { FlashSalesCarousel } from "@/components/storefront/FlashSalesCarousel";
@@ -326,6 +327,43 @@ export default async function HomePage({
     seeAllQuery ? `${railPath}?${seeAllQuery}` : railPath;
 
   const featured = ranked.slice(0, 8);
+
+  // Hero collage + promo banners both pull from real listings so the page
+  // never ships placeholder art. Falls back gracefully when a rail is thin:
+  // HomeHero renders a brand plate with no images, PromoBannerDuo a flat
+  // tint, so an empty catalogue still looks intentional.
+  const heroImages: HeroImage[] = featured
+    .map((p) => {
+      const src = parseJsonArray(p.imagesJson)[0];
+      return src ? { id: p.id, src, alt: p.name } : null;
+    })
+    .filter((x): x is HeroImage => x !== null)
+    .slice(0, 3);
+
+  const promoBanners: PromoBanner[] = [
+    {
+      eyebrow: "For buyers",
+      title: "Your style.",
+      accent: "Our priority.",
+      bullets: ["Verified sellers", "Fast delivery", "Hassle-free returns"],
+      ctaLabel: "Start shopping",
+      ctaHref: "/products/featured",
+      script: "Look\ngood.",
+      image: parseJsonArray(featured[0]?.imagesJson ?? "[]")[0] ?? null,
+      tone: "light",
+    },
+    {
+      eyebrow: "For designers",
+      title: "Bold styles.",
+      accent: "Bigger visions.",
+      bullets: ["Preorder tools", "Sketch studio", "Wallet payouts"],
+      ctaLabel: "Start selling",
+      ctaHref: user ? "/account" : "/register",
+      script: "Build\nyour label.",
+      image: parseJsonArray(featured[1]?.imagesJson ?? "[]")[0] ?? null,
+      tone: "dark",
+    },
+  ];
   const trendingFabrics = products
     .filter((p) => p.kind === ProductKind.MATERIAL)
     .sort((a, b) => b.likeCount - a.likeCount)
@@ -359,69 +397,7 @@ export default async function HomePage({
         <LocationFilter />
       </div>
 
-      <section className="grid gap-4 lg:grid-cols-[14rem_1fr]">
-        <CategoryRail counts={categoryCounts} groups={categoryGroups} basePath="/" activeCategory={activeCategory} />
-
-        <div className="relative h-[300px] overflow-hidden rounded-2xl bg-g-aurora text-white shadow-soft sm:h-[360px] lg:h-[420px]">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold-300/30 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-16 left-0 h-56 w-56 rounded-full bg-fuchsia-400/30 blur-3xl" />
-
-          <div className="relative grid h-full gap-6 px-6 py-7 sm:gap-8 sm:px-8 sm:py-9 md:grid-cols-[1.5fr_1fr] md:items-center lg:gap-10 lg:px-10">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-gold-200 backdrop-blur">
-                <span className="h-1.5 w-1.5 rounded-full bg-gold-300" />
-                Fashion marketplace
-              </span>
-              <h1 className="mt-3 font-display text-3xl font-bold leading-[0.95] sm:text-4xl lg:text-5xl">
-                From the <span className="italic text-gold-200">loom</span>
-                <br />
-                to the <span className="italic text-gold-200">look.</span>
-              </h1>
-              <p className="mt-3 max-w-md text-sm text-white/85 sm:text-[15px]">
-                Fabrics, ready-to-wear, and accessories from independent sellers and designers.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Link
-                  href="/feed"
-                  className="btn-gold inline-flex shrink-0 whitespace-nowrap px-3 py-1.5 text-xs sm:text-sm"
-                >
-                  Explore designers
-                </Link>
-                <Link
-                  href="/search"
-                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-white/30 bg-white/10 px-3 py-1.5 text-xs text-white backdrop-blur hover:bg-white/20 sm:text-sm"
-                >
-                  ✨ Smart search
-                </Link>
-              </div>
-            </div>
-
-            <div className="hidden grid-cols-2 gap-3 md:grid">
-              {featured.slice(0, 4).map((p, i) => {
-                const img = parseJsonArray(p.imagesJson)[0];
-                return (
-                  <Link
-                    key={p.id}
-                    href={`/products/${p.id}`}
-                    className={`aspect-square overflow-hidden rounded-xl bg-violet-900/40 ring-1 ring-white/10 ${
-                      i % 2 === 1 ? "translate-y-4" : ""
-                    }`}
-                  >
-                    {img && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={img}
-                        alt={p.name}
-                        className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                      />
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
+      <HomeHero images={heroImages} />
 
       {/* Popular category cards — visible on every viewport (not hidden in
           a collapsible). Tap a card to filter every rail below to that
@@ -544,6 +520,10 @@ export default async function HomePage({
           <CardGrid items={bestSellers.map(shape)} savedSet={savedSet} cols={6} />
         </Section>
       )}
+
+      {/* Paired editorial banners — breaks up the run of product grids with
+          something full-width and image-led before the closing CTA. */}
+      <PromoBannerDuo banners={promoBanners} />
 
       {/* Smart suggestions — personalised for signed-in users, trending for guests. */}
       <SmartSuggestions />
