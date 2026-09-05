@@ -7,7 +7,9 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-gray-200 bg-gray-50 mt-12 dark:border-ink-700 dark:bg-ink-800">
+    // No top margin — the footer butts directly against the last page band
+    // so the surface stays continuous from header to base.
+    <footer className="border-t border-gray-200 bg-gray-50 dark:border-ink-700 dark:bg-ink-800">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           {/* Brand */}

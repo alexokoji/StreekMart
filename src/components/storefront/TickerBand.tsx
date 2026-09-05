@@ -24,7 +24,7 @@ export function TickerBand() {
   return (
     <section
       aria-hidden
-      className="-mx-4 select-none border-y border-ink-800 bg-ink-900 py-5 text-white sm:-mx-6 lg:-mx-10 dark:border-ink-700"
+      className="band band-deep -mx-4 select-none py-5 sm:-mx-6 lg:-mx-10"
     >
       <Marquee speed={34} className="mb-2">
         {LINE_A.map((t, i) => (
@@ -40,7 +40,7 @@ export function TickerBand() {
       <Marquee speed={44} reverse>
         {LINE_B.map((t, i) => (
           <span key={`${t}-${i}`} className="flex items-center gap-8">
-            <span className="whitespace-nowrap font-display text-2xl font-bold italic tracking-tight text-white/35 sm:text-3xl">
+            <span className="whitespace-nowrap font-display text-2xl font-bold italic tracking-tight text-ink-400 dark:text-white/35 sm:text-3xl">
               {t}
             </span>
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-400" />

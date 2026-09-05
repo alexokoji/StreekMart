@@ -12,6 +12,7 @@ import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
 import { type ProductCardData } from "@/components/storefront/ProductCard";
 import { CardGrid } from "@/components/storefront/CardGrid";
+import { Band } from "@/components/storefront/Band";
 import { LivingHero, type HeroShot } from "@/components/storefront/LivingHero";
 import { TickerBand } from "@/components/storefront/TickerBand";
 import { Reveal } from "@/components/motion/Motion";
@@ -382,22 +383,18 @@ export default async function HomePage({
     .slice(0, 6);
 
   return (
-    <div className="space-y-10 pb-12 sm:space-y-12">
+    // Cancels <main>'s vertical padding so the first band meets the header
+    // and the last meets the footer — the page is one continuous surface,
+    // not a column of cards floating on a background.
+    <div className="-mt-6 -mb-28 lg:-mb-10">
       {/* Paid promotions — sellers pay ₦500 for a 3-day admin-approved
           slot at the absolute top of the home page, above everything
           else. Hidden when no live promotion exists. */}
-      {promotionSlides.length > 0 && <PromotionSlider slides={promotionSlides} />}
-
-      {/*
-        Top row: dense category rail (lg+) | compact hero.
-        Hero is intentionally bounded (~h-[420px] on desktop) so the first
-        product rail peeks above the fold instead of being pushed below.
-      */}
-      {/* Desktop-only location filter strip — mobile gets it inside the
-          collapsible Shop-by-category section below. */}
-      <div className="hidden lg:block">
-        <LocationFilter />
-      </div>
+      {promotionSlides.length > 0 && (
+        <Band tone="base" size="tight">
+          <PromotionSlider slides={promotionSlides} />
+        </Band>
+      )}
 
       <LivingHero
         images={heroImages}
@@ -407,26 +404,33 @@ export default async function HomePage({
 
       <TickerBand />
 
-      {/* Popular category cards — visible on every viewport (not hidden in
-          a collapsible). Tap a card to filter every rail below to that
-          category in a single tap, no scroll-through required. */}
-      <PopularCategoryCards
-        activeCategory={activeCategory}
-        categoryCounts={categoryCounts}
-        preserveSearchParams={(() => {
-          const sp = new URLSearchParams();
-          if (country) sp.set("country", country);
-          if (city) sp.set("city", city);
-          return sp;
-        })()}
-      />
+      <Band tone="base">
+        {/* Desktop-only location filter strip — mobile gets it inside the
+            collapsible Shop-by-category section below. */}
+        <div className="mb-8 hidden lg:block">
+          <LocationFilter />
+        </div>
+
+        {/* Popular category cards — visible on every viewport (not hidden in
+            a collapsible). Tap a card to filter every rail below to that
+            category in a single tap, no scroll-through required. */}
+        <PopularCategoryCards
+          activeCategory={activeCategory}
+          categoryCounts={categoryCounts}
+          preserveSearchParams={(() => {
+            const sp = new URLSearchParams();
+            if (country) sp.set("country", country);
+            if (city) sp.set("city", city);
+            return sp;
+          })()}
+        />
 
       {/*
         Long-tail categories + location filter — still useful for buyers who
         want a niche like "Velvet" or "Watches". Collapsed by default on
         mobile so the popular cards + flash sales own the above-the-fold.
       */}
-      <details className="group lg:hidden">
+      <details className="group mt-6 lg:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-ink-100 bg-white px-4 py-3 transition-colors hover:border-violet-400">
           <h2 className="font-display text-base font-semibold sm:text-lg">More categories & location</h2>
           <svg
@@ -465,7 +469,10 @@ export default async function HomePage({
           ))}
         </div>
       </details>
+      </Band>
 
+      <Band tone="raised">
+       <div className="space-y-14">
       {/* Flash sales — now a horizontal scroll carousel with smaller cards
           so more deals fit in the row + the next section stays close. */}
       {flashSales.length > 0 && (
@@ -512,6 +519,11 @@ export default async function HomePage({
         </Section>
       )}
 
+       </div>
+      </Band>
+
+      <Band tone="base">
+       <div className="space-y-14">
       {/* Featured (ranked) */}
       <Section title="Featured pieces" subtitle="Ranked by engagement, sales, and active promotions." href={seeAllHref("/products/featured")}>
         <CardGrid items={featured.map(shape)} savedSet={savedSet} cols={4} />
@@ -529,10 +541,17 @@ export default async function HomePage({
         </Section>
       )}
 
+       </div>
+      </Band>
+
       {/* Paired editorial banners — breaks up the run of product grids with
           something full-width and image-led before the closing CTA. */}
-      <PromoBannerDuo banners={promoBanners} />
+      <Band tone="raised">
+        <PromoBannerDuo banners={promoBanners} />
+      </Band>
 
+      <Band tone="base">
+       <div className="space-y-14">
       {/* Smart suggestions — personalised for signed-in users, trending for guests. */}
       <SmartSuggestions />
 
@@ -596,13 +615,16 @@ export default async function HomePage({
         </Section>
       )}
 
+       </div>
+      </Band>
+
       {/* Top designers — only renders when at least one verified designer exists. */}
       {designers.length > 0 && (
-      <section>
-        <div className="mb-4 flex items-end justify-between gap-3">
+      <Band tone="raised">
+        <div className="mb-5 flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-display text-lg font-semibold sm:text-xl">Top designers</h2>
-            <p className="text-xs text-ink-500">Independent designers ranked by exposure on StreekMart.</p>
+            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Top designers</h2>
+            <p className="mt-1 text-xs text-ink-500 sm:text-sm">Independent designers ranked by exposure on StreekMart.</p>
           </div>
           <Link
             href="/feed"
@@ -630,7 +652,7 @@ export default async function HomePage({
             </Link>
           ))}
         </div>
-      </section>
+      </Band>
       )}
 
       {/* CTA — become a seller/designer. The mobile shell hides this whole
@@ -640,15 +662,18 @@ export default async function HomePage({
           obviously pointless once the user IS in the app. */}
       <section
         data-app-hide
-        className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-10 text-center dark:border-ink-700 dark:from-ink-800 dark:via-ink-900 dark:to-violet-950"
+        className="band band-deep grain relative -mx-4 overflow-hidden px-4 py-16 text-center sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10"
       >
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-fuchsia-200/40 blur-3xl dark:bg-fuchsia-700/20" />
-        <div className="pointer-events-none absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-violet-300/30 blur-3xl dark:bg-violet-700/20" />
-        <div className="relative">
+        <div className="float-slow pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-fuchsia-300/40 blur-3xl dark:bg-fuchsia-600/20" />
+        <div
+          className="float-slow pointer-events-none absolute -bottom-12 -left-12 h-64 w-64 rounded-full bg-violet-300/40 blur-3xl dark:bg-violet-600/25"
+          style={{ animationDelay: "-3s" }}
+        />
+        <div className="relative mx-auto max-w-[1800px]">
           <h2 className="font-display text-3xl font-bold sm:text-4xl">
             Sell or design on <span className="h-italic-gold">StreekMart.</span>
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm text-ink-600 dark:text-ink-300 sm:text-base">
+          <p className="mx-auto mt-3 max-w-xl text-sm text-ink-600 dark:text-white/70 sm:text-base">
             Open your storefront in minutes. Sellers list materials and ready-to-wear; designers publish portfolio posts and use the Sketch Studio. AI tools help you write listings and posts.
           </p>
           <div className="mt-6 flex justify-center gap-3">
@@ -674,40 +699,40 @@ export default async function HomePage({
               app the entire CTA section is hidden via the [data-app-hide]
               attribute on the parent <section>. */}
           <div className="mt-10">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-ink-400">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-ink-500 dark:text-white/45">
               Or get the app
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <a
                 href="/streekmart.apk"
                 download
-                className="inline-flex items-center gap-2.5 rounded-2xl bg-ink-900 px-5 py-3 text-left text-white shadow-sm transition hover:bg-ink-800 dark:bg-violet-600 dark:hover:bg-violet-500"
+                className="inline-flex items-center gap-2.5 rounded-2xl bg-violet-600 px-5 py-3 text-left text-white shadow-sm transition hover:bg-violet-500"
               >
                 <AndroidGlyph />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-300 dark:text-violet-100">Download</span>
+                  <span className="text-[10px] uppercase tracking-wider text-violet-100">Download</span>
                   <span className="text-sm font-semibold">Android APK</span>
                 </span>
               </a>
               <span
                 aria-disabled="true"
                 title="Listing in review — launching soon"
-                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm dark:border-ink-600 dark:bg-ink-700 dark:text-ink-300"
+                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white/70 px-5 py-3 text-left text-ink-500 shadow-sm dark:border-white/15 dark:bg-white/5 dark:text-white/60"
               >
                 <GooglePlayGlyph />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-400 dark:text-ink-400">Coming soon</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-400 dark:text-white/40">Coming soon</span>
                   <span className="text-sm font-semibold">Google Play</span>
                 </span>
               </span>
               <span
                 aria-disabled="true"
                 title="Listing in review — launching soon"
-                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white px-5 py-3 text-left text-ink-500 shadow-sm dark:border-ink-600 dark:bg-ink-700 dark:text-ink-300"
+                className="relative inline-flex items-center gap-2.5 rounded-2xl border border-ink-200 bg-white/70 px-5 py-3 text-left text-ink-500 shadow-sm dark:border-white/15 dark:bg-white/5 dark:text-white/60"
               >
                 <AppStoreGlyph />
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[10px] uppercase tracking-wider text-ink-400 dark:text-ink-400">Coming soon</span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-400 dark:text-white/40">Coming soon</span>
                   <span className="text-sm font-semibold">App Store</span>
                 </span>
               </span>

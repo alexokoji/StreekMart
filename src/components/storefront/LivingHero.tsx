@@ -25,11 +25,12 @@ export function LivingHero({
   const [a, b, c] = images;
 
   return (
-    <section className="grain relative -mx-4 overflow-hidden bg-ink-900 text-white sm:-mx-6 lg:-mx-10">
-      {/* Ambient blooms — the only things moving when the page is idle. */}
-      <div className="float-slow pointer-events-none absolute -left-24 top-0 h-[26rem] w-[26rem] rounded-full bg-violet-700/30 blur-[100px]" />
+    <section className="band band-base grain relative -mx-4 overflow-hidden sm:-mx-6 lg:-mx-10">
+      {/* Ambient blooms — the only things moving when the page is idle.
+          Stronger tints in light mode so they still register against white. */}
+      <div className="float-slow pointer-events-none absolute -left-24 top-0 h-[26rem] w-[26rem] rounded-full bg-violet-300/50 blur-[100px] dark:bg-violet-700/30" />
       <div
-        className="float-slow pointer-events-none absolute -right-20 bottom-0 h-[22rem] w-[22rem] rounded-full bg-fuchsia-600/20 blur-[100px]"
+        className="float-slow pointer-events-none absolute -right-20 bottom-0 h-[22rem] w-[22rem] rounded-full bg-fuchsia-300/40 blur-[100px] dark:bg-fuchsia-600/20"
         style={{ animationDelay: "-4s" }}
       />
 
@@ -37,8 +38,8 @@ export function LivingHero({
         {/* ---------------- Copy ---------------- */}
         <div>
           <Reveal y={16}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-gold-200 backdrop-blur">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold-300" />
+            <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-violet-700 backdrop-blur dark:border-white/15 dark:bg-white/5 dark:text-gold-200">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-500 dark:bg-gold-300" />
               Nigeria&rsquo;s fashion marketplace
             </span>
           </Reveal>
@@ -54,7 +55,7 @@ export function LivingHero({
               </span>
             </span>
             <span className="block overflow-hidden">
-              <span className="rise-word italic text-gold-300" style={{ ["--i" as string]: 2 }}>
+              <span className="rise-word italic text-violet-600 dark:text-gold-300" style={{ ["--i" as string]: 2 }}>
                 nobody
               </span>{" "}
               <span className="rise-word" style={{ ["--i" as string]: 3 }}>
@@ -64,7 +65,7 @@ export function LivingHero({
           </h1>
 
           <Reveal delay={420} y={18}>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-white/70">
+            <p className="mt-6 max-w-md text-base leading-relaxed text-ink-600 dark:text-white/70">
               Fabrics by the yard, ready-to-wear, and one-off pieces made to order
               — straight from the independent sellers and designers who make them.
             </p>
@@ -75,7 +76,7 @@ export function LivingHero({
               <Magnetic strength={0.28}>
                 <Link
                   href="/products/featured"
-                  className="group inline-flex items-center gap-3 rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-gold-300"
+                  className="group inline-flex items-center gap-3 rounded-full bg-violet-600 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 dark:bg-white dark:text-ink-900 dark:hover:bg-gold-300"
                 >
                   Start shopping
                   <span className="transition-transform duration-300 group-hover:translate-x-1">
@@ -86,7 +87,7 @@ export function LivingHero({
               <Magnetic strength={0.2}>
                 <Link
                   href="/feed"
-                  className="link-wipe text-sm font-semibold text-white/80 hover:text-white"
+                  className="link-wipe text-sm font-semibold text-ink-700 hover:text-ink-900 dark:text-white/80 dark:hover:text-white"
                 >
                   Meet the designers
                 </Link>
@@ -96,7 +97,7 @@ export function LivingHero({
 
           {/* Live stats — count up when scrolled into view. */}
           <Reveal delay={620} y={18}>
-            <dl className="mt-12 flex flex-wrap gap-x-10 gap-y-5 border-t border-white/10 pt-6">
+            <dl className="mt-12 flex flex-wrap gap-x-10 gap-y-5 border-t border-ink-100 pt-6 dark:border-white/10">
               <Stat value={productCount} suffix="+" label="Pieces listed" />
               <Stat value={designerCount} suffix="+" label="Verified makers" />
               <Stat value={100} suffix="%" label="Escrow protected" />
@@ -105,7 +106,7 @@ export function LivingHero({
         </div>
 
         {/* ---------------- Collage ---------------- */}
-        <div className="relative h-[24rem] sm:h-[30rem] lg:h-[34rem]">
+        <div className="relative h-[24rem] sm:h-[30rem] lg:h-[34rem]" data-hero-collage>
           {a && (
             <ParallaxLayer depth={16} className="absolute left-0 top-4 h-[72%] w-[58%]">
               <Frame image={a} priorityLabel="Featured" />
@@ -122,7 +123,7 @@ export function LivingHero({
             </ParallaxLayer>
           )}
           {!a && (
-            <div className="flex h-full items-center justify-center rounded-3xl border border-white/10 text-sm text-white/40">
+            <div className="flex h-full items-center justify-center rounded-3xl border border-ink-100 text-sm text-ink-400 dark:border-white/10 dark:text-white/40">
               StreekMart
             </div>
           )}
@@ -161,10 +162,10 @@ function Frame({ image, priorityLabel }: { image: HeroShot; priorityLabel?: stri
 function Stat({ value, suffix, label }: { value: number; suffix: string; label: string }) {
   return (
     <div>
-      <dt className="font-display text-3xl font-bold text-white">
+      <dt className="font-display text-3xl font-bold text-ink-900 dark:text-white">
         <CountUp to={value} suffix={suffix} />
       </dt>
-      <dd className="mt-0.5 text-[11px] uppercase tracking-[0.18em] text-white/50">{label}</dd>
+      <dd className="mt-0.5 text-[11px] uppercase tracking-[0.18em] text-ink-500 dark:text-white/50">{label}</dd>
     </div>
   );
 }

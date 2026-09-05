@@ -4,6 +4,7 @@
 // mobile exposes via useThemePreference() in mobile/src/state/ThemeContext.
 // Uses line-art SVGs (not emoji) so it matches the rest of the nav's icon
 // set and renders consistently across platforms/fonts.
+import { useEffect, useState } from "react";
 import { useThemePreference } from "@/state/ThemeContext";
 
 const NEXT: Record<string, "system" | "light" | "dark"> = {
@@ -14,17 +15,26 @@ const NEXT: Record<string, "system" | "light" | "dark"> = {
 
 export function ThemeToggle() {
   const { preference, setPreference } = useThemePreference();
+
+  // The stored preference only exists in the browser, so the server always
+  // renders the "system" state. Swapping the icon during the first client
+  // render would be a hydration mismatch — and React responds by discarding
+  // the whole server-rendered tree. Hold the neutral icon until mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const shown = mounted ? preference : "system";
+
   return (
     <button
       type="button"
       onClick={() => setPreference(NEXT[preference])}
-      aria-label={`Theme: ${preference}. Tap to change.`}
-      title={`Theme: ${preference}`}
+      aria-label={`Theme: ${shown}. Tap to change.`}
+      title={`Theme: ${shown}`}
       className="rounded-lg p-2 text-ink-600 hover:bg-ink-50 hover:text-violet-700 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-violet-300"
     >
-      {preference === "system" && <SystemIcon />}
-      {preference === "light" && <SunIcon />}
-      {preference === "dark" && <MoonIcon />}
+      {shown === "system" && <SystemIcon />}
+      {shown === "light" && <SunIcon />}
+      {shown === "dark" && <MoonIcon />}
     </button>
   );
 }

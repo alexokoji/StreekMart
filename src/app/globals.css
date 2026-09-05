@@ -159,6 +159,28 @@ body { overscroll-behavior-y: none; }
   100% { transform: translateX(100%); }
 }
 
+/* ---- Band surfaces -------------------------------------------------------
+   The storefront reads as one continuous canvas: full-bleed bands stacked
+   flush against each other, separated by a tonal step rather than a gap.
+
+   These are hand-written rather than `@apply bg-white dark:bg-ink-900`
+   on purpose — the dark-mode escape hatch further down uses `!important`
+   on `.bg-white` / `.bg-ink-*`, which would win against a `dark:` variant
+   and force every band to the same colour. Distinct class names sidestep
+   that entirely.                                                          */
+.band-base    { background-color: #ffffff; }
+.band-raised  { background-color: #f7f7f8; } /* ink-50 */
+.band-deep    { background-color: #f5f3ff; } /* violet-50 — the accent band */
+
+html.dark .band-base   { background-color: #0a0a14; } /* ink-900 */
+html.dark .band-raised { background-color: #171720; } /* ink-800 */
+html.dark .band-deep   { background-color: #05050c; } /* below ink-900 */
+
+/* Hairline between adjacent bands — enough to register the change of
+   surface, not enough to read as a gap. */
+.band + .band { border-top: 1px solid rgb(228 228 232 / 0.7); }
+html.dark .band + .band { border-top-color: rgb(38 38 48 / 0.9); }
+
 /* ---- Motion system -------------------------------------------------------
    Keyframes + classes backing src/components/motion/*. Everything here is
    wrapped so `prefers-reduced-motion: reduce` gets a still page rather than
