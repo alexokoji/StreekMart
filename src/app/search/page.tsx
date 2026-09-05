@@ -1,4 +1,5 @@
 import { SmartSearchClient } from "./SmartSearchClient";
+import { Band, PageCanvas, PageHead } from "@/components/storefront/Band";
 
 export default function SearchPage({
   searchParams,
@@ -6,14 +7,17 @@ export default function SearchPage({
   searchParams: { q?: string };
 }) {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Smart search</h1>
-        <p className="text-sm text-gray-600">
-          Describe what you&apos;re looking for in plain English — &ldquo;a relaxed white button-down for summer&rdquo; or &ldquo;something I can wear to a wedding under $200&rdquo;.
-        </p>
-      </div>
-      <SmartSearchClient initialQuery={searchParams.q ?? ""} />
-    </div>
+    <PageCanvas>
+      <PageHead
+        eyebrow="Find anything"
+        title="Smart search"
+        subtitle="Describe what you're looking for in plain English — “a relaxed white button-down for summer” or “something I can wear to a wedding”."
+        backHref="/"
+        backLabel="Back home"
+      />
+      <Band tone="base">
+        <SmartSearchClient initialQuery={searchParams.q ?? ""} />
+      </Band>
+    </PageCanvas>
   );
 }

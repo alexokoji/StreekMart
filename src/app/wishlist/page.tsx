@@ -5,6 +5,7 @@ import { displaySellerName } from "@/lib/businessName";
 import { parseJsonArray, timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { Band, PageCanvas, PageHead } from "@/components/storefront/Band";
 
 export default async function WishlistPage() {
   const user = await requireUser();
@@ -17,17 +18,17 @@ export default async function WishlistPage() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Your wishlist</h1>
-          <p className="text-sm text-gray-600">
-            Saved products ready to move into your cart.
-          </p>
-        </div>
-        <Link href="/favorites" className="btn-secondary text-sm">Saved posts</Link>
-      </div>
+    <PageCanvas>
+      <PageHead
+        eyebrow="Saved"
+        title="Your wishlist"
+        subtitle="Saved products ready to move into your cart."
+        backHref="/"
+        backLabel="Back home"
+        action={<Link href="/favorites" className="btn-secondary text-sm">Saved posts</Link>}
+      />
 
+      <Band tone="base">
       {favorites.length === 0 ? (
         <div className="card p-10 text-center text-gray-500">
           You haven&apos;t saved any products yet. Browse the <Link href="/" className="text-brand-700 hover:underline">storefront</Link> to start collecting.
@@ -68,6 +69,7 @@ export default async function WishlistPage() {
           })}
         </div>
       )}
-    </div>
+      </Band>
+    </PageCanvas>
   );
 }

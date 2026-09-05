@@ -12,6 +12,7 @@ import { OutfitPairings } from "@/components/OutfitPairings";
 import { ProductImageSlider } from "@/components/storefront/ProductImageSlider";
 import { TierBadge } from "@/components/TierBadge";
 import { ProductReviews } from "@/components/storefront/ProductReviews";
+import { Band, PageCanvas } from "@/components/storefront/Band";
 import { perUnitLabel } from "@/lib/units";
 
 export default async function PublicProductPage({ params }: { params: { id: string } }) {
@@ -52,14 +53,18 @@ export default async function PublicProductPage({ params }: { params: { id: stri
   const isOwnListing = !!user && user.id === product.seller.id;
 
   return (
-    // `lg:items-start` stops the right column from stretching to match the
-    // image column's height — on wide screens the image card would otherwise
-    // be free to grow unbounded.
-    //
-    // `min-w-0` on the grid children defeats CSS Grid's default
-    // `min-width: auto`, which would otherwise let an unbreakable word
-    // (e.g. a long URL in the description) push the cell past the viewport
-    // and cause horizontal page scroll.
+    <PageCanvas>
+    <Band tone="base">
+    {/*
+      `lg:items-start` stops the right column from stretching to match the
+      image column's height — on wide screens the image card would otherwise
+      be free to grow unbounded.
+
+      `min-w-0` on the grid children defeats CSS Grid's default
+      `min-width: auto`, which would otherwise let an unbreakable word
+      (e.g. a long URL in the description) push the cell past the viewport
+      and cause horizontal page scroll.
+    */}
     <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
       {/* Fixed visual envelope for the gallery so a tall portrait or extra-
           wide landscape can't push the rest of the page around. Hard-capped
@@ -183,5 +188,7 @@ export default async function PublicProductPage({ params }: { params: { id: stri
         <ProductReviews productId={product.id} />
       </div>
     </div>
+    </Band>
+    </PageCanvas>
   );
 }

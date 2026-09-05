@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { Band, PageCanvas } from "@/components/storefront/Band";
 import { getCurrentUser } from "@/lib/auth";
 import { parseJsonArray } from "@/lib/utils";
 import {
@@ -72,10 +73,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   });
 
   return (
-    <div className="md:flex md:gap-6">
-      <Sidebar title="Admin" items={stripPerm(visible)} isAdmin showAdminLink={false} />
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
+    <PageCanvas>
+      <Band tone="base">
+        <div className="md:flex md:gap-6">
+          <Sidebar title="Admin" items={stripPerm(visible)} isAdmin showAdminLink={false} />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
+      </Band>
+    </PageCanvas>
   );
 }
 

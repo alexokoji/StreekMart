@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { readCategories } from "@/lib/categories";
+import { Band, PageCanvas, PageHead } from "@/components/storefront/Band";
 
 // /categories -- top-level grouping page. Lists each group with its
 // active categories (drill-down by parent). Multi-level support uses
@@ -17,13 +18,15 @@ export default async function CategoriesPage() {
     groups.set(key, arr);
   }
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl font-bold">All categories</h1>
-        <p className="text-sm text-ink-600">
-          Browse the full taxonomy. Tap any category to filter the storefront.
-        </p>
-      </div>
+    <PageCanvas>
+      <PageHead
+        eyebrow="Directory"
+        title="All categories"
+        subtitle="Browse the full taxonomy. Tap any category to filter the storefront."
+        backHref="/"
+        backLabel="Back home"
+      />
+      <Band tone="base">
       <div className="grid gap-4 sm:grid-cols-2">
         {Array.from(groups.entries()).map(([groupName, cats]) => (
           <section key={groupName} className="card p-5">
@@ -43,6 +46,7 @@ export default async function CategoriesPage() {
           </section>
         ))}
       </div>
-    </div>
+      </Band>
+    </PageCanvas>
   );
 }

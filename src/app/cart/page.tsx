@@ -8,6 +8,7 @@ import {
 } from "@/lib/productAttributes";
 import { Price } from "@/components/Price";
 import { CartClient } from "./CartClient";
+import { Band, PageCanvas, PageHead } from "@/components/storefront/Band";
 
 // Page is dynamic — reads cookies (for auth) and searchParams. Mark
 // explicit so Next never tries to cache an old quote on us.
@@ -64,15 +65,20 @@ export default async function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl card p-10 text-center">
-        <h1 className="text-2xl font-bold">Your cart is empty.</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Browse the storefront and add a few pieces to get started.
-        </p>
-        <Link href="/" className="btn-primary mt-6 inline-flex">
-          Continue shopping
-        </Link>
-      </div>
+      <PageCanvas>
+        <PageHead eyebrow="Bag" title="Your cart" backHref="/" backLabel="Back home" />
+        <Band tone="base">
+          <div className="mx-auto max-w-2xl card p-10 text-center">
+            <h1 className="text-2xl font-bold">Your cart is empty.</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Browse the storefront and add a few pieces to get started.
+            </p>
+            <Link href="/" className="btn-primary mt-6 inline-flex">
+              Continue shopping
+            </Link>
+          </div>
+        </Band>
+      </PageCanvas>
     );
   }
 
@@ -88,14 +94,25 @@ export default async function CartPage() {
   const grandTotal = subtotal;
 
   return (
-    // `min-w-0` on both grid children defeats the default `min-width: auto`
-    // so a long product name or business name can't push the cell past the
-    // viewport. Without these, the CartClient's product titles or the
-    // delivery breakdown's seller names cause horizontal page scroll.
+    <PageCanvas>
+    <PageHead
+      eyebrow="Bag"
+      title="Your cart"
+      subtitle={`${items.length} item${items.length === 1 ? "" : "s"} ready for checkout.`}
+      backHref="/"
+      backLabel="Continue shopping"
+    />
+    <Band tone="base">
+    {/*
+      `min-w-0` on both grid children defeats the default `min-width: auto`
+      so a long product name or business name can't push the cell past the
+      viewport. Without these, the CartClient's product titles or the
+      delivery breakdown's seller names cause horizontal page scroll.
+    */}
     <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="min-w-0 space-y-3">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Your cart</h1>
+          <h2 className="font-display text-xl font-bold">Items</h2>
           <p className="text-sm text-gray-500">{items.length} item{items.length === 1 ? "" : "s"}</p>
         </div>
         <CartClient items={items} />
@@ -139,5 +156,7 @@ export default async function CartPage() {
         </Link>
       </aside>
     </div>
+    </Band>
+    </PageCanvas>
   );
 }

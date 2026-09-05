@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Band, PageCanvas } from "@/components/storefront/Band";
 import { getCurrentUser } from "@/lib/auth";
 import { LogoutButton } from "@/components/layout/LogoutButton";
 import { LoginForm } from "./LoginForm";
@@ -12,7 +13,7 @@ export default async function LoginPage({
 
   if (user) {
     return (
-      <div className="mx-auto mt-10 max-w-md card p-8">
+      <PageCanvas><Band tone="raised"><div className="mx-auto max-w-md card p-8">
         <h1 className="text-2xl font-bold">You&apos;re already signed in</h1>
         <p className="mt-1 text-sm text-gray-600">
           Signed in as <span className="font-medium">{user.name}</span> ({user.email}).
@@ -26,18 +27,18 @@ export default async function LoginPage({
             className="btn-secondary"
           />
         </div>
-      </div>
+      </div></Band></PageCanvas>
     );
   }
 
   return (
-    <div className="mx-auto mt-10 max-w-md card p-8">
+    <PageCanvas><Band tone="raised"><div className="mx-auto max-w-md card p-8">
       <h1 className="text-2xl font-bold">Welcome back</h1>
       <p className="mt-1 text-sm text-gray-600">Log in to your StreekMart account.</p>
       <LoginForm
         redirectTo={searchParams.redirect}
         oauthError={searchParams.error}
       />
-    </div>
+    </div></Band></PageCanvas>
   );
 }

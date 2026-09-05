@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/Sidebar";
+import { Band, PageCanvas } from "@/components/storefront/Band";
 import { ProfileCompletionBanner } from "@/components/layout/ProfileCompletionBanner";
 import { requireUser } from "@/lib/auth";
 
@@ -22,6 +23,8 @@ const NAV = [
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   return (
+    <PageCanvas>
+    <Band tone="base">
     <div className="md:flex md:gap-6">
       <Sidebar title="Account" items={NAV} isAdmin={user.isAdmin} />
       <div className="min-w-0 flex-1">
@@ -34,5 +37,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
         {children}
       </div>
     </div>
+    </Band>
+    </PageCanvas>
   );
 }

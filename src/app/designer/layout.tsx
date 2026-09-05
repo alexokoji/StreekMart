@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/Sidebar";
+import { Band, PageCanvas } from "@/components/storefront/Band";
 import { ProfileCompletionBanner } from "@/components/layout/ProfileCompletionBanner";
 import { requireUser } from "@/lib/auth";
 import { Permission } from "@/lib/enums";
@@ -22,6 +23,8 @@ export default async function DesignerLayout({ children }: { children: React.Rea
   // Stack on mobile (sidebar collapses into a drawer + trigger bar);
   // side-by-side on md+ where the sidebar is an inline column.
   return (
+    <PageCanvas>
+    <Band tone="base">
     <div className="md:flex md:gap-6">
       <Sidebar title="Designer" items={NAV} isAdmin={user.isAdmin} />
       <div className="min-w-0 flex-1">
@@ -34,5 +37,7 @@ export default async function DesignerLayout({ children }: { children: React.Rea
         {children}
       </div>
     </div>
+    </Band>
+    </PageCanvas>
   );
 }

@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ProductStatus } from "@/lib/enums";
 import { readCategoryGroups } from "@/lib/categories";
+import { Band, PageCanvas, PageHead } from "./Band";
 import { CategoryRail } from "./CategoryRail";
 import { LocationFilter } from "./LocationFilter";
 
@@ -48,28 +48,30 @@ export async function FilterableRailLayout({
   const categoryCounts = new Map(grouped.map((g) => [g.category, g._count._all]));
 
   return (
-    <div className="space-y-4 pb-12">
-      <div className="space-y-2">
-        <Link href="/" className="text-sm text-brand-700 hover:underline">
-          ← Back home
-        </Link>
-        <h1 className="font-display text-2xl font-bold sm:text-3xl">{title}</h1>
-        <p className="text-sm text-ink-500">{subtitle}</p>
-      </div>
+    <PageCanvas>
+      <PageHead
+        eyebrow="Browse"
+        title={title}
+        subtitle={subtitle}
+        backHref="/"
+        backLabel="Back home"
+      />
 
-      <div className="hidden lg:block">
-        <LocationFilter />
-      </div>
+      <Band tone="base">
+        <div className="mb-6 hidden lg:block">
+          <LocationFilter />
+        </div>
 
-      <section className="grid gap-4 lg:grid-cols-[14rem_1fr]">
-        <CategoryRail
-          counts={categoryCounts}
-          groups={categoryGroups}
-          basePath={basePath}
-          activeCategory={activeCategory}
-        />
-        <div className="min-w-0">{children}</div>
-      </section>
-    </div>
+        <div className="grid gap-6 lg:grid-cols-[14rem_1fr]">
+          <CategoryRail
+            counts={categoryCounts}
+            groups={categoryGroups}
+            basePath={basePath}
+            activeCategory={activeCategory}
+          />
+          <div className="min-w-0">{children}</div>
+        </div>
+      </Band>
+    </PageCanvas>
   );
 }

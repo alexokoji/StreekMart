@@ -9,6 +9,7 @@ import { buildWatermarkedUrl } from "@/lib/cloudinaryUrl";
 import { PostCard } from "@/components/feed/PostCard";
 import { ForYouRow } from "@/components/ForYouRow";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
+import { Band, PageCanvas, PageHead } from "@/components/storefront/Band";
 
 // Designer-content feed (Facebook-style: left nav, main timeline, right rail).
 // Shopping happens on the storefront homepage; this page is for inspiration.
@@ -140,6 +141,15 @@ export default async function FeedPage({
   );
 
   return (
+    <PageCanvas>
+    <PageHead
+      eyebrow="Designer feed"
+      title="The runway"
+      subtitle="Portfolio pieces, lookbooks and made-to-order designs from independent makers."
+      backHref="/"
+      backLabel="Back home"
+    />
+    <Band tone="base">
     <div className="grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)_18rem]">
       {/* Mobile/tablet — collapsible filter drawer above the timeline. */}
       <details className="group lg:hidden">
@@ -265,5 +275,7 @@ export default async function FeedPage({
         )}
       </aside>
     </div>
+    </Band>
+    </PageCanvas>
   );
 }

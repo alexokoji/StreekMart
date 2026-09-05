@@ -6,7 +6,7 @@ import { TopPromoStrip } from "@/components/layout/TopPromoStrip";
 import { TopNav } from "@/components/layout/TopNav";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { NewsletterBar } from "@/components/layout/NewsletterBar";
-import { Footer } from "@/components/layout/Footer";
+import { LegalStrip } from "@/components/layout/LegalStrip";
 import { FloatingSupport } from "@/components/FloatingSupport";
 import { CursorGlow } from "@/components/motion/CursorGlow";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
@@ -124,7 +124,7 @@ export default async function RootLayout({
               {children}
             </main>
             <NewsletterBar />
-            <Footer />
+            <LegalStrip />
             <BottomNav user={user} />
             {/* SmartSearch renders its own desktop launcher (bottom-right) and
                 listens for the "upclo:open-search" event from the BottomNav FAB
