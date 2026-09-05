@@ -127,8 +127,8 @@ export default function PrivacyPolicyPage() {
             </p>
             <div className="bg-gray-50 p-6 rounded-lg mt-4">
               <p className="text-gray-700 font-semibold mb-2">StreekMart</p>
-              <p className="text-gray-700">Email: privacy@streekmart.online</p>
-              <p className="text-gray-700">Website: www.streekmart.online</p>
+              <p className="text-gray-700">Email: privacy@streekmart.com</p>
+              <p className="text-gray-700">Website: www.streekmart.com</p>
             </div>
           </section>
         </div>

@@ -9,7 +9,7 @@
 //   1. Create a Meta Business app at developers.facebook.com.
 //   2. Add the "WhatsApp" product, accept the terms.
 //   3. Note the test phone number ID + permanent access token.
-//   4. Set the webhook URL to https://streekmart.online/api/whatsapp/webhook
+//   4. Set the webhook URL to https://streekmart.com/api/whatsapp/webhook
 //      and configure the verify token to match WHATSAPP_VERIFY_TOKEN.
 //   5. Subscribe to the `messages` webhook field.
 //

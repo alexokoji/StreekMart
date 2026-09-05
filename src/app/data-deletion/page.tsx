@@ -5,7 +5,7 @@ import { DeletionForm } from "./DeletionForm";
 // Public "how to delete your data" page. The URL Meta asks for under
 // "Data Deletion Instructions URL" in the app dashboard:
 //   App Dashboard → Settings → Basic → User Data Deletion
-//   → Data Deletion Instructions URL = https://streekmart.online/data-deletion
+//   → Data Deletion Instructions URL = https://streekmart.com/data-deletion
 //
 // Behaviour:
 //   - Signed-in users see a self-serve form: retype email → delete now.
@@ -100,10 +100,10 @@ export default async function DataDeletionInstructionsPage() {
               If you can&rsquo;t sign in (lost password, deactivated phone),
               email{" "}
               <a
-                href="mailto:support@streekmart.online?subject=Data%20deletion%20request"
+                href="mailto:support@streekmart.com?subject=Data%20deletion%20request"
                 className="font-medium text-violet-700 hover:underline"
               >
-                support@streekmart.online
+                support@streekmart.com
               </a>{" "}
               <strong>from the address on your account</strong>. We&rsquo;ll
               verify the request and process it within 7 business days.
@@ -134,10 +134,10 @@ export default async function DataDeletionInstructionsPage() {
       <p className="text-center text-xs text-ink-500">
         Questions? Email{" "}
         <a
-          href="mailto:support@streekmart.online"
+          href="mailto:support@streekmart.com"
           className="text-violet-700 hover:underline"
         >
-          support@streekmart.online
+          support@streekmart.com
         </a>{" "}
         or read the{" "}
         <Link href="/privacy-policy" className="text-violet-700 hover:underline">

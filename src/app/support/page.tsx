@@ -68,7 +68,7 @@ export default async function SupportPage() {
           />
           <Faq
             q="Can I delete my account?"
-            a={`Email support@streekmart.online from the address on file. We honour deletion requests within 7 days; outstanding orders are settled first.`}
+            a={`Email support@streekmart.com from the address on file. We honour deletion requests within 7 days; outstanding orders are settled first.`}
           />
         </div>
       </section>
@@ -77,8 +77,8 @@ export default async function SupportPage() {
         <h2 className="font-display text-xl font-semibold">Reach a human</h2>
         <p className="mt-2 text-sm text-ink-600">
           Email{" "}
-          <a className="font-medium text-violet-700 hover:underline" href="mailto:support@streekmart.online">
-            support@streekmart.online
+          <a className="font-medium text-violet-700 hover:underline" href="mailto:support@streekmart.com">
+            support@streekmart.com
           </a>{" "}
           for anything urgent. For non-urgent feedback or feature requests, use
           the form below — it composes the email for you with the right

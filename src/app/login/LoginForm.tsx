@@ -63,7 +63,7 @@ export function LoginForm({
           <Link href="/forgot-password" className="text-xs text-brand-700 hover:underline">Forgot your password?</Link>
         </div>
         <button type="submit" className="btn-primary w-full" disabled={loading}>
-          {loading ? "Signing inâ€¦" : "Sign in"}
+          {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
 

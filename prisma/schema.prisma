@@ -1,4 +1,4 @@
-// UpClo â€” fashion marketplace data model
+// UpClo — fashion marketplace data model
 // SQLite for local dev; swap provider to "postgresql" for production.
 // SQLite has no native enums; status fields are stored as strings. Type safety
 // is provided by `src/lib/enums.ts`.
@@ -6,7 +6,7 @@
 generator client {
   provider = "prisma-client-js"
   // Driver adapters are GA in Prisma 6, no preview flag needed. Turso
-  // connectivity in production goes through @prisma/adapter-libsql â€”
+  // connectivity in production goes through @prisma/adapter-libsql —
   // see src/lib/db.ts. The datasource below stays "sqlite" so local dev
   // with a dev.db file is unchanged.
 }
@@ -24,7 +24,7 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
-  // Nullable â€” Google OAuth accounts have no password. At least one of
+  // Nullable — Google OAuth accounts have no password. At least one of
   // (passwordHash, googleId) is expected to be set; the login endpoints
   // enforce that on their respective paths.
   passwordHash String?
@@ -38,13 +38,13 @@ model User {
   // profile, and order receipts. Required for sellers (enforced in the
   // UI + API; legacy rows allowed to be null until the user fills it in).
   // Stored case-as-typed. `businessNameLower` is a normalised mirror that
-  // carries the @unique constraint â€” SQLite has no case-insensitive
+  // carries the @unique constraint — SQLite has no case-insensitive
   // collation, so we compare on lowercase ourselves.
-  // Once set, the user can't edit it directly â€” they submit a
+  // Once set, the user can't edit it directly — they submit a
   // BusinessNameChangeRequest for admin approval.
   businessName       String?
   businessNameLower  String?  @unique
-  // Required for everyone â€” used for delivery contact and order updates.
+  // Required for everyone — used for delivery contact and order updates.
   // Nullable for legacy rows; the dashboard nags users to fill it in.
   phone              String?
   // Optional banner shown on the public profile page (/u/<slug>). Only the
@@ -56,7 +56,7 @@ model User {
   slug         String?  @unique
   isSeller     Boolean  @default(false)
   isDesigner   Boolean  @default(false)
-  // Verification flags â€” only verified sellers/designers get a badge in UI.
+  // Verification flags — only verified sellers/designers get a badge in UI.
   // Kept as the canonical "admin has approved them" gate. The tier columns
   // below derive presentation from this plus profile completeness.
   sellerVerified   Boolean @default(false)
@@ -65,12 +65,12 @@ model User {
   //   1 = Unverified (default).
   //   2 = Blue check. Admin has approved verification AND the relevant
   //       profile data is in place (sellers also need a default PICKUP
-  //       address â€” recompute lives in src/lib/tiers.ts).
+  //       address — recompute lives in src/lib/tiers.ts).
   //   3 = Gold check. Admin-granted only; sticky once awarded. Incentive /
-  //       criteria TBD â€” for now treat as an explicit override.
+  //       criteria TBD — for now treat as an explicit override.
   sellerTier       Int     @default(1)
   designerTier     Int     @default(1)
-  // Audit for verification decisions â€” set when an admin approves the request.
+  // Audit for verification decisions — set when an admin approves the request.
   verifiedAt   DateTime?
   verifiedBy   String?
   // Seller rating rollup. Source of truth is the SellerReview table;
@@ -79,11 +79,11 @@ model User {
   // aggregation query per product.
   sellerRatingAvg   Float @default(0)
   sellerRatingCount Int   @default(0)
-  // Platform admin flag â€” gates /admin and the /api/admin/* endpoints.
+  // Platform admin flag — gates /admin and the /api/admin/* endpoints.
   isAdmin      Boolean  @default(false)
   // Staff = a user with a scoped subset of admin permissions. A super-admin
   // (`isAdmin: true`) implicitly has every permission; staff have only the
-  // ones listed in `staffPermissionsJson`. Both flags can be true (rare â€”
+  // ones listed in `staffPermissionsJson`. Both flags can be true (rare —
   // a staffer promoted to admin keeps their perm list for audit/history).
   isStaff      Boolean  @default(false)
   // JSON array of permission strings (see src/lib/staffPermissions.ts for
@@ -92,16 +92,16 @@ model User {
   staffPermissionsJson String @default("[]")
   // Soft-suspension. When set, the account can't sign in, all sessions are
   // invalidated at the next request (auth gate checks this column), and
-  // their products/posts are hidden from the storefront. Reversible â€” an
+  // their products/posts are hidden from the storefront. Reversible — an
   // admin clears the field to reinstate. A hard removal is a separate
   // path that uses Prisma's onDelete:Cascade on User to wipe everything.
   suspendedAt      DateTime?
   suspendedBy      String?
   suspensionReason String?
-  // Presence heartbeat â€” bumped by requireApiUser when stale (>30s old).
+  // Presence heartbeat — bumped by requireApiUser when stale (>30s old).
   // The chat polling endpoint reads this to surface "online" / "offline"
   // for the peer. We deliberately don't show a "last seen X minutes ago"
-  // anywhere â€” only the live online flag, derived as `now - lastSeenAt < 90s`.
+  // anywhere — only the live online flag, derived as `now - lastSeenAt < 90s`.
   lastSeenAt   DateTime?
   // Email verification. NULL until the user clicks the link in the
   // verification email; set to the timestamp of the successful click.
@@ -116,23 +116,23 @@ model User {
   // consumed (and cleared) on /api/auth/reset-password. Tokens expire after 60min.
   passwordResetToken               String?   @unique
   passwordResetTokenExpiresAt      DateTime?
-  // Trusted-buyer flag â€” set by an admin once a buyer has completed enough
+  // Trusted-buyer flag — set by an admin once a buyer has completed enough
   // delivery-confirmed orders. Required to use Pay-on-Delivery at checkout.
   trustedBuyer Boolean  @default(false)
-  // StreekMart-affiliated seller flag â€” set manually by an admin. When
+  // StreekMart-affiliated seller flag — set manually by an admin. When
   // true, the seller bypasses escrow (payment lands as withdrawable
   // immediately on paid order, not held until delivery), gets a branded
   // badge, and is allowed to set their own delivery fees. Lib/orders.ts
   // reads this when crediting the wallet; admin UI in /admin/users toggles.
   streekmartAffiliated Boolean @default(false)
-  // Location â€” collected at registration so buyers can be matched with
+  // Location — collected at registration so buyers can be matched with
   // nearby sellers and sellers know where they're shipping. ISO-3166 alpha-2
   // for `country`. Nullable on legacy rows; the UI prompts users to fill in.
   country      String?
   region       String?
   city         String?
   // Seller delivery rates (cents). Apply when this user is the seller on an
-  // order. Buyers don't write to these â€” they're seller-side shop config.
+  // order. Buyers don't write to these — they're seller-side shop config.
   // Stored in USD-cents like every other money field on the platform.
   deliveryWithinCityCents      Int @default(0)
   deliveryOutsideCityCents     Int @default(0)
@@ -164,9 +164,9 @@ model User {
   comments       Comment[]
   followedBy     Follow[]          @relation("FollowedDesigner")
   following      Follow[]          @relation("Follower")
-  // Wallet (1:1 â€” provisioned at first sale or first wallet view).
+  // Wallet (1:1 — provisioned at first sale or first wallet view).
   wallet         Wallet?
-  // Account/shop manager links â€” accounts this user OWNS, and accounts
+  // Account/shop manager links — accounts this user OWNS, and accounts
   // they MANAGE for someone else.
   managedAccounts Manager[]        @relation("Owner")
   managingFor     Manager[]        @relation("ManagerUser")
@@ -184,7 +184,7 @@ model User {
   preordersAsBuyer      Preorder[] @relation("BuyerPreorders")
   preordersAsDesigner   Preorder[] @relation("DesignerPreorders")
   collections           Collection[]
-  // Referral program â€” every user gets a code at signup (see lib/referrals.ts).
+  // Referral program — every user gets a code at signup (see lib/referrals.ts).
   // pointsBalance is the running total maintained alongside the ledger so the
   // dashboard doesn't have to sum the whole ledger on every render.
   referralCode          String?     @unique
@@ -200,18 +200,18 @@ model User {
   couponClaims          CouponClaim[]
 }
 
-// Expo push tokens. One row per device â€” the same user may install on
+// Expo push tokens. One row per device — the same user may install on
 // iOS + Android, so we don't UNIQUE on (userId). Token itself is unique
 // to allow upsert-by-token (a device re-registering with a new install
 // overwrites the old row instead of duplicating it). Rows are removed
-// when Expo returns a DeviceNotRegistered receipt â€” see sendPush in
+// when Expo returns a DeviceNotRegistered receipt — see sendPush in
 // src/lib/notifications.ts.
 model PushToken {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   token     String   @unique
-  platform  String?  // "ios" | "android" â€” best-effort, used for analytics only
+  platform  String?  // "ios" | "android" — best-effort, used for analytics only
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -220,16 +220,16 @@ model PushToken {
 
 // Saved addresses (address book).
 //
-// One record per place the user wants to reuse â€” DELIVERY for buyers shipping
+// One record per place the user wants to reuse — DELIVERY for buyers shipping
 // to a recurring location, PICKUP for sellers' warehouse/store. A user can
 // have many of each. The `isDefault` flag is enforced as "at most one default
 // per (userId, kind)" by application code (no Prisma partial-unique support
-// on SQLite â€” see /api/account/addresses for the transactional guard).
+// on SQLite — see /api/account/addresses for the transactional guard).
 model Address {
   id                String   @id @default(cuid())
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // "DELIVERY" | "PICKUP" â€” same model serves buyer and seller use cases.
+  // "DELIVERY" | "PICKUP" — same model serves buyer and seller use cases.
   kind              String
   // Optional human label like "Home", "Office", "Aba warehouse".
   label             String?
@@ -292,7 +292,7 @@ model Wallet {
   // Withdrawable balance = balanceCents - heldCents. Decreases when the
   // related order moves to COMPLETED (release) or CANCELLED (claw back).
   heldCents    Int      @default(0)
-  // The wallet operates in USD internally â€” currency display happens at the
+  // The wallet operates in USD internally — currency display happens at the
   // UI layer via the CurrencyProvider context.
   currencyCode String   @default("USD")
   transactions WalletTransaction[]
@@ -321,7 +321,7 @@ model WalletTransaction {
   @@index([walletId, createdAt])
 }
 
-// Withdrawal request â€” captures bank details and tracks Monnify status.
+// Withdrawal request — captures bank details and tracks Monnify status.
 model PayoutRequest {
   id              String   @id @default(cuid())
   userId          String
@@ -351,11 +351,11 @@ model Manager {
   owner           User     @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
   managerId       String
   manager         User     @relation("ManagerUser", fields: [managerId], references: [id], onDelete: Cascade)
-  // "manager" (default) | "rider"  â€” controls which surface they see when
+  // "manager" (default) | "rider"  — controls which surface they see when
   // they log in. Riders land on /rider; managers stay on the regular
   // dashboards their permissions allow.
   role            String   @default("manager")
-  // Optional contact number â€” useful for delivery riders so buyers can call.
+  // Optional contact number — useful for delivery riders so buyers can call.
   phone           String?
   // JSON array of permission strings, e.g. ["edit_products","manage_orders","reply_messages"]
   // See PERMISSION_KEYS in src/lib/managers.ts.
@@ -388,12 +388,12 @@ model VerificationRequest {
   idType        String?
   idNumber      String?
   // CDN URL for the photo / scan of the actual ID document. The number
-  // alone is too easy to fabricate â€” having a legible image of the card
+  // alone is too easy to fabricate — having a legible image of the card
   // lets admins eyeball it for tampering, name match, and expiry.
   idDocumentUrl String?
   // PENDING | APPROVED | REJECTED
   status        String    @default("PENDING")
-  // Business fields â€” replace the old free-text "tell us about yourself" with
+  // Business fields — replace the old free-text "tell us about yourself" with
   // structured intake so admins can decide in seconds.
   businessName    String?
   businessAddress String?
@@ -406,7 +406,7 @@ model VerificationRequest {
   // CDN URL for the CAC certificate PDF/image (required if !hasPhysicalStore;
   // optional otherwise).
   cacDocumentUrl  String?
-  // Free-text from the requester â€” kept as supplemental context.
+  // Free-text from the requester — kept as supplemental context.
   notes         String?
   // JSON array of extra {label, url} document references the requester wants
   // to share (press, certifications, etc.).
@@ -429,11 +429,11 @@ model OrderUpdate {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   // STATUS | DISPATCHED | ARRIVING | NOTE
   kind      String
-  // Human-readable text the seller wrote â€” shown verbatim in the timeline.
+  // Human-readable text the seller wrote — shown verbatim in the timeline.
   message   String
   // Optional ETA for arrival; populated for "DISPATCHED" / "ARRIVING" kinds.
   etaAt     DateTime?
-  // Author â€” the seller or a manager acting on their behalf.
+  // Author — the seller or a manager acting on their behalf.
   createdById String
   createdAt DateTime @default(now())
 
@@ -476,7 +476,7 @@ model EmailBroadcast {
 
 model Category {
   id           String   @id @default(cuid())
-  // Display name â€” must be unique. Used as the literal value stored on
+  // Display name — must be unique. Used as the literal value stored on
   // Product.category, Post tags, AI prompts, search filters. Renaming an
   // existing category currently breaks references; the admin UI surfaces
   // a warning before allowing a rename.
@@ -496,7 +496,7 @@ model Category {
   // hide from buyer-facing dropdowns but the historical Product.category
   // values keep resolving.
   enabled      Boolean  @default(true)
-  // Categorisation kind â€” when an admin adds a fabric category we want
+  // Categorisation kind — when an admin adds a fabric category we want
   // products created in it to land on the Materials rail. Mirrors the
   // kindForCategory() switch in enums.ts. Values: "MATERIAL" | "PRODUCT".
   kind         String   @default("PRODUCT")
@@ -557,7 +557,7 @@ model Product {
   price       Float
   // Optional sale price for flash-sale / discount display.
   salePrice   Float?
-  // Category from the fashion-only allowlist in src/lib/enums.ts â†’ CATEGORIES.
+  // Category from the fashion-only allowlist in src/lib/enums.ts → CATEGORIES.
   category    String
   // Higher-level grouping used on the homepage rails.
   // Values: "MATERIAL" (fabrics + sewing supplies) or "PRODUCT" (everything else).
@@ -591,7 +591,7 @@ model Product {
   imagesJson  String   @default("[]")
   // JSON array of dominant hex colors extracted from product images at upload
   // time. Used by the deterministic SmartSearch image matcher. Empty by default
-  // â€” older products without colors fall back to text-only matching.
+  // — older products without colors fall back to text-only matching.
   dominantColorsJson String @default("[]")
   // Free-form lowercase tags for the search bot (e.g. ["oversized", "boho",
   // "linen"]). Sellers can leave blank; bot still works on name+description.
@@ -705,7 +705,7 @@ model CartItem {
   // Optional size for sized goods (clothing, shoes, bags). NULL for
   // materials and unsized items. Two carts of the same product in
   // different sizes overwrite today (unique constraint is on
-  // cartId+productId, not size) â€” acceptable for V1, revisit if buyers
+  // cartId+productId, not size) — acceptable for V1, revisit if buyers
   // start asking for it.
   size      String?
   // Buyer's pick from the product's attribute groups, e.g.
@@ -729,7 +729,7 @@ model Order {
   buyer           User     @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Cascade)
   sellerId        String
   seller          User     @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Cascade)
-  // Float to mirror CartItem.quantity â€” fabric orders can be 2.5 yards.
+  // Float to mirror CartItem.quantity — fabric orders can be 2.5 yards.
   quantity        Float    @default(1)
   totalPrice      Float
   // PENDING | PAID | SHIPPED | COMPLETED | CANCELLED
@@ -749,7 +749,7 @@ model Order {
   // the product had no buyer-selectable attribute groups.
   selectedAttributesJson String @default("{}")
   // "DIRECT" (pay upfront via Monnify) | "ON_DELIVERY" (pay cash on arrival).
-  // ON_DELIVERY is gated on User.trustedBuyer â€” see /api/cart/checkout.
+  // ON_DELIVERY is gated on User.trustedBuyer — see /api/cart/checkout.
   paymentMethod   String   @default("DIRECT")
   // Set when payment is confirmed. `expectedDeliveryBy` is the deadline after
   // which buyers can self-cancel a paid-but-undelivered order; default window
@@ -776,7 +776,7 @@ model Order {
   // minus admin's DELIVERY_PLATFORM_CUT_BPS).
   deliveryFulfiller String @default("SELLER")
   // 4-char alphanumeric code the buyer shares with the dispatch rider on
-  // arrival. The rider confirms delivery by entering this code â€” released
+  // arrival. The rider confirms delivery by entering this code — released
   // funds + COMPLETED status all flow from a verified match. Stored as a
   // string so leading zeros / letters are preserved.
   deliveryCode    String?
@@ -903,10 +903,10 @@ model Review {
 // Distinct from `Review` (which is per-product). Eligibility is enforced
 // by the API layer: only the buyer on a COMPLETED order can write here,
 // and only within 30 days of completion. After the window the row is
-// frozen (no PATCH) â€” see /api/seller-reviews.
+// frozen (no PATCH) — see /api/seller-reviews.
 model SellerReview {
   id        String   @id @default(cuid())
-  // The order this review covers. One review per order â€” the unique
+  // The order this review covers. One review per order — the unique
   // constraint makes idempotent upserts straightforward.
   orderId   String   @unique
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -946,11 +946,11 @@ model ChatParticipant {
   // Read receipt cursor: every message in this chat with createdAt <= lastReadAt
   // is considered read by this participant. Updated by the read endpoint when
   // the chat is open and new messages roll in. Read state for individual
-  // messages is derived from this cursor â€” saves a per-message write per poll.
+  // messages is derived from this cursor — saves a per-message write per poll.
   lastReadAt   DateTime?
   // Typing indicator. Client heartbeats this field while the user is typing;
   // the peer's poll reads it and compares against `now() - 5s` to decide
-  // whether to show "Alex is typingâ€¦". Stale entries are ignored, so no
+  // whether to show "Alex is typing…". Stale entries are ignored, so no
   // explicit "stopped typing" message is needed.
   lastTypingAt DateTime?
 
@@ -965,7 +965,7 @@ model Message {
   sender    User      @relation("MessageSender", fields: [senderId], references: [id])
   body      String
   // Quoted reply: parent message id. Null for top-level messages. The
-  // relation is intentionally NOT cascade â€” deleting the parent shows
+  // relation is intentionally NOT cascade — deleting the parent shows
   // "original message deleted" in the reply UI rather than wiping the
   // child too.
   replyToId String?
@@ -981,7 +981,7 @@ model Message {
   attachmentName String?
   attachmentSize Int?
   // Edit / delete state. `editedAt` set when the sender revises body; UI
-  // shows an "edited" indicator. `deletedAt` is a soft-delete â€” body
+  // shows an "edited" indicator. `deletedAt` is a soft-delete — body
   // and attachment are blanked client-side but the row stays so the
   // surrounding conversation reads coherently.
   editedAt  DateTime?
@@ -989,7 +989,7 @@ model Message {
   readAt    DateTime?
   // Client-generated UUID used to make sends idempotent. The server uses it
   // as a "have I seen this before?" check; identical retries collapse to one
-  // row. Optional so legacy rows and non-idempotent callers still work â€”
+  // row. Optional so legacy rows and non-idempotent callers still work —
   // the unique constraint only collides when both sides provide a value.
   clientMessageId String?
   createdAt DateTime  @default(now())
@@ -1005,7 +1005,7 @@ model Message {
   @@unique([chatId, senderId, clientMessageId])
 }
 
-// Emoji reactions on individual messages. WhatsApp-style â€” one reaction
+// Emoji reactions on individual messages. WhatsApp-style — one reaction
 // per (message, user, emoji) tuple, but a user can stack multiple emojis
 // on the same message if they want. Toggle semantics: the API endpoint
 // creates the row if absent, deletes if present.
@@ -1059,17 +1059,17 @@ model Like {
 
 // Product promotions (paid) and post promotions (free, legacy).
 //
-// Product flow (paid, fixed â‚¦500 / 3-day, admin-approved):
-//   PENDING_PAYMENT  â†’ seller created the request, awaiting Monnify
+// Product flow (paid, fixed ₦500 / 3-day, admin-approved):
+//   PENDING_PAYMENT  → seller created the request, awaiting Monnify
 //                      callback. `active=false`. `endsAt` is a placeholder.
-//   PENDING_REVIEW   â†’ payment succeeded; waits for admin approval.
+//   PENDING_REVIEW   → payment succeeded; waits for admin approval.
 //                      `paidAt` is set, `paymentTxnRef` carries the Monnify ref.
-//   APPROVED         â†’ admin approved. `startsAt`=approval time,
+//   APPROVED         → admin approved. `startsAt`=approval time,
 //                      `endsAt`=startsAt+3d, `active=true`. Shows on the
 //                      homepage slider above featured pieces.
-//   REJECTED         â†’ admin declined. Fee auto-refunded to the seller's
+//   REJECTED         → admin declined. Fee auto-refunded to the seller's
 //                      wallet (see /api/admin/promotions/[id]).
-//   CANCELLED        â†’ Monnify reported FAILED_TRANSACTION â€” buyer abandoned.
+//   CANCELLED        → Monnify reported FAILED_TRANSACTION — buyer abandoned.
 //
 // Post flow (legacy, free): created directly as APPROVED + active.
 model Promotion {
@@ -1084,7 +1084,7 @@ model Promotion {
   // Status lives in lib/enums.ts as PromotionStatus. SQLite stores it as a
   // string. Existing free post promotions migrate to "APPROVED".
   status        String   @default("APPROVED")
-  // Stored as Monnify-compatible kobo (50000 = â‚¦500). Zero for free post
+  // Stored as Monnify-compatible kobo (50000 = ₦500). Zero for free post
   // promotions so the wallet refund step on rejection is a no-op.
   priceCents    Int      @default(0)
   // Monnify reference written at creation time; used as the webhook
@@ -1111,7 +1111,7 @@ model Promotion {
 
 // Records every search the bot serves, plus which result the user clicked.
 // The ranker reads recent rows to bias future results toward what worked
-// for similar queries. This is the "controlled learning" â€” it's a stats
+// for similar queries. This is the "controlled learning" — it's a stats
 // table, not an opaque model, so behavior is predictable and auditable.
 model SearchLog {
   id              String   @id @default(cuid())
@@ -1121,7 +1121,7 @@ model SearchLog {
   source          String   @default("text")
   userId          String?
   // The first product the user clicked from this query, if any. Null if
-  // they never clicked â€” those rows still teach the bot the query gave
+  // they never clicked — those rows still teach the bot the query gave
   // poor results.
   clickedProductId String?
   createdAt       DateTime @default(now())
@@ -1153,7 +1153,7 @@ model Sketch {
 // in. Admin manages this. When BOTH the buyer and seller are in the same
 // entry, checkout uses the admin's `feeCents` (with a platform cut taken
 // off the top). Outside this list, sellers must use their own riders and
-// rates. See src/lib/location.ts â†’ resolveDeliveryQuote.
+// rates. See src/lib/location.ts → resolveDeliveryQuote.
 model DeliveryCity {
   id        String   @id @default(cuid())
   // ISO-3166 alpha-2 country code (matches User.country).
@@ -1177,7 +1177,7 @@ model DeliveryCity {
 // Key/value overrides for things that used to be plain env vars. The
 // getter in src/lib/settings.ts checks this table first and falls back to
 // process.env. Only a curated whitelist of keys is exposed in the admin UI
-// (see SETTINGS_DEFINITIONS) â€” secrets like JWT_SECRET stay env-only.
+// (see SETTINGS_DEFINITIONS) — secrets like JWT_SECRET stay env-only.
 model SiteSetting {
   key       String   @id
   value     String
@@ -1196,20 +1196,20 @@ model ShipbubbleAddressCode {
 
 // -------------------- Commission Requests --------------------
 // Custom-design requests from buyers to designers. Replaces the informal
-// chat-based commission flow with a structured brief â†’ quote â†’ accept â†’
+// chat-based commission flow with a structured brief → quote → accept →
 // deliver pipeline that's auditable and notifies both sides at every step.
 //
 // Status machine (see src/lib/commissions.ts for transitions):
-//   REQUESTED  â†’ designer hasn't responded yet
-//   QUOTED     â†’ designer named a price + estimated days
-//   ACCEPTED   â†’ buyer accepted the quote (payment happens off-platform
-//                in V1 â€” a "Mark as paid" admin action wires real
+//   REQUESTED  → designer hasn't responded yet
+//   QUOTED     → designer named a price + estimated days
+//   ACCEPTED   → buyer accepted the quote (payment happens off-platform
+//                in V1 — a "Mark as paid" admin action wires real
 //                payments later)
-//   DECLINED   â†’ designer or buyer walked away during negotiation
-//   IN_PROGRESS â†’ designer started work
-//   DELIVERED  â†’ designer marked delivery + supplied a code
-//   COMPLETED  â†’ buyer confirmed delivery with the code (releases payout)
-//   CANCELLED  â†’ either party cancelled after accept
+//   DECLINED   → designer or buyer walked away during negotiation
+//   IN_PROGRESS → designer started work
+//   DELIVERED  → designer marked delivery + supplied a code
+//   COMPLETED  → buyer confirmed delivery with the code (releases payout)
+//   CANCELLED  → either party cancelled after accept
 model CommissionRequest {
   id          String   @id @default(cuid())
   buyerId     String
@@ -1217,22 +1217,22 @@ model CommissionRequest {
   designerId  String
   designer    User     @relation("DesignerCommissions", fields: [designerId], references: [id], onDelete: Cascade)
 
-  // Brief â€” what the buyer wants
+  // Brief — what the buyer wants
   title       String
   occasion    String?    // "Wedding", "Aso Ebi", "Birthday", free-form
   description String
-  budgetCents Int?       // buyer's max budget in NGN cents (â‚¦ * 100), optional
+  budgetCents Int?       // buyer's max budget in NGN cents (₦ * 100), optional
   deadlineAt  DateTime?  // when the buyer needs it
   // JSON array of image URLs the buyer attached as visual references.
   referencesJson String  @default("[]")
 
-  // Quote â€” what the designer responds with
+  // Quote — what the designer responds with
   quoteCents     Int?
   quoteNote      String?
   quotedAt       DateTime?
   estimatedDays  Int?
 
-  // Fulfillment â€” same delivery-code pattern as the regular Order flow so
+  // Fulfillment — same delivery-code pattern as the regular Order flow so
   // a buyer hands over the code on receipt and the designer's wallet is
   // credited.
   deliveryCode   String?
@@ -1253,7 +1253,7 @@ model CommissionRequest {
 
 // -------------------- Collections (look-books) --------------------
 // Designer-curated bundles of posts (and optionally products) that present
-// a body of work as a single shareable URL â€” e.g. "Aso Ebi Spring 2026".
+// a body of work as a single shareable URL — e.g. "Aso Ebi Spring 2026".
 // Public via /lookbook/[slug]. A collection is owned by exactly one user;
 // posts/products on the join tables stay independently owned by their
 // creators.
@@ -1306,7 +1306,7 @@ model CollectionItem {
 // so we only model the two opt-in roles.
 //
 // We store the requested target as two explicit booleans rather than a
-// single role string â€” lets a user request "add designer" without
+// single role string — lets a user request "add designer" without
 // touching their seller status, and lets the admin still see what the
 // user originally wanted even after their roles drift over time.
 model RoleChangeRequest {
@@ -1359,7 +1359,7 @@ model WhatsAppMessage {
   // webhook deliveries don't double-insert.
   externalId  String?  @unique
   // Optional link to a StreekMart user when we can resolve the phone.
-  // Null otherwise â€” we still keep the conversation history.
+  // Null otherwise — we still keep the conversation history.
   userId      String?
   // Free-text tag the AI loop can populate (e.g. "recommendation",
   // "greeting", "out-of-scope"). Useful for measuring how the bot is used.
@@ -1372,7 +1372,7 @@ model WhatsAppMessage {
 
 
 // -------------------- Meta Data Deletion Requests --------------------
-// Required by Meta for any app handling user data â€” they POST to the
+// Required by Meta for any app handling user data — they POST to the
 // configured "Data Deletion Callback URL" when a user requests deletion
 // from their Facebook / WhatsApp account; we delete the corresponding
 // data, return a confirmation_code, and let the user check status at
@@ -1380,13 +1380,13 @@ model WhatsAppMessage {
 //
 // We don't always know which of our rows belong to the requesting user
 // (the signed_request gives us a Meta-internal user_id, not necessarily
-// a phone number) â€” phone is set when we could resolve it.
+// a phone number) — phone is set when we could resolve it.
 model DataDeletionRequest {
   id               String   @id @default(cuid())
   // Random hex string returned to Meta. Used by the public status page to
   // look up the row without leaking other PII.
   confirmationCode String   @unique
-  // The Meta user_id from the signed_request payload â€” opaque to us.
+  // The Meta user_id from the signed_request payload — opaque to us.
   metaUserId       String
   // Phone we successfully matched against WhatsAppMessage history, if any.
   phone            String?
@@ -1407,19 +1407,19 @@ model DataDeletionRequest {
 // -------------------- Preorders --------------------
 // Buyer requests a designer's piece from the feed/home. Lifecycle:
 //
-//   PENDING_PAYMENT      â†’ buyer just clicked "Preorder", needs to pay the
+//   PENDING_PAYMENT      → buyer just clicked "Preorder", needs to pay the
 //                          design price.
-//   AWAITING_READY       â†’ design paid. Designer's wallet credited (skip-
+//   AWAITING_READY       → design paid. Designer's wallet credited (skip-
 //                          hold for verified Tier 2/3 designers so they
 //                          can withdraw and buy materials).
-//   READY                â†’ designer marked the piece ready. Buyer needs
+//   READY                → designer marked the piece ready. Buyer needs
 //                          to pay delivery + supply shipping address.
-//   AWAITING_SHIPMENT    â†’ delivery paid. Designer creates the actual
+//   AWAITING_SHIPMENT    → delivery paid. Designer creates the actual
 //                          shipment via the existing logistics flow.
-//   SHIPPED              â†’ shipment created with tracking. Buyer sees
+//   SHIPPED              → shipment created with tracking. Buyer sees
 //                          delivery code.
-//   COMPLETED            â†’ buyer confirmed receipt with the code.
-//   CANCELLED            â†’ terminal failure (either side).
+//   COMPLETED            → buyer confirmed receipt with the code.
+//   CANCELLED            → terminal failure (either side).
 //
 // Two payments, two gateway references:
 //   designPaymentRef    = PREORDER_DESIGN_<id>

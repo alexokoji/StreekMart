@@ -128,7 +128,7 @@ async function handleInbound(message: InboundMessage): Promise<void> {
   if (!isAiEnabled() || !isWhatsAppEnabled()) {
     await sendWhatsAppText({
       to: message.from,
-      body: "Hey! StreekMart's concierge isn't on right now — try browsing https://www.streekmart.online while we get this fixed.",
+      body: "Hey! StreekMart's concierge isn't on right now — try browsing https://www.streekmart.com while we get this fixed.",
     });
     return;
   }
@@ -168,7 +168,7 @@ async function handleInbound(message: InboundMessage): Promise<void> {
     console.error("[whatsapp:webhook] concierge threw", { err });
     await sendWhatsAppText({
       to: message.from,
-      body: "I hit a snag finding pieces just now. Try again in a minute or browse https://streekmart.online directly.",
+      body: "I hit a snag finding pieces just now. Try again in a minute or browse https://streekmart.com directly.",
     });
     return;
   }

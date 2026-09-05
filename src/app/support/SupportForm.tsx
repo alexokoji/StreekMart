@@ -46,7 +46,7 @@ export function SupportForm({
     ].join("\n");
     // mailto: works on every desktop + mobile platform. iOS / Android open
     // the system mail client; desktop opens whatever's set as the handler.
-    const href = `mailto:support@streekmart.online?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines)}`;
+    const href = `mailto:support@streekmart.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines)}`;
     window.location.href = href;
     setSent(true);
   }

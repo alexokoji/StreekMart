@@ -170,8 +170,8 @@ export default function TermsAndConditionsPage() {
             </p>
             <div className="bg-gray-50 p-6 rounded-lg">
               <p className="text-gray-700 font-semibold mb-2">StreekMart</p>
-              <p className="text-gray-700">Email: support@streekmart.online</p>
-              <p className="text-gray-700">Website: www.streekmart.online</p>
+              <p className="text-gray-700">Email: support@streekmart.com</p>
+              <p className="text-gray-700">Website: www.streekmart.com</p>
             </div>
           </section>
         </div>

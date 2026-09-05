@@ -5,10 +5,10 @@ import { requireApiAdmin } from "@/lib/auth";
 import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { isValidCountryCode } from "@/lib/location";
 
-// GET    /api/admin/delivery-cities                â€” list all cities (active + inactive)
-// POST   /api/admin/delivery-cities                â€” add a city
-// PATCH  /api/admin/delivery-cities/[id]           â€” edit fee / active flag
-// DELETE /api/admin/delivery-cities/[id]           â€” hard delete
+// GET    /api/admin/delivery-cities                — list all cities (active + inactive)
+// POST   /api/admin/delivery-cities                — add a city
+// PATCH  /api/admin/delivery-cities/[id]           — edit fee / active flag
+// DELETE /api/admin/delivery-cities/[id]           — hard delete
 //
 // A row here whitelists a (country, city) pair for in-house platform
 // delivery. Checkout reads it via resolveDeliveryQuote in lib/location.ts.

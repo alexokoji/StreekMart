@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Admin accounts can't be deleted from here. Email support@streekmart.online for offline help.",
+          "Admin accounts can't be deleted from here. Email support@streekmart.com for offline help.",
       },
       { status: 403 },
     );
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "We couldn't complete the deletion automatically. Email support@streekmart.online and we'll process it manually.",
+          "We couldn't complete the deletion automatically. Email support@streekmart.com and we'll process it manually.",
       },
       { status: 500 },
     );

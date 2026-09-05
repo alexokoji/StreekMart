@@ -85,10 +85,10 @@ export default async function DataDeletionStatusPage({
               submitted this from Meta&rsquo;s settings page, try again or
               email{" "}
               <a
-                href="mailto:support@streekmart.online"
+                href="mailto:support@streekmart.com"
                 className="text-violet-700 hover:underline"
               >
-                support@streekmart.online
+                support@streekmart.com
               </a>
               .
             </>
@@ -128,7 +128,7 @@ export default async function DataDeletionStatusPage({
 
         <p className="mt-6 text-xs text-ink-500">
           Want to also delete your StreekMart account in full? Email
-          support@streekmart.online from the address on file.
+          support@streekmart.com from the address on file.
         </p>
       </div>
     </div>

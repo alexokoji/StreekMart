@@ -11,7 +11,7 @@ import { ensureReferralCode } from "@/lib/referrals";
 // /account is the buyer dashboard. Sellers and designers have their own
 // dashboards; we forward them there so the avatar chip lands on the right
 // surface every time. A user with both Seller AND Designer permissions stays
-// here so they can pick which dashboard to enter â€” landing them automatically
+// here so they can pick which dashboard to enter — landing them automatically
 // on either one would be wrong.
 export default async function AccountPage() {
   const user = await requireUser();
@@ -68,7 +68,7 @@ export default async function AccountPage() {
         code={referralCode}
         pointsBalance={currentUser?.pointsBalance ?? 0}
         referralCount={referralCount}
-        siteUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://www.streekmart.online"}
+        siteUrl={process.env.NEXT_PUBLIC_APP_URL ?? "https://www.streekmart.com"}
       />
 
       <DailyCheckIn />

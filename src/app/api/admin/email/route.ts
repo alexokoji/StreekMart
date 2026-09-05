@@ -11,13 +11,13 @@ import {
 } from "@/lib/email";
 import { sendPushBulk } from "@/lib/notifications";
 
-// POST /api/admin/email â€” broadcast email to a chosen audience.
+// POST /api/admin/email — broadcast email to a chosen audience.
 //
 // Body: { subject, body (HTML allowed), audience, specificIds? }
 //
 // We deliver sequentially with a small concurrency cap so a Resend rate
 // limit doesn't take down the request. For very large blasts, a real job
-// queue would be the next step â€” out of scope for V1.
+// queue would be the next step — out of scope for V1.
 
 const Body = z.object({
   subject: z.string().min(2).max(200),
@@ -30,7 +30,7 @@ const Body = z.object({
 });
 
 // Resend's free tier rate-limits at 2 requests/second. We send sequentially
-// (1 in flight) with a 600ms gap â†’ ~1.7/sec, safely under the ceiling.
+// (1 in flight) with a 600ms gap → ~1.7/sec, safely under the ceiling.
 // Anything more aggressive triggers 429s mid-blast and silently fails
 // recipients. If you upgrade Resend's plan, lift these numbers in tandem.
 const SEND_GAP_MS = 600;
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
   // For EMAILS audience some recipients won't have a user id (non-users);
   // store the raw emails in the audit field instead. Otherwise store the
   // resolved user ids as before. The column is `String @default("[]")`
-  // â€” semantically just a JSON array, the field name is historical.
+  // — semantically just a JSON array, the field name is historical.
   const auditList =
     parsed.data.audience === "EMAILS"
       ? recipients.map((r) => r.email)
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
   // Sequential send loop with pacing. One send per ~600ms keeps us under
   // Resend's free-tier 2 req/s. On a 429-shaped error we wait longer and
-  // retry once â€” captures the common transient-rate-limit case without
+  // retry once — captures the common transient-rate-limit case without
   // looping forever.
   for (let i = 0; i < recipients.length; i++) {
     const r = recipients[i];
@@ -133,10 +133,10 @@ export async function POST(req: Request) {
   }
 
   // Fire a parallel push broadcast to recipients that have a user id
-  // (non-user EMAILS-audience entries are skipped â€” there's nothing to
+  // (non-user EMAILS-audience entries are skipped — there's nothing to
   // route a push to). Body is the plain-text version of the email body
   // truncated to ~140 chars so the system banner doesn't wrap awkwardly.
-  // Fire-and-forget â€” email is the authoritative channel for this audit
+  // Fire-and-forget — email is the authoritative channel for this audit
   // log; the push is a courtesy.
   const userIds = recipients.map((r) => r.id).filter(Boolean);
   if (userIds.length > 0) {
@@ -146,7 +146,7 @@ export async function POST(req: Request) {
       .trim();
     void sendPushBulk(userIds, {
       title: parsed.data.subject,
-      body: previewBody.length > 140 ? previewBody.slice(0, 137) + "â€¦" : previewBody,
+      body: previewBody.length > 140 ? previewBody.slice(0, 137) + "…" : previewBody,
       data: { type: "admin-broadcast", broadcastId: broadcast.id },
     }).catch((err) => console.error("[push:broadcast] threw", { broadcastId: broadcast.id, err }));
   }

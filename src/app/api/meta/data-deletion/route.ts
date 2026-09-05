@@ -11,7 +11,7 @@ import { verifySignedRequest } from "@/lib/metaSignedRequest";
 // return the JSON envelope Meta expects:
 //
 //   {
-//     "url": "https://streekmart.online/data-deletion/<code>",
+//     "url": "https://streekmart.com/data-deletion/<code>",
 //     "confirmation_code": "<code>"
 //   }
 //

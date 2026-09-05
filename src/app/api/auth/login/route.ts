@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  // Suspension gate â€” block at sign-in so the user gets a clear message
+  // Suspension gate — block at sign-in so the user gets a clear message
   // instead of a confusing successful login that then 401s on every page.
   if (user.suspendedAt) {
     return NextResponse.json(
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Older accounts may not have a cart row yet â€” provision lazily on login.
+  // Older accounts may not have a cart row yet — provision lazily on login.
   await prisma.cart.upsert({
     where: { userId: user.id },
     create: { userId: user.id },

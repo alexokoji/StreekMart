@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       <p>This is a diagnostic email from StreekMart.</p>
       <p>If you received this, the Resend transport is wired correctly. Sent at ${new Date().toISOString()}.</p>
     `,
-    text: `StreekMart email test â€” Resend transport is wired. Sent at ${new Date().toISOString()}.`,
+    text: `StreekMart email test — Resend transport is wired. Sent at ${new Date().toISOString()}.`,
   });
 
   return NextResponse.json({
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     result,
     env: {
       RESEND_API_KEY_set: !!process.env.RESEND_API_KEY,
-      EMAIL_FROM: process.env.EMAIL_FROM ?? "(unset â€” using Resend sandbox)",
+      EMAIL_FROM: process.env.EMAIL_FROM ?? "(unset — using Resend sandbox)",
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "(unset)",
     },
   });
