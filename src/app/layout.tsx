@@ -8,6 +8,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { NewsletterBar } from "@/components/layout/NewsletterBar";
 import { Footer } from "@/components/layout/Footer";
 import { FloatingSupport } from "@/components/FloatingSupport";
+import { CursorGlow } from "@/components/motion/CursorGlow";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { ThemeProvider } from "@/state/ThemeContext";
@@ -132,6 +133,8 @@ export default async function RootLayout({
             {/* Discreet help-pill in the bottom-right corner that routes to
                 /support. Stays out of the way until tapped. */}
             <FloatingSupport />
+            {/* Pointer companion — desktop, fine-pointer, motion-allowed only. */}
+            <CursorGlow />
           </CurrencyProvider>
         </ThemeProvider>
       </body>

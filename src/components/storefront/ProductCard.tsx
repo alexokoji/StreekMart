@@ -38,11 +38,16 @@ export function ProductCard({ p, saved }: { p: ProductCardData; saved: boolean }
       ? [p.image]
       : []);
 
+  // Second image (when the seller uploaded one) cross-fades in on hover —
+  // the single highest-signal micro-interaction on a fashion grid, since it
+  // answers "what does the back/other colourway look like" without a click.
+  const hoverImage = galleryImages[1] ?? null;
+
   return (
     <article className="product-card group relative">
       <Link href={`/products/${p.id}`} className="block">
-        <div className="relative aspect-square bg-ink-50">
-          {galleryImages.length > 1 ? (
+        <div className="relative aspect-square overflow-hidden bg-ink-50">
+          {galleryImages.length > 1 && !hoverImage ? (
             <ProductImageSlider
               images={galleryImages}
               alt={p.name}
@@ -50,17 +55,35 @@ export function ProductCard({ p, saved }: { p: ProductCardData; saved: boolean }
               chevronVisibility="hover"
             />
           ) : galleryImages[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={galleryImages[0]}
-              alt={p.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={galleryImages[0]}
+                alt={p.name}
+                className={`h-full w-full object-cover transition-all duration-[800ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.06] ${
+                  hoverImage ? "group-hover:opacity-0" : ""
+                }`}
+              />
+              {hoverImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={hoverImage}
+                  alt=""
+                  aria-hidden
+                  className="absolute inset-0 h-full w-full scale-[1.06] object-cover opacity-0 transition-all duration-[800ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:scale-100 group-hover:opacity-100"
+                />
+              )}
+            </>
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-ink-300">
               No image
             </div>
           )}
+
+          {/* Quick-view affordance slides up from the bottom edge on hover. */}
+          <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full bg-ink-900/85 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-sm transition-transform duration-500 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] group-hover:translate-y-0">
+            View piece
+          </span>
 
           {onSale && (
             <span className="absolute left-2 top-2 rounded-md bg-burgundy-700 px-2 py-1 text-xs font-bold text-white">

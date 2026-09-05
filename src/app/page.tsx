@@ -12,7 +12,9 @@ import { rankScore } from "@/lib/ranking";
 import { parseJsonArray } from "@/lib/utils";
 import { type ProductCardData } from "@/components/storefront/ProductCard";
 import { CardGrid } from "@/components/storefront/CardGrid";
-import { HomeHero, type HeroImage } from "@/components/storefront/HomeHero";
+import { LivingHero, type HeroShot } from "@/components/storefront/LivingHero";
+import { TickerBand } from "@/components/storefront/TickerBand";
+import { Reveal } from "@/components/motion/Motion";
 import { PromoBannerDuo, type PromoBanner } from "@/components/storefront/PromoBannerDuo";
 import { LocationFilter } from "@/components/storefront/LocationFilter";
 import { PopularCategoryCards } from "@/components/storefront/PopularCategoryCards";
@@ -332,12 +334,12 @@ export default async function HomePage({
   // never ships placeholder art. Falls back gracefully when a rail is thin:
   // HomeHero renders a brand plate with no images, PromoBannerDuo a flat
   // tint, so an empty catalogue still looks intentional.
-  const heroImages: HeroImage[] = featured
+  const heroImages: HeroShot[] = featured
     .map((p) => {
       const src = parseJsonArray(p.imagesJson)[0];
       return src ? { id: p.id, src, alt: p.name } : null;
     })
-    .filter((x): x is HeroImage => x !== null)
+    .filter((x): x is HeroShot => x !== null)
     .slice(0, 3);
 
   const promoBanners: PromoBanner[] = [
@@ -397,7 +399,13 @@ export default async function HomePage({
         <LocationFilter />
       </div>
 
-      <HomeHero images={heroImages} />
+      <LivingHero
+        images={heroImages}
+        productCount={products.length}
+        designerCount={designers.length}
+      />
+
+      <TickerBand />
 
       {/* Popular category cards — visible on every viewport (not hidden in
           a collapsible). Tap a card to filter every rail below to that
@@ -723,23 +731,26 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <div className="mb-4 flex items-end justify-between gap-3">
+    <Reveal as="section" y={28}>
+      <div className="mb-5 flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-display text-xl font-bold sm:text-2xl">{title}</h2>
-          {subtitle && <p className="mt-0.5 text-xs text-ink-500 sm:text-sm">{subtitle}</p>}
+          <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">{title}</h2>
+          {subtitle && <p className="mt-1 text-xs text-ink-500 sm:text-sm">{subtitle}</p>}
         </div>
         {href && (
           <Link
             href={href}
-            className="shrink-0 whitespace-nowrap rounded-full border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-violet-400 hover:text-violet-700 dark:border-ink-600 dark:text-ink-200 dark:hover:border-violet-400 dark:hover:text-violet-300 sm:text-sm"
+            className="group shrink-0 whitespace-nowrap rounded-full border border-ink-200 px-4 py-2 text-xs font-medium text-ink-700 transition-all hover:border-violet-500 hover:bg-violet-600 hover:text-white dark:border-ink-600 dark:text-ink-200 dark:hover:border-violet-400 dark:hover:bg-violet-600 dark:hover:text-white sm:text-sm"
           >
-            See all →
+            See all
+            <span className="ml-1.5 inline-block transition-transform duration-300 group-hover:translate-x-1">
+              →
+            </span>
           </Link>
         )}
       </div>
       {children}
-    </section>
+    </Reveal>
   );
 }
 
