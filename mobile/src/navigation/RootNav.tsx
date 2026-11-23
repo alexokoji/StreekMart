@@ -5,6 +5,7 @@ import {
   DefaultTheme,
   type LinkingOptions,
   type NavigatorScreenParams,
+  createNavigationContainerRef,
 } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -21,7 +22,6 @@ import { LoginScreen } from "../screens/LoginScreen";
 import { RegisterScreen } from "../screens/RegisterScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { ForgotPasswordScreen } from "../screens/ForgotPasswordScreen";
-import { GetStartedScreen } from "../screens/GetStartedScreen";
 import { OnboardingScreen } from "../screens/OnboardingScreen";
 import { AddressesScreen } from "../screens/AddressesScreen";
 import { AddressFormScreen } from "../screens/AddressFormScreen";
@@ -166,6 +166,9 @@ export type RootStackParamList = {
   VerifyEmail: undefined;
 };
 
+// Lets non-screen code (e.g. App.tsx on sign-out) navigate.
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -243,6 +246,7 @@ export function RootNav({
     <>
       <StatusBar style={t.statusBarStyle === "dark" ? "dark" : "light"} />
       <NavigationContainer
+        ref={navigationRef}
         linking={linking}
         theme={{
           ...navTheme,
@@ -279,7 +283,7 @@ export function RootNav({
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
           {/* Get Started + Onboarding render their own header / no header
               so we hide the stack's. */}
-          <Stack.Screen name="GetStarted" component={GetStartedScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="GetStarted" component={OnboardingScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
           {/* All redesigned screens render their own BackHeader, so hide the
               native stack header to avoid a double-header. */}

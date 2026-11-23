@@ -1,6 +1,6 @@
 // StreekMart mobile shell (v2 - native).
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { TextStyle } from "react-native";
 import { fontFamilyFor } from "./src/theme/tokens";
@@ -28,7 +28,6 @@ if (originalRender) {
 }
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import {
@@ -44,12 +43,9 @@ import { AuthProvider, useAuth } from "./src/state/AuthContext";
 import { CartProvider } from "./src/state/CartContext";
 import { usePushRegistration } from "./src/state/usePush";
 import { promptBiometric, readBiometricState } from "./src/state/biometric";
-import { RootNav } from "./src/navigation/RootNav";
+import { RootNav, navigationRef } from "./src/navigation/RootNav";
+import { AnimatedSplash } from "./src/components/AnimatedSplash";
 import type { RootStackParamList } from "./src/navigation/RootNav";
-
-// Matches the flag persisted by OnboardingScreen on completion. Bump
-// the suffix if a future redesign should re-show the flow.
-const ONBOARDED_KEY = "streekmart:onboarded:v2";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -92,24 +88,29 @@ function AppInner() {
   const [unlocked, setUnlocked] = useState(false);
   const [needsBiometric, setNeedsBiometric] = useState<"checking" | "yes" | "no">("checking");
 
-  // First-launch onboarding gate. While we wait for AsyncStorage we hold
-  // the splash up so the user never sees a flash of the wrong route.
+  // Where the app opens. Signed-in users go straight in; everyone else
+  // always starts at the onboarding slides (the way in to sign up, log in or
+  // browse as a guest), on every launch.
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList | null>(null);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
-    (async () => {
-      // Already signed in -- skip onboarding entirely.
-      if (user) {
-        setInitialRoute("Tabs");
-        return;
+    setInitialRoute(user ? "Tabs" : "Onboarding");
+  }, [ready, user]);
+
+  // Signing out from inside the app drops the user back at onboarding.
+  const wasSignedIn = useRef(false);
+  useEffect(() => {
+    if (!ready) return;
+    if (user) {
+      wasSignedIn.current = true;
+    } else if (wasSignedIn.current) {
+      wasSignedIn.current = false;
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: "Onboarding" }] });
       }
-      // Logged out: route to GetStarted on first launch, otherwise to
-      // Tabs (which renders the public storefront; each tab handles its
-      // own auth prompt if needed).
-      const seen = await AsyncStorage.getItem(ONBOARDED_KEY).catch(() => null);
-      setInitialRoute(seen === "1" ? "Tabs" : "GetStarted");
-    })();
+    }
   }, [ready, user]);
 
   useEffect(() => {
@@ -134,20 +135,22 @@ function AppInner() {
     })();
   }, [ready, user]);
 
-  useEffect(() => {
-    // Don't hide the splash until BOTH the session AND the
-    // onboarded-flag check have resolved -- otherwise the user can see
-    // GetStarted flash before we route them to Tabs.
-    if (ready && initialRoute !== null) SplashScreen.hideAsync().catch(() => {});
-  }, [ready, initialRoute]);
+  const bootReady = ready && initialRoute !== null;
+  const locked = !unlocked && needsBiometric === "yes";
 
-  if (!ready || initialRoute === null) return null;
-
-  if (!unlocked && needsBiometric === "yes") {
-    return <BiometricLockScreen onRetry={() => setUnlocked(false)} onSignOut={logout} />;
-  }
-
-  return <RootNav initialRouteName={initialRoute} />;
+  return (
+    <View style={{ flex: 1, backgroundColor: "#17121F" }}>
+      {bootReady ? (
+        locked ? (
+          <BiometricLockScreen onRetry={() => setUnlocked(false)} onSignOut={logout} />
+        ) : (
+          <RootNav initialRouteName={initialRoute!} />
+        )
+      ) : null}
+      {/* Animated splash sits on top until the app is ready, then fades away. */}
+      {!splashDone ? <AnimatedSplash ready={bootReady} onFinish={() => setSplashDone(true)} /> : null}
+    </View>
+  );
 }
 
 function BiometricLockScreen({ onRetry, onSignOut }: { onRetry: () => void; onSignOut: () => void }) {
