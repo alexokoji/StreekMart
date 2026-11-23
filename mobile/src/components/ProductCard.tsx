@@ -18,7 +18,7 @@ export type ProductCardData = {
 };
 
 function formatNgn(value: number): string {
-  return `Ã¢â€šÂ¦${Math.round(value).toLocaleString("en-NG")}`;
+  return `₦${Math.round(value).toLocaleString("en-NG")}`;
 }
 
 export function ProductCard({

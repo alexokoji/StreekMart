@@ -1,10 +1,12 @@
 import React, { useCallback, useState } from "react";
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { RootStackParamList } from "../navigation/RootNav";
 import { Ionicons } from "@expo/vector-icons";
 import { ListScaffold } from "../components/ListScaffold";
 import { useTheme } from "../state/ThemeContext";
-import { API_URL, api, isNotFound } from "../api/client";
+import { api, isNotFound } from "../api/client";
 import { radius, type } from "../theme/tokens";
 
 // /api/wallet shape — see src/app/api/wallet/route.ts.
@@ -42,13 +44,13 @@ function txColors(t: ReturnType<typeof useTheme>, type: string, amountCents: num
   return { fg: t.success.fg, bg: t.success.bg, icon: "arrow-up-outline" as const, sign: "+" };
 }
 
-export function DesignerEarningsScreen() {
+export function WalletScreen({ title = "Earnings", tone = "promo" }: { title?: string; tone?: "cta" | "promo" }) {
   const t = useTheme();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [requesting, setRequesting] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -60,7 +62,7 @@ export function DesignerEarningsScreen() {
       // transactions (sales, etc.) — derived from the transactions
       // list since the wallet endpoint doesn't ship a separate field.
       const lifetimeCents = (w.transactions ?? [])
-        .filter((tx) => tx.amountCents > 0 && tx.status === "PAID")
+        .filter((tx) => tx.type === "SALE_CREDIT" && tx.status === "COMPLETED")
         .reduce((sum, tx) => sum + tx.amountCents, 0);
       setData({
         availableBalance: (w.availableCents ?? 0) / 100,
@@ -83,33 +85,17 @@ export function DesignerEarningsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function requestPayout() {
+  function requestPayout() {
     if (!data || data.availableBalance <= 0) {
       Alert.alert("Nothing to withdraw", "Your available balance is zero.");
       return;
     }
-    // POST /api/wallet/payout requires bank details (bankCode,
-    // accountNumber, accountName, amountCents). The bank-picker
-    // form lives on the web; route the user there until the mobile
-    // payout form is built, mirroring the rest of the app's
-    // "advanced settings live on the web" pattern.
-    setRequesting(true);
-    try {
-      const url = `${API_URL.replace(/\/$/, "")}/designer/wallet`;
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert(
-        "Open in browser",
-        "Withdrawals are processed on the web — open designer/wallet in your browser.",
-      );
-    } finally {
-      setRequesting(false);
-    }
+    nav.navigate("Withdraw", { availableCents: Math.round(data.availableBalance * 100) });
   }
 
   const header = (
     <View style={{ marginBottom: 6 }}>
-      <View style={[styles.heroCard, { backgroundColor: t.promo }]}>
+      <View style={[styles.heroCard, { backgroundColor: tone === "cta" ? t.cta : t.promo }]}>
         <Text style={[type.micro, { color: t.ctaText, opacity: 0.85 }]}>AVAILABLE</Text>
         <Text style={[styles.heroAmount, { color: t.ctaText }]}>
           ₦{Math.round(data?.availableBalance ?? 0).toLocaleString("en-NG")}
@@ -120,17 +106,17 @@ export function DesignerEarningsScreen() {
           </Text>
           <Pressable
             onPress={requestPayout}
-            disabled={requesting || !data || data.availableBalance <= 0}
+            disabled={!data || data.availableBalance <= 0}
             style={({ pressed }) => [
               styles.withdrawBtn,
               {
                 backgroundColor: "rgba(255,255,255,0.22)",
-                opacity: requesting || !data || data.availableBalance <= 0 ? 0.55 : pressed ? 0.85 : 1,
+                opacity: !data || data.availableBalance <= 0 ? 0.55 : pressed ? 0.85 : 1,
               },
             ]}
           >
             <Text style={{ color: t.ctaText, fontWeight: "800" }}>
-              {requesting ? "Opening…" : "Withdraw"}
+              Withdraw
             </Text>
           </Pressable>
         </View>
@@ -157,7 +143,7 @@ export function DesignerEarningsScreen() {
 
   return (
     <ListScaffold<WalletTransaction>
-      title="Earnings"
+      title={title}
       data={data?.transactions ?? []}
       keyExtractor={(tx) => tx.id}
       loading={loading}
@@ -241,3 +227,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 });
+
+export function DesignerEarningsScreen() {
+  return <WalletScreen title="Earnings" tone="promo" />;
+}

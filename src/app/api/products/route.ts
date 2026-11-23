@@ -27,10 +27,26 @@ export async function GET(req: Request) {
     const products = await prisma.product.findMany({
       where: { sellerId: guard.session.sub },
       orderBy: { createdAt: "desc" },
+      include: {
+        // Only what's needed to show the promotion badge in the app.
+        promotions: {
+          where: { status: { in: ["PENDING_PAYMENT", "PENDING_REVIEW", "APPROVED"] } },
+          select: { status: true, endsAt: true },
+        },
+      },
     });
+    const now = new Date();
     return NextResponse.json({
-      products: products.map((p) => ({
+      products: products.map(({ promotions, ...p }) => ({
         ...p,
+        // LIVE | REVIEW | PAYMENT | null — mirrors the web PromoteButton states.
+        promotionState: promotions.some((x) => x.status === "APPROVED" && x.endsAt > now)
+          ? "LIVE"
+          : promotions.some((x) => x.status === "PENDING_REVIEW")
+            ? "REVIEW"
+            : promotions.some((x) => x.status === "PENDING_PAYMENT")
+              ? "PAYMENT"
+              : null,
         displayPrice: p.price,
         displaySalePrice: p.salePrice,
         currency: "NGN",

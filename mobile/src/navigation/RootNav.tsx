@@ -43,6 +43,7 @@ import { ActionScreen, type ActionScreenParams } from "../screens/ActionScreen";
 import { SellerProductsScreen } from "../screens/SellerProductsScreen";
 import { AddProductScreen } from "../screens/AddProductScreen";
 import { SellerPayoutsScreen } from "../screens/SellerPayoutsScreen";
+import { WithdrawScreen } from "../screens/WithdrawScreen";
 import { SellerPromotionsScreen } from "../screens/SellerPromotionsScreen";
 import { SellerSettingsScreen } from "../screens/SellerSettingsScreen";
 import { NewPostScreen } from "../screens/NewPostScreen";
@@ -111,6 +112,7 @@ export type RootStackParamList = {
   SellerProducts: undefined;
   AddProduct: undefined;
   SellerPayouts: undefined;
+  Withdraw: { availableCents: number };
   SellerPromotions: undefined;
   SellerSettings: undefined;
 
@@ -300,6 +302,7 @@ export function RootNav({
           <Stack.Screen name="SellerProducts" component={SellerProductsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="AddProduct" component={AddProductScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerPayouts" component={SellerPayoutsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Withdraw" component={WithdrawScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerPromotions" component={SellerPromotionsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} options={{ headerShown: false }} />
 

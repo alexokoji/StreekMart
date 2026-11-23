@@ -20,7 +20,7 @@ type SellerProduct = {
   status: string;
   imagesJson?: string;
   images?: string[];
-  stockCount?: number;
+  stock?: number;
 };
 
 function firstImage(p: SellerProduct): string | null {
@@ -65,7 +65,7 @@ export function SellerProductsScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await api.get<{ products: SellerProduct[] }>("/api/seller/products");
+      const data = await api.get<{ products: SellerProduct[] }>("/api/products", { mine: 1 });
       setItems(data.products ?? []);
     } catch (err) {
       if (isNotFound(err)) {
@@ -91,7 +91,7 @@ export function SellerProductsScreen() {
           const prev = items;
           setItems((cur) => cur.filter((p) => p.id !== id));
           try {
-            await api.delete(`/api/seller/products/${id}`);
+            await api.delete(`/api/products/${id}`);
           } catch (err) {
             setItems(prev);
             Alert.alert("Couldn't delete", err instanceof Error ? err.message : "Try again.");
@@ -145,8 +145,8 @@ export function SellerProductsScreen() {
                 <View style={[styles.statusChip, { backgroundColor: sc.bg }]}>
                   <Text style={{ color: sc.fg, fontSize: 11, fontWeight: "800" }}>{item.status}</Text>
                 </View>
-                {typeof item.stockCount === "number" ? (
-                  <Text style={[type.small, { color: t.textMuted }]}>{item.stockCount} in stock</Text>
+                {typeof item.stock === "number" ? (
+                  <Text style={[type.small, { color: t.textMuted }]}>{item.stock} in stock</Text>
                 ) : null}
               </View>
             </View>
