@@ -10,6 +10,7 @@ export type ProductRow = {
   supplierId: string;
   supplierName: string;
   name: string;
+  description: string;
   image: string | null;
   category: string;
   costPrice: number;
@@ -43,7 +44,23 @@ export function ProductsPanel({
   const [n, setN] = useState({ name: "", cost: "", stock: "10", category: "", images: "", description: "" });
   const [csv, setCsv] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
-  const [e, setE] = useState({ cost: "", stock: "", category: "", mType: "", mValue: "", images: "" });
+  const [e, setE] = useState({ name: "", description: "", cost: "", stock: "", category: "", mType: "", mValue: "", images: "" });
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkCat, setBulkCat] = useState("");
+  const [bulkType, setBulkType] = useState("");
+  const [bulkVal, setBulkVal] = useState("");
+  const toggle = (id: string) => setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  async function bulk(action: string, extra: Record<string, unknown> = {}) {
+    if (action === "delete" && !window.confirm(`Delete ${sel.size} product(s)? Live listings are archived.`)) return;
+    const r = await call(`bulk:${action}`, "POST", "/api/admin/supplier-products/bulk", { ids: Array.from(sel), action, ...extra });
+    if (r) {
+      const failed = (r.failed ?? []) as { name: string; error: string }[];
+      if (failed.length) setErr(`${r.done} done, ${failed.length} failed — ` + failed.slice(0, 3).map((f) => `${f.name}: ${f.error}`).join("; "));
+      else setMsg(`${r.done} product(s) updated.`);
+      setSel(new Set());
+    }
+  }
 
   const imgList = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 
@@ -97,6 +114,8 @@ export function ProductsPanel({
   function startEdit(p: ProductRow) {
     setEditId(p.id);
     setE({
+      name: p.name,
+      description: p.description,
       cost: String(p.costPrice),
       stock: String(p.stock),
       category: p.category,
@@ -109,6 +128,8 @@ export function ProductsPanel({
   async function saveEdit(p: ProductRow, publish = false) {
     const override = e.mType && e.mValue !== "";
     const r = await call(`edit:${p.id}`, "PATCH", `/api/admin/supplier-products/${p.id}`, {
+      name: e.name,
+      description: e.description,
       costPrice: Number(e.cost),
       stock: Number(e.stock) || 0,
       category: e.category,
@@ -208,6 +229,35 @@ export function ProductsPanel({
         </div>
       )}
 
+      {sel.size > 0 && (
+        <div className="card flex flex-wrap items-center gap-2 p-3 text-sm">
+          <b>{sel.size} selected</b>
+          <button className="btn-primary text-sm" disabled={!!busy} onClick={() => bulk("publish")}>Publish</button>
+          <button className="btn-secondary text-sm" disabled={!!busy} onClick={() => bulk("unpublish")}>Unpublish</button>
+          <select className="input text-sm" value={bulkCat} onChange={(ev) => setBulkCat(ev.target.value)}>
+            <option value="">Category…</option>
+            {categories.map((c) => <option key={c}>{c}</option>)}
+          </select>
+          <button className="btn-secondary text-sm" disabled={!bulkCat || !!busy} onClick={() => bulk("setCategory", { category: bulkCat })}>Set category</button>
+          <select className="input text-sm" value={bulkType} onChange={(ev) => setBulkType(ev.target.value)}>
+            <option value="">Supplier default</option>
+            <option value="PERCENT">% markup</option>
+            <option value="FIXED">₦ markup</option>
+          </select>
+          <input className="input w-20 text-sm" inputMode="decimal" disabled={!bulkType} value={bulkVal} onChange={(ev) => setBulkVal(ev.target.value)} />
+          <button className="btn-secondary text-sm" disabled={!!busy || (!!bulkType && bulkVal === "")} onClick={() => bulk("setMarkup", { markupType: bulkType || null, markupValue: bulkType ? Number(bulkVal) : null })}>Set markup</button>
+          <button className="btn-secondary text-sm text-red-700" disabled={!!busy} onClick={() => bulk("delete")}>Delete</button>
+          <button className="text-xs underline" onClick={() => setSel(new Set())}>Clear</button>
+        </div>
+      )}
+
+      {products.length > 0 && (
+        <label className="flex items-center gap-2 text-xs text-ink-500">
+          <input type="checkbox" checked={sel.size === products.length} onChange={(ev) => setSel(ev.target.checked ? new Set(products.map((p) => p.id)) : new Set())} />
+          Select all {products.length}
+        </label>
+      )}
+
       <ul className="card divide-y divide-ink-100">
         {products.length === 0 && <li className="p-6 text-center text-sm text-ink-500">No supplier products match.</li>}
         {products.map((p) => {
@@ -220,6 +270,7 @@ export function ProductsPanel({
           return (
             <li key={p.id} className="space-y-3 p-3">
               <div className="flex items-center gap-3">
+                <input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} aria-label={`Select ${p.name}`} />
                 <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-ink-50">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   {p.image && <img src={p.image} alt="" className="h-full w-full object-cover" />}
@@ -246,6 +297,12 @@ export function ProductsPanel({
               {open && (
                 <div className="space-y-3 rounded bg-ink-50 p-3">
                   <div className="grid gap-3 sm:grid-cols-4">
+                    <label className="text-sm sm:col-span-4">Name
+                      <input className="input mt-1 w-full" value={e.name} onChange={(ev) => setE({ ...e, name: ev.target.value })} />
+                    </label>
+                    <label className="text-sm sm:col-span-4">Description
+                      <textarea className="input mt-1 w-full" rows={2} value={e.description} onChange={(ev) => setE({ ...e, description: ev.target.value })} />
+                    </label>
                     <label className="text-sm">Cost (₦)
                       <input className="input mt-1 w-full" inputMode="decimal" value={e.cost} onChange={(ev) => setE({ ...e, cost: ev.target.value })} />
                     </label>

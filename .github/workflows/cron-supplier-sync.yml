@@ -1,0 +1,21 @@
+name: Cron · Supplier sync
+
+# Every 6 hours: refresh API suppliers' catalogs (cost + stock → live
+# prices) and poll supplier order status/tracking.
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit the supplier sync endpoint
+        run: |
+          curl -fsS \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -X GET \
+            --max-time 300 \
+            "${{ secrets.CRON_BASE_URL }}/api/cron/supplier-sync" \
+            -w "\nHTTP %{http_code} in %{time_total}s\n"

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireApiAdmin } from "@/lib/auth";
 import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { SupplierBody, slugifyName } from "@/lib/suppliers/schemas";
+import { checkSupplierUrl, validateApiConfig } from "@/lib/suppliers/apiConfig";
 
 // POST /api/admin/suppliers — create a supplier.
 export async function POST(req: Request) {
@@ -16,6 +17,14 @@ export async function POST(req: Request) {
   if (d.integration === "API" && !d.apiBaseUrl) {
     return NextResponse.json({ error: "API suppliers need an API base URL" }, { status: 400 });
   }
+  let apiConfigJson = "{}";
+  if (d.integration === "API") {
+    const urlErr = checkSupplierUrl(d.apiBaseUrl!, process.env.NODE_ENV !== "production");
+    if (urlErr) return NextResponse.json({ error: urlErr }, { status: 400 });
+    const v = validateApiConfig(d.apiConfig);
+    if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+    apiConfigJson = JSON.stringify(v.config);
+  }
   let slug = slugifyName(d.name);
   if (await prisma.supplier.findUnique({ where: { slug } })) slug = `${slug}-${Date.now().toString(36)}`;
   const s = await prisma.supplier.create({
@@ -25,6 +34,7 @@ export async function POST(req: Request) {
       integration: d.integration,
       apiBaseUrl: d.integration === "API" ? d.apiBaseUrl ?? null : null,
       apiKey: d.apiKey || null,
+      apiConfigJson,
       contactName: d.contactName ?? null,
       contactEmail: d.contactEmail ?? null,
       contactPhone: d.contactPhone ?? null,

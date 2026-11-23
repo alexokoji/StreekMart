@@ -4,6 +4,7 @@ import { requireApiAdmin } from "@/lib/auth";
 import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { refreshSupplierListings } from "@/lib/suppliers/service";
 import { SupplierBody } from "@/lib/suppliers/schemas";
+import { checkSupplierUrl, validateApiConfig } from "@/lib/suppliers/apiConfig";
 
 // PATCH /api/admin/suppliers/[id] — edit details / markup / pause.
 // Changing markup re-prices every published product of this supplier.
@@ -22,9 +23,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (integration === "API" && !apiBaseUrl) {
     return NextResponse.json({ error: "API suppliers need an API base URL" }, { status: 400 });
   }
+  let apiConfigJson: string | undefined;
+  if (integration === "API") {
+    const urlErr = checkSupplierUrl(apiBaseUrl!, process.env.NODE_ENV !== "production");
+    if (urlErr) return NextResponse.json({ error: urlErr }, { status: 400 });
+    if (d.apiConfig !== undefined) {
+      const v = validateApiConfig(d.apiConfig);
+      if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+      apiConfigJson = JSON.stringify(v.config);
+    }
+  }
   await prisma.supplier.update({
     where: { id: cur.id },
     data: {
+      ...(apiConfigJson ? { apiConfigJson } : {}),
       ...(d.name !== undefined ? { name: d.name } : {}),
       integration,
       apiBaseUrl: integration === "API" ? apiBaseUrl : null,

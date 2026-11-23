@@ -149,22 +149,37 @@ export async function upsertCatalog(supplierId: string, items: CatalogItem[]) {
   for (const it of items) {
     const existing = await prisma.supplierProduct.findUnique({
       where: { supplierId_externalId: { supplierId, externalId: it.externalId } },
-      select: { id: true },
     });
-    const data = {
-      name: it.name,
-      description: it.description ?? "",
-      imagesJson: JSON.stringify(it.images ?? []),
-      costPrice: it.costPrice,
-      stock: it.stock ?? 0,
-      ...(it.category ? { category: it.category } : {}),
-    };
+    const images = JSON.stringify(it.images ?? []);
     if (existing) {
-      await prisma.supplierProduct.update({ where: { id: existing.id }, data });
+      // A re-sync/re-import owns cost + stock. Everything an admin may have
+      // curated (name, description, images, category) is only filled in when
+      // still empty, so edits are never clobbered.
+      await prisma.supplierProduct.update({
+        where: { id: existing.id },
+        data: {
+          costPrice: it.costPrice,
+          stock: it.stock ?? existing.stock,
+          ...(!existing.description && it.description ? { description: it.description } : {}),
+          ...(existing.imagesJson === "[]" && images !== "[]" ? { imagesJson: images } : {}),
+          ...(!existing.category && it.category ? { category: it.category } : {}),
+        },
+      });
       await refreshListing(existing.id);
       updated++;
     } else {
-      await prisma.supplierProduct.create({ data: { ...data, supplierId, externalId: it.externalId } });
+      await prisma.supplierProduct.create({
+        data: {
+          supplierId,
+          externalId: it.externalId,
+          name: it.name,
+          description: it.description ?? "",
+          imagesJson: images,
+          costPrice: it.costPrice,
+          stock: it.stock ?? 0,
+          category: it.category ?? "",
+        },
+      });
       created++;
     }
   }
@@ -178,22 +193,86 @@ export async function syncSupplier(supplierId: string) {
   const adapter = getAdapter(supplier);
   if (!adapter) throw new Error("This supplier is manual — it has no API to sync");
   try {
-    const items = await adapter.fetchCatalog();
-    const r = await upsertCatalog(supplier.id, items);
-    const note = `Synced ${items.length} items (${r.created} new, ${r.updated} updated)`;
+    const cat = await adapter.fetchCatalog();
+    const r = await upsertCatalog(supplier.id, cat.items);
+    // Items we know about that the supplier no longer lists are treated as
+    // out of stock (and pulled from sale via refreshListing). Only when we
+    // saw the WHOLE catalog and it wasn't empty — a partial or blank
+    // response must never wipe our stock.
+    let gone = 0;
+    if (cat.complete && cat.items.length > 0) {
+      const missing = await prisma.supplierProduct.findMany({
+        where: {
+          supplierId: supplier.id,
+          stock: { gt: 0 },
+          externalId: { notIn: cat.items.map((i) => i.externalId) },
+          NOT: { externalId: { startsWith: "manual:" } },
+        },
+        select: { id: true },
+      });
+      for (const m of missing) {
+        await prisma.supplierProduct.update({ where: { id: m.id }, data: { stock: 0 } });
+        await refreshListing(m.id);
+        gone++;
+      }
+    }
+    const note =
+      `Synced ${cat.items.length} items (${r.created} new, ${r.updated} updated` +
+      `${gone ? `, ${gone} no longer listed` : ""}` +
+      `${cat.skipped.length ? `, ${cat.skipped.length}+ skipped` : ""})` +
+      `${cat.complete ? "" : " — partial"}`;
     await prisma.supplier.update({
       where: { id: supplier.id },
       data: { lastSyncAt: new Date(), lastSyncNote: note },
     });
-    return { ...r, total: items.length };
+    return { ...r, total: cat.items.length, gone, skipped: cat.skipped, complete: cat.complete };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Sync failed";
     await prisma.supplier.update({
       where: { id: supplier.id },
-      data: { lastSyncAt: new Date(), lastSyncNote: `Failed: ${msg}` },
+      data: { lastSyncAt: new Date(), lastSyncNote: `Failed: ${msg.slice(0, 200)}` },
     });
     throw e;
   }
+}
+
+/**
+ * Poll API suppliers for status/tracking of orders they've accepted.
+ * Returns how many orders changed. Errors on one order never stop the rest.
+ */
+export async function syncSupplierOrders() {
+  const open = await prisma.supplierOrder.findMany({
+    where: {
+      status: { in: ["PLACED", "SHIPPED"] },
+      externalOrderId: { not: null },
+      supplier: { integration: "API", active: true },
+    },
+    include: { supplier: true },
+    take: 200,
+  });
+  let changed = 0;
+  let failed = 0;
+  for (const so of open) {
+    const adapter = getAdapter(so.supplier);
+    if (!adapter) continue;
+    try {
+      const r = await adapter.getOrderStatus(so.externalOrderId!);
+      if (!r) continue;
+      const nextStatus = r.status ?? so.status;
+      const tracking = r.trackingCode ?? so.trackingCode;
+      if (nextStatus !== so.status || tracking !== so.trackingCode) {
+        await prisma.supplierOrder.update({
+          where: { id: so.id },
+          data: { status: nextStatus, trackingCode: tracking },
+        });
+        changed++;
+      }
+    } catch (e) {
+      failed++;
+      console.error("[suppliers] order status poll failed", so.id, (e as Error).message);
+    }
+  }
+  return { checked: open.length, changed, failed };
 }
 
 /**
@@ -228,6 +307,13 @@ export async function routeOrdersToSuppliers(orderIds: string[]) {
         })
         .catch(() => null); // unique race → someone else created it
       if (!so) continue;
+      // Reserve stock so we don't oversell between syncs (manual suppliers
+      // especially). refreshListing flips the listing to SOLD_OUT at zero.
+      await prisma.supplierProduct.update({
+        where: { id: sp.id },
+        data: { stock: Math.max(0, sp.stock - Math.ceil(o.quantity)) },
+      });
+      await refreshListing(sp.id);
       await placeSupplierOrder(so.id);
     }
   } catch (err) {
@@ -253,6 +339,7 @@ export async function placeSupplierOrder(supplierOrderId: string) {
       reference: so.id,
       sku: so.supplierProduct.externalId,
       quantity: so.quantity,
+      unitCost: so.unitCost,
       recipient: {
         name: so.order.buyer.name,
         phone: so.order.buyer.phone,

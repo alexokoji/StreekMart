@@ -1671,6 +1671,9 @@ model Supplier {
   // any non-admin response.
   apiBaseUrl  String?
   apiKey      String?
+  // JSON ApiConfig (auth style, field mapping, pagination, order payload,
+  // tracking). See src/lib/suppliers/apiConfig.ts. "{}" = defaults.
+  apiConfigJson String @default("{}")
   contactName  String?
   contactEmail String?
   contactPhone String?

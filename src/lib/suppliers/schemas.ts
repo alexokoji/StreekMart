@@ -6,6 +6,8 @@ export const SupplierBody = z.object({
   apiBaseUrl: z.string().trim().url().max(300).nullable().optional(),
   // Empty string / undefined on update = keep the stored key.
   apiKey: z.string().trim().max(300).optional(),
+  // Raw ApiConfig object; validated with validateApiConfig in the route.
+  apiConfig: z.record(z.any()).optional(),
   contactName: z.string().trim().max(80).nullable().optional(),
   contactEmail: z.string().trim().max(120).nullable().optional(),
   contactPhone: z.string().trim().max(40).nullable().optional(),

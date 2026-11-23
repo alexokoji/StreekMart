@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { readActiveCategoryNames } from "@/lib/categories";
 import { safeArray } from "@/lib/suppliers/service";
+import { parseApiConfig } from "@/lib/suppliers/apiConfig";
 import { SuppliersPanel } from "./SuppliersPanel";
 import { ProductsPanel } from "./ProductsPanel";
 import { OrdersPanel } from "./OrdersPanel";
@@ -89,6 +90,7 @@ export default async function AdminSuppliersPage({
               name: s.name,
               integration: s.integration === "API" ? "API" : "MANUAL",
               apiBaseUrl: s.apiBaseUrl,
+              apiConfig: parseApiConfig(s.apiConfigJson),
               hasApiKey: !!s.apiKey,
               contactName: s.contactName,
               contactEmail: s.contactEmail,
@@ -150,6 +152,7 @@ async function ProductsTab({
           supplierId: p.supplierId,
           supplierName: p.supplier.name,
           name: p.name,
+          description: p.description,
           image: imgs[0] ?? null,
           imagesCsv: imgs.join(", "),
           category: p.category,
