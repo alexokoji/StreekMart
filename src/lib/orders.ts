@@ -20,6 +20,7 @@ import {
   parseAttributeSelection,
 } from "@/lib/productAttributes";
 import { markRefereeQualified } from "@/lib/referrals";
+import { routeOrdersToSuppliers } from "@/lib/suppliers/service";
 
 // How many days a buyer has to wait between payment and the option to
 // self-cancel an undelivered order. Conservative default — long enough for
@@ -222,6 +223,11 @@ export async function finalizePaidOrders(args: {
       ),
     ),
   );
+
+  // Supplier-sourced items: queue them with the supplier (auto-placed for
+  // API suppliers). Awaited so serverless runtimes don't cut it off; it
+  // never throws, so it can't undo the payment.
+  await routeOrdersToSuppliers(pending.map((o) => o.id));
 
   return {
     finalisedOrderIds: pending.map((o) => o.id),

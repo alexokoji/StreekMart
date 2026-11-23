@@ -24,6 +24,9 @@ export const ADMIN_PERMISSIONS = {
   MANAGE_PROMOTIONS: "manage-promotions",
   // Product moderation (hide / unhide listings).
   MANAGE_PRODUCTS: "manage-products",
+  // Suppliers, sourced products, pricing markups and supplier orders.
+  // Separate from MANAGE_PRODUCTS because it exposes our costs and profit.
+  MANAGE_SUPPLIERS: "manage-suppliers",
   // Delivery cities + per-zone fees.
   MANAGE_DELIVERY: "manage-delivery",
   // Email broadcasts to user cohorts.
@@ -62,6 +65,10 @@ export const ADMIN_PERMISSION_LABELS: Record<AdminPermission, { title: string; d
   "manage-products": {
     title: "Product moderation",
     desc: "Hide listings reported as off-policy.",
+  },
+  "manage-suppliers": {
+    title: "Suppliers & sourced products",
+    desc: "Manage suppliers, supplier costs, markups and supplier orders. Can see our profit margins.",
   },
   "manage-delivery": {
     title: "Delivery",

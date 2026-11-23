@@ -619,6 +619,7 @@ model Product {
   collectionItems CollectionItem[]
   recentlyViewed RecentlyViewed[]
   preorders  Preorder[]
+  supplierProduct SupplierProduct?
 }
 
 // -------------------- Posts (Designers) --------------------
@@ -790,6 +791,7 @@ model Order {
   logisticsProvider String?
   updates         OrderUpdate[]
   shipment        Shipment?
+  supplierOrder   SupplierOrder?
   shippingRates   ShippingRate[]
   sellerReview    SellerReview?
   createdAt       DateTime @default(now())
@@ -1647,4 +1649,104 @@ model CouponClaim {
 
   @@unique([userId, promoCodeId])
   @@index([userId, claimedAt])
+}
+
+// -------------------- Suppliers & dropship sourcing --------------------
+//
+// StreekMart can source products from outside suppliers and sell them as
+// its own. Shoppers never see the supplier: every published supplier
+// product is a normal `Product` owned by the StreekMart house account, so
+// all storefront surfaces keep working unchanged. These tables hold the
+// private side — what we pay, who fulfils it, and the markup we add.
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  // MANUAL: admin adds products by hand / CSV and places supplier orders
+  //         themselves. API: products + orders flow through the supplier's
+  //         JSON API (see src/lib/suppliers/adapters.ts).
+  integration String   @default("MANUAL")
+  // API integration config. apiKey is admin-only and never serialised to
+  // any non-admin response.
+  apiBaseUrl  String?
+  apiKey      String?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  notes       String?
+  // Default markup added on top of the supplier's cost.
+  // PERCENT: value is a percentage (25 = +25%). FIXED: value is naira.
+  markupType  String   @default("PERCENT")
+  markupValue Float    @default(25)
+  active      Boolean  @default(true)
+  lastSyncAt  DateTime?
+  lastSyncNote String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products SupplierProduct[]
+  orders   SupplierOrder[]
+}
+
+model SupplierProduct {
+  id          String   @id @default(cuid())
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  // The supplier's own id / SKU for this item. Unique per supplier so a
+  // re-sync updates rather than duplicates.
+  externalId  String
+  name        String
+  description String   @default("")
+  imagesJson  String   @default("[]")
+  // Suggested StreekMart category (must match a Category.name to publish).
+  category    String   @default("")
+  // What the supplier charges us, in naira.
+  costPrice   Float
+  // Optional override of the supplier's default markup for this item.
+  markupType  String?
+  markupValue Float?
+  stock       Int      @default(0)
+  // IMPORTED (not on the storefront) | PUBLISHED (live) | HIDDEN (pulled)
+  status      String   @default("IMPORTED")
+  // The storefront listing, created on first publish.
+  productId   String?  @unique
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders SupplierOrder[]
+
+  @@unique([supplierId, externalId])
+  @@index([supplierId, status])
+}
+
+// One row per customer Order that contains a supplier product: what we
+// owe the supplier, where it was sent, and its tracking.
+model SupplierOrder {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  supplierProductId String
+  supplierProduct   SupplierProduct @relation(fields: [supplierProductId], references: [id])
+  quantity    Float    @default(1)
+  // Frozen at order time so later price changes don't rewrite history.
+  unitCost    Float
+  totalCost   Float
+  // What the customer paid for the goods (excl. delivery).
+  revenue     Float
+  // TO_PLACE (needs placing with supplier) | PLACED | SHIPPED | DELIVERED
+  // | FAILED (auto-placement errored) | CANCELLED
+  status      String   @default("TO_PLACE")
+  externalOrderId String?
+  trackingCode    String?
+  error       String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([supplierId])
 }
