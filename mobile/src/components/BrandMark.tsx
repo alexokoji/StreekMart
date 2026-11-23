@@ -17,7 +17,7 @@ export function BrandMark({
   const isHero = size === "hero";
   return (
     <View style={[styles.row, style]}>
-      <StreekMark size={isHero ? 52 : 36} body={t.scheme === "dark" ? "#F6F3ED" : "#2B1760"} letter={t.scheme === "dark" ? "#5B21B6" : "#F6F3ED"} />
+      <StreekMark size={isHero ? 56 : 38} />
       <Text style={[styles.wordmark, { fontSize: isHero ? 34 : 26, color: t.text }]}>
         Streek<Text style={{ color: t.accent }}>Mart</Text>
       </Text>

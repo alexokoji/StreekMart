@@ -72,7 +72,14 @@ export function OnboardingScreen() {
   const listRef = useRef<FlatList<Slide>>(null);
   const [index, setIndex] = useState(0);
   const last = index === SLIDES.length - 1;
-  const artH = Math.min(Math.max(height * 0.44, 280), 420);
+  // Short phones get tighter text and buttons. The artwork then takes
+  // whatever height is left once the copy and the fixed footer are
+  // accounted for (it is drawn at 360pt and scaled to fit, and centred in
+  // the free space on tall phones).
+  const compact = height < 720;
+  const copyH = compact ? 178 : 220;
+  const [listH, setListH] = useState(height * 0.5);
+  const artScale = Math.max(0.5, Math.min(1.12, (listH - copyH) / 360));
 
   function onEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     setIndex(Math.round(e.nativeEvent.contentOffset.x / width));
@@ -100,6 +107,7 @@ export function OnboardingScreen() {
         )}
       </SafeAreaView>
 
+      <View style={{ flex: 1 }} onLayout={(e) => setListH(e.nativeEvent.layout.height)}>
       <Animated.FlatList
         ref={listRef as never}
         data={SLIDES}
@@ -117,37 +125,38 @@ export function OnboardingScreen() {
           const artO = scrollX.interpolate({ inputRange: input, outputRange: [0, 1, 0] });
           const textY = scrollX.interpolate({ inputRange: input, outputRange: [40, 0, 40] });
           return (
-            <View style={{ width }}>
-              <Animated.View style={[styles.artWrap, { height: artH, opacity: artO, transform: [{ translateX: artX }] }]}>
-                {/* Illustrations are drawn at 360pt tall; shrink to fit short phones. */}
-                <View style={{ height: 360, transform: [{ scale: Math.min(1, artH / 360) }], transformOrigin: "top" }}>
+            <View style={{ width, height: listH }}>
+              <Animated.View style={[styles.artWrap, { opacity: artO, transform: [{ translateX: artX }] }]}>
+                {/* Illustrations are drawn at 360pt tall and scaled to fit. */}
+                <View style={{ width, height: 360, transform: [{ scale: artScale }] }}>
                   <Art kind={item.art} />
                 </View>
               </Animated.View>
-              <Animated.View style={[styles.copy, { opacity: artO, transform: [{ translateY: textY }] }]}>
+              <Animated.View style={[styles.copy, { height: copyH, opacity: artO, transform: [{ translateY: textY }] }]}>
                 <Text style={styles.eyebrow}>{item.eyebrow}</Text>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.body}>{item.body}</Text>
+                <Text style={[styles.title, compact && styles.titleCompact]}>{item.title}</Text>
+                <Text style={[styles.body, compact && styles.bodyCompact]}>{item.body}</Text>
               </Animated.View>
             </View>
           );
         }}
       />
+      </View>
 
-      <SafeAreaView edges={["bottom"]} style={styles.bottom}>
+      <SafeAreaView edges={["bottom"]} style={[styles.bottom, compact && { minHeight: 206, gap: 12 }]}>
         <Dots scrollX={scrollX} width={width} />
         {last ? (
           <View style={{ gap: 12 }}>
             <Pressable
               onPress={() => nav.navigate("Register")}
-              style={({ pressed }) => [styles.primary, { opacity: pressed ? 0.9 : 1 }]}
+              style={({ pressed }) => [styles.primary, compact && { height: 52 }, { opacity: pressed ? 0.9 : 1 }]}
               accessibilityRole="button"
             >
               <Text style={styles.primaryText}>Create account</Text>
             </Pressable>
             <Pressable
               onPress={() => nav.navigate("Login")}
-              style={({ pressed }) => [styles.secondary, { opacity: pressed ? 0.85 : 1 }]}
+              style={({ pressed }) => [styles.secondary, compact && { height: 52 }, { opacity: pressed ? 0.85 : 1 }]}
               accessibilityRole="button"
             >
               <Text style={styles.secondaryText}>I already have an account</Text>
@@ -164,7 +173,7 @@ export function OnboardingScreen() {
         ) : (
           <Pressable
             onPress={() => goTo(index + 1)}
-            style={({ pressed }) => [styles.primary, { opacity: pressed ? 0.9 : 1 }]}
+            style={({ pressed }) => [styles.primary, compact && { height: 52 }, { opacity: pressed ? 0.9 : 1 }]}
             accessibilityRole="button"
           >
             <Text style={styles.primaryText}>Next</Text>
@@ -342,13 +351,16 @@ const styles = StyleSheet.create({
   brandText: { color: CREAM, fontSize: 24, fontFamily: fontFamily.serif },
   skip: { minWidth: 64, minHeight: 44, alignItems: "flex-end", justifyContent: "center" },
   skipText: { color: MUTED, fontSize: 15, fontFamily: fontFamily.bold },
-  artWrap: { justifyContent: "flex-start", marginTop: 6 },
+  artWrap: { flex: 1, alignItems: "center", justifyContent: "center" },
   art: { flex: 1 },
-  copy: { paddingHorizontal: 26, paddingTop: 10, gap: 10 },
+  copy: { paddingHorizontal: 26, paddingTop: 6, gap: 8, overflow: "hidden" },
   eyebrow: { color: GOLD, fontSize: 11, letterSpacing: 1.6, fontFamily: fontFamily.extrabold },
   title: { color: CREAM, fontSize: 36, lineHeight: 38, fontFamily: fontFamily.serif },
   body: { color: MUTED, fontSize: 16, lineHeight: 24, fontFamily: fontFamily.medium },
-  bottom: { paddingHorizontal: 22, paddingBottom: 14, gap: 18 },
+  titleCompact: { fontSize: 29, lineHeight: 31 },
+  bodyCompact: { fontSize: 14.5, lineHeight: 21 },
+  // Fixed height so the slides above never resize between pages.
+  bottom: { paddingHorizontal: 22, paddingBottom: 14, gap: 16, minHeight: 236, justifyContent: "flex-end" },
   dots: { flexDirection: "row", gap: 6, alignItems: "center", height: 10 },
   dot: { height: 8, borderRadius: 4, backgroundColor: CREAM },
   primary: { height: 58, borderRadius: 29, backgroundColor: VIOLET, flexDirection: "row", gap: 10, alignItems: "center", justifyContent: "center" },
