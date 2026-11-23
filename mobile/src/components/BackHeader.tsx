@@ -26,9 +26,9 @@ export function BackHeader({
         <Pressable
           onPress={() => (onBack ? onBack() : nav.canGoBack() && nav.goBack())}
           hitSlop={12}
-          style={styles.iconBtn}
+          style={[styles.iconBtn, { backgroundColor: t.card, borderColor: t.border, borderWidth: StyleSheet.hairlineWidth }]}
         >
-          <Ionicons name="chevron-back" size={24} color={t.text} />
+          <Ionicons name="chevron-back" size={22} color={t.text} />
         </Pressable>
         <View style={styles.titleWrap}>
           {title ? (
@@ -49,8 +49,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    height: 52,
+    height: 60,
   },
-  iconBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   titleWrap: { flex: 1, alignItems: "center" },
 });

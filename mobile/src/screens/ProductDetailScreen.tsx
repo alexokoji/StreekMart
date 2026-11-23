@@ -48,7 +48,7 @@ type Product = {
   sizes?: string[];
   sizesJson?: string;
   attributesJson?: string;
-  seller: { id: string; name: string; businessName?: string | null };
+  seller: { id: string; name: string; businessName?: string | null; sellerVerified?: boolean };
   ratingAvg?: number;
   ratingCount?: number;
 };
@@ -96,7 +96,7 @@ type ReviewsResp = {
 };
 
 const { width: SCREEN_W } = Dimensions.get("window");
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 
 export function ProductDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "ProductDetail">>();
@@ -329,7 +329,7 @@ export function ProductDetailScreen() {
       await api.post("/api/cart", payload);
       // Refresh the global cart count so every cart icon updates.
       bumpCart().catch(() => {});
-      Alert.alert("Added", `${product!.name} is in your cart.`);
+      Alert.alert("Added to bag", `${product!.name} is in your bag.`);
     } catch (err) {
       Alert.alert("Couldn't add", err instanceof Error ? err.message : "Try again.");
     } finally {
@@ -587,9 +587,9 @@ export function ProductDetailScreen() {
 
         {/* Badge chips */}
         <View style={[styles.block, { flexDirection: "row", flexWrap: "wrap", gap: 8 }]}>
-          <BadgeChip label="Verified seller" />
+          {product.seller?.sellerVerified ? <BadgeChip label="Verified seller" /> : null}
           <BadgeChip label="Secure checkout" />
-          <BadgeChip label="Return policy" />
+          <BadgeChip label="Delivery code protection" />
         </View>
 
         {/* Primary actions: Add to cart + Buy now */}
@@ -599,12 +599,12 @@ export function ProductDetailScreen() {
             disabled={adding}
             style={({ pressed }) => [
               styles.ctaPill,
-              { backgroundColor: t.cta, opacity: pressed || adding ? 0.85 : 1 },
+              { backgroundColor: t.card, borderWidth: 1.5, borderColor: t.text, opacity: pressed || adding ? 0.85 : 1 },
             ]}
           >
             <View style={styles.ctaInner}>
-              <Ionicons name="bag-handle" size={18} color={t.ctaText} />
-              <Text style={{ color: t.ctaText, fontSize: 16, fontWeight: "700" }}>Add to cart</Text>
+              <Ionicons name="bag-handle-outline" size={18} color={t.text} />
+              <Text style={{ color: t.text, fontSize: 16, fontWeight: "800" }}>Add to bag</Text>
             </View>
           </Pressable>
           <Pressable
@@ -612,21 +612,23 @@ export function ProductDetailScreen() {
             disabled={adding}
             style={({ pressed }) => [
               styles.ctaPill,
-              { backgroundColor: t.success.fg, opacity: pressed || adding ? 0.85 : 1 },
+              { backgroundColor: t.cta, opacity: pressed || adding ? 0.85 : 1 },
             ]}
           >
             <View style={styles.ctaInner}>
-              <Ionicons name="flash" size={18} color="#fff" />
-              <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>Buy now</Text>
+              <Ionicons name="flash" size={18} color={t.ctaText} />
+              <Text style={{ color: t.ctaText, fontSize: 16, fontWeight: "800" }}>Buy now</Text>
             </View>
           </Pressable>
         </View>
 
         {/* Delivery info card */}
         <View style={styles.block}>
-          <View style={[styles.deliveryCard, { backgroundColor: "rgba(217,70,239,0.10)", borderColor: t.promo }]}>
+          <View style={[styles.deliveryCard, { backgroundColor: t.accentSoft }]}>
             <Text style={[type.small, { color: t.textMuted }]}>Delivery</Text>
-            <Text style={[type.bodyStrong, { color: t.text, marginTop: 2 }]}>3–5 business days</Text>
+            <Text style={[type.bodyStrong, { color: t.text, marginTop: 2 }]}>
+              Fee is calculated for your address at checkout. You get a delivery code to share with the rider.
+            </Text>
           </View>
         </View>
 
@@ -842,13 +844,13 @@ const styles = StyleSheet.create({
   },
   deliveryCard: {
     padding: 14,
-    borderRadius: radius.md,
-    borderLeftWidth: 4,
+    borderRadius: radius.lg,
   },
   outlinedBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: radius.md,
+    minHeight: 48,
+    justifyContent: "center",
+    borderRadius: radius.pill,
     borderWidth: 1,
     alignItems: "center",
   },

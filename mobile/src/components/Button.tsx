@@ -41,9 +41,9 @@ export function Button({
       fg = t.ctaText;
       break;
     case "secondary":
-      bg = t.bgElevated;
+      bg = t.card;
       fg = t.text;
-      border = t.border;
+      border = t.text;
       break;
     case "ghost":
       bg = "transparent";
@@ -64,7 +64,7 @@ export function Button({
         {
           backgroundColor: pressed && variant === "primary" ? t.ctaPressed : bg,
           opacity: disabled ? 0.55 : 1,
-          borderWidth: border ? StyleSheet.hairlineWidth : 0,
+          borderWidth: border ? 1.5 : 0,
           borderColor: border,
         },
         style,
@@ -86,12 +86,12 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
-    paddingHorizontal: 18,
-    borderRadius: radius.md,
+    minHeight: 54,
+    paddingHorizontal: 24,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  label: type.bodyStrong,
+  label: { fontSize: 15, fontWeight: "800" },
 });

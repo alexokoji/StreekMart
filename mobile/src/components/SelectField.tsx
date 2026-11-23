@@ -43,7 +43,7 @@ export function SelectField({
         style={[
           styles.field,
           {
-            backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6",
+            backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE",
             opacity: disabled ? 0.5 : 1,
           },
         ]}

@@ -154,7 +154,7 @@ export function SellerDashboardScreen() {
                 icon={<Ionicons name="cube-outline" size={22} />}
                 label="Orders"
                 sub="Buyers, status, fulfilment"
-                onPress={() => nav.navigate("Orders")}
+                onPress={() => nav.navigate("SellerOrders")}
               />
               <QuickAction
                 tone="gold"
@@ -208,7 +208,7 @@ export function SellerDashboardScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
-            onPress={() => nav.navigate("OrderDetail", { id: item.id })}
+            onPress={() => nav.navigate("SellerOrderDetail", { id: item.id })}
             style={({ pressed }) => [
               styles.orderRow,
               { backgroundColor: t.card, borderColor: t.border, opacity: pressed ? 0.85 : 1 },

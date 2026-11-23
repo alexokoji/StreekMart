@@ -15,7 +15,7 @@ import { goToTab } from "../navigation/goToTab";
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 // Bottom padding to clear the centre Search FAB on the new BottomNav.
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 
 // Account hub. Profile card + daily-rewards card on top, then grouped
 // rows for orders/notifications/coupons/addresses etc. Role
@@ -134,7 +134,8 @@ export function AccountScreen() {
         {/* Shopping group */}
         <Group title="Shopping">
           <Row icon={<Ionicons name="cube-outline" size={18} />} label="My orders" onPress={() => nav.navigate("Orders")} />
-          <Row icon={<Ionicons name="time-outline" size={18} />} label="Preorders" onPress={() => nav.navigate("Orders")} />
+          <Row icon={<Ionicons name="time-outline" size={18} />} label="Preorders" onPress={() => nav.navigate("WebPage", { path: "/account/preorders", title: "Preorders" })} />
+          <Row icon={<Ionicons name="brush-outline" size={18} />} label="Custom commissions" onPress={() => nav.navigate("WebPage", { path: "/account/commissions", title: "Commissions" })} />
           <Row icon={<Ionicons name="heart-outline" size={18} />} label="Wishlist" onPress={() => nav.navigate("Wishlist")} />
           <Row icon={<Ionicons name="ticket-outline" size={18} />} label="Coupons" onPress={() => nav.navigate("Coupons")} />
           <Row icon={<Ionicons name="location-outline" size={18} />} label="Delivery addresses" onPress={() => nav.navigate("Addresses")} last />
@@ -160,6 +161,7 @@ export function AccountScreen() {
 
         {/* Wallet group */}
         <Group title="Wallet">
+          <Row icon={<Ionicons name="wallet-outline" size={18} />} label="Wallet" onPress={() => nav.navigate("Wallet")} />
           <Row icon={<Ionicons name="card-outline" size={18} />} label="Payment methods" onPress={() => nav.navigate("PaymentMethods")} last />
         </Group>
 
@@ -184,6 +186,29 @@ export function AccountScreen() {
             ) : null}
           </Group>
         ) : null}
+
+        {/* Website features without a native screen yet — opened signed-in. */}
+        <Group title="More">
+          {user.isSeller ? (
+            <>
+              <Row icon={<Ionicons name="time-outline" size={18} />} label="Seller preorders" onPress={() => nav.navigate("WebPage", { path: "/seller/preorders", title: "Seller preorders" })} />
+              <Row icon={<Ionicons name="people-outline" size={18} />} label="Shop managers" onPress={() => nav.navigate("WebPage", { path: "/seller/managers", title: "Shop managers" })} />
+            </>
+          ) : null}
+          {user.isDesigner ? (
+            <>
+              <Row icon={<Ionicons name="images-outline" size={18} />} label="Lookbooks" onPress={() => nav.navigate("WebPage", { path: "/designer/lookbooks", title: "Lookbooks" })} />
+              <Row icon={<Ionicons name="time-outline" size={18} />} label="Designer preorders" onPress={() => nav.navigate("WebPage", { path: "/designer/preorders", title: "Designer preorders" })} />
+              <Row icon={<Ionicons name="people-outline" size={18} />} label="Team managers" onPress={() => nav.navigate("WebPage", { path: "/designer/managers", title: "Team managers" })} />
+            </>
+          ) : null}
+          <Row icon={<Ionicons name="swap-horizontal-outline" size={18} />} label="Become a seller or designer" onPress={() => nav.navigate("WebPage", { path: "/account/role", title: "Account type" })} />
+          <Row icon={<Ionicons name="color-wand-outline" size={18} />} label="Sketch studio" onPress={() => nav.navigate("WebPage", { path: "/sketch", title: "Sketch studio" })} />
+          <Row icon={<Ionicons name="help-buoy-outline" size={18} />} label="Help and support" onPress={() => nav.navigate("WebPage", { path: "/support", title: "Support" })} />
+          <Row icon={<Ionicons name="document-text-outline" size={18} />} label="Terms" onPress={() => nav.navigate("WebPage", { path: "/terms-and-conditions", title: "Terms" })} />
+          <Row icon={<Ionicons name="lock-closed-outline" size={18} />} label="Privacy policy" onPress={() => nav.navigate("WebPage", { path: "/privacy-policy", title: "Privacy policy" })} />
+          <Row icon={<Ionicons name="trash-outline" size={18} />} label="Delete my data" onPress={() => nav.navigate("WebPage", { path: "/data-deletion", title: "Data deletion" })} last />
+        </Group>
 
         {/* App + sign out */}
         <Group title="App">

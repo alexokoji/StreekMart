@@ -24,7 +24,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 type SearchResult = ProductCardData;
 
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 
 const QUICK_TAGS = [
   "Aso-oke",
@@ -146,7 +146,7 @@ export function SearchScreen() {
         <View
           style={[
             styles.searchInputWrap,
-            { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" },
+            { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" },
           ]}
         >
           <Ionicons name="search" size={18} color={t.textMuted} style={{ marginRight: 8 }} />

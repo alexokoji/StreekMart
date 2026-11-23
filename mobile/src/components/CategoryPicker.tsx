@@ -64,7 +64,7 @@ export function CategoryPicker({
         onPress={() => setOpen(true)}
         style={[
           styles.field,
-          { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" },
+          { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" },
         ]}
       >
         <Text style={[type.body, { color: value ? t.text : t.textMuted, flex: 1 }]} numberOfLines={1}>
@@ -85,7 +85,7 @@ export function CategoryPicker({
             <View
               style={[
                 styles.search,
-                { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" },
+                { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" },
               ]}
             >
               <Ionicons name="search" size={18} color={t.textMuted} style={{ marginRight: 8 }} />

@@ -128,7 +128,7 @@ export function NewPostScreen() {
 
         <View style={{ marginTop: 14 }}>
           <Text style={[type.small, { color: t.textMuted, marginBottom: 6 }]}>Caption</Text>
-          <View style={[styles.textarea, { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" }]}>
+          <View style={[styles.textarea, { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" }]}>
             <TextInput
               value={body}
               onChangeText={setBody}

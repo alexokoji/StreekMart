@@ -43,9 +43,9 @@ export function Input({
       style={[
         styles.wrap,
         {
-          backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6",
-          borderColor: highlighted ? t.cta : "transparent",
-          borderWidth: highlighted ? 1.5 : 0,
+          backgroundColor: t.card,
+          borderColor: highlighted ? t.cta : t.border,
+          borderWidth: highlighted ? 2 : 1,
         },
         containerStyle,
       ]}
@@ -92,9 +92,9 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 14,
-    height: 54,
-    borderRadius: radius.md,
+    paddingHorizontal: 18,
+    minHeight: 56,
+    borderRadius: radius.lg,
   },
   leftIcon: { marginRight: 10, width: 22, alignItems: "center" },
   input: {

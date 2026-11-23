@@ -157,6 +157,9 @@ export function SellerProductsScreen() {
               >
                 <Ionicons name="eye-outline" size={20} color={t.text} />
               </Pressable>
+              <Pressable onPress={() => nav.navigate("AddProduct", { id: item.id })} hitSlop={6}>
+                <Ionicons name="create-outline" size={20} color={t.text} />
+              </Pressable>
               <Pressable onPress={() => deleteProduct(item.id)} hitSlop={6}>
                 <Ionicons name="trash-outline" size={20} color={t.danger.fg} />
               </Pressable>

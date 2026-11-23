@@ -231,3 +231,8 @@ const styles = StyleSheet.create({
 export function DesignerEarningsScreen() {
   return <WalletScreen title="Earnings" tone="promo" />;
 }
+
+// Everyone has a wallet (refund credit, spending at checkout, withdrawals).
+export function BuyerWalletScreen() {
+  return <WalletScreen title="Wallet" tone="cta" />;
+}

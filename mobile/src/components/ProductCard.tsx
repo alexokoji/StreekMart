@@ -21,6 +21,8 @@ function formatNgn(value: number): string {
   return `₦${Math.round(value).toLocaleString("en-NG")}`;
 }
 
+// Product tile: a tall rounded image with the save heart and badges on it,
+// then name and price underneath. No card chrome, so the goods carry the page.
 export function ProductCard({
   product,
   onPress,
@@ -34,8 +36,7 @@ export function ProductCard({
 }) {
   const t = useTheme();
   const effectivePrice = product.salePrice ?? product.price;
-  const hasDiscount =
-    product.salePrice != null && product.salePrice < product.price;
+  const hasDiscount = product.salePrice != null && product.salePrice < product.price;
   const discountPct = hasDiscount
     ? Math.round(((product.price - product.salePrice!) / product.price) * 100)
     : 0;
@@ -43,118 +44,84 @@ export function ProductCard({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        {
-          backgroundColor: t.card,
-          borderColor: t.border,
-          opacity: pressed ? 0.85 : 1,
-        },
-        compact ? styles.compact : null,
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`${product.name}, ${formatNgn(effectivePrice)}`}
+      style={({ pressed }) => [styles.card, compact ? styles.compact : null, { opacity: pressed ? 0.88 : 1 }]}
     >
-      <View style={[styles.imageWrap, { backgroundColor: t.bgElevated }]}>
-        {product.image && (
-          <Image
-            source={{ uri: product.image }}
-            style={styles.image}
-            contentFit="cover"
-            transition={120}
-          />
-        )}
+      <View style={[styles.imageWrap, { backgroundColor: t.border }]}>
+        {product.image ? (
+          <Image source={{ uri: product.image }} style={styles.image} contentFit="cover" transition={150} />
+        ) : null}
         {product.promoted && (
-          <View style={[styles.promotedBadge, { backgroundColor: t.accent }]}>
-            <Text style={[type.micro, { color: t.ctaText }]}>PROMO</Text>
+          <View style={[styles.badge, styles.left, { backgroundColor: t.gold }]}>
+            <Text style={[type.micro, { color: "#17121F" }]}>PROMO</Text>
           </View>
         )}
         {hasDiscount && (
-          <View style={[styles.discountBadge, { backgroundColor: t.promo }]}>
-            <Text style={[type.micro, { color: t.ctaText }]}>-{discountPct}%</Text>
+          <View style={[styles.badge, styles.leftBottom, { backgroundColor: t.ink }]}>
+            <Text style={[type.micro, { color: t.inkText }]}>-{discountPct}%</Text>
           </View>
         )}
         {onToggleSave && (
           <Pressable
-            onPress={(e) => { e.stopPropagation && e.stopPropagation(); onToggleSave(); }}
-            hitSlop={8}
+            onPress={(e) => {
+              e.stopPropagation && e.stopPropagation();
+              onToggleSave();
+            }}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={product.saved ? "Remove from wishlist" : "Save to wishlist"}
             style={styles.heartBtn}
           >
             <Ionicons
               name={product.saved ? "heart" : "heart-outline"}
-              size={18}
-              color={product.saved ? t.promo : t.textMuted}
+              size={19}
+              color={product.saved ? "#C2392F" : "#17121F"}
             />
           </Pressable>
         )}
       </View>
       <View style={styles.body}>
-        <Text style={[type.body, { color: t.text }]} numberOfLines={2}>
+        <Text style={[styles.name, { color: t.text }]} numberOfLines={2}>
           {product.name}
         </Text>
         <View style={styles.priceRow}>
-          <Text style={[type.bodyStrong, { color: t.cta }]}>
-            {formatNgn(effectivePrice)}
-          </Text>
+          <Text style={[type.price, { color: t.text }]}>{formatNgn(effectivePrice)}</Text>
           {hasDiscount && (
-            <Text
-              style={[
-                type.small,
-                {
-                  color: t.textMuted,
-                  textDecorationLine: "line-through",
-                  marginLeft: 6,
-                },
-              ]}
-            >
+            <Text style={[type.small, { color: t.textMuted, textDecorationLine: "line-through", marginLeft: 6 }]}>
               {formatNgn(product.price)}
             </Text>
           )}
         </View>
-        {product.sellerName && (
+        {product.sellerName ? (
           <Text style={[type.small, { color: t.textMuted }]} numberOfLines={1}>
             {product.sellerName}
           </Text>
-        )}
+        ) : null}
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-    flex: 1,
-  },
+  card: { flex: 1 },
   compact: { maxWidth: 170 },
-  imageWrap: { aspectRatio: 1, position: "relative" },
+  imageWrap: { aspectRatio: 4 / 5, borderRadius: radius.lg, overflow: "hidden", position: "relative" },
   image: { width: "100%", height: "100%" },
-  body: { padding: 10, gap: 4 },
+  body: { paddingTop: 10, gap: 3 },
+  name: { fontSize: 14, fontWeight: "600", lineHeight: 18 },
   priceRow: { flexDirection: "row", alignItems: "baseline" },
-  promotedBadge: {
-    position: "absolute",
-    top: 6,
-    left: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  discountBadge: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
+  badge: { position: "absolute", paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.sm },
+  left: { top: 10, left: 10 },
+  leftBottom: { bottom: 10, left: 10 },
   heartBtn: {
     position: "absolute",
-    bottom: 6,
-    right: 6,
-    width: 32,
-    height: 32,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    top: 10,
+    right: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.94)",
     alignItems: "center",
     justifyContent: "center",
   },

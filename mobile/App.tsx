@@ -3,14 +3,14 @@
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import type { TextStyle } from "react-native";
-import { nunitoFamilyFor } from "./src/theme/tokens";
+import { fontFamilyFor } from "./src/theme/tokens";
 
-// Force every <Text> to render in the brand font (Nunito) regardless of
+// Force every <Text> to render in the brand font (Manrope) regardless of
 // how it was styled. RN won't auto-pick a bold member of a custom
 // family — `<Text style={{ fontWeight: "700" }}>` paints with the
 // device default unless we explicitly set fontFamily too. By wrapping
 // Text.render we flatten the incoming style, read its fontWeight, and
-// inject the matching Nunito weight family. Per-call styles still win
+// inject the matching Manrope weight family. Per-call styles still win
 // — we only add fontFamily when the caller didn't.
 type RenderableText = typeof Text & {
   render?: (props: object, ref: unknown) => React.ReactNode;
@@ -21,7 +21,7 @@ if (originalRender) {
   RenderableTextRef.render = function patched(props: object, ref: unknown) {
     const p = props as { style?: TextStyle | TextStyle[] };
     const flat = (StyleSheet.flatten(p.style) ?? {}) as TextStyle;
-    const family = flat.fontFamily ?? nunitoFamilyFor(flat.fontWeight);
+    const family = flat.fontFamily ?? fontFamilyFor(flat.fontWeight);
     const nextStyle: TextStyle = { ...flat, fontFamily: family };
     return originalRender.call(this, { ...props, style: nextStyle }, ref);
   };
@@ -30,15 +30,15 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
 import {
-  useFonts,
-  Nunito_400Regular,
-  Nunito_500Medium,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-  Nunito_800ExtraBold,
-  Nunito_900Black,
-} from "@expo-google-fonts/nunito";
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from "@expo-google-fonts/manrope";
+import { InstrumentSerif_400Regular } from "@expo-google-fonts/instrument-serif";
 import { ThemeProvider, useTheme } from "./src/state/ThemeContext";
 import { AuthProvider, useAuth } from "./src/state/AuthContext";
 import { CartProvider } from "./src/state/CartContext";
@@ -54,16 +54,16 @@ const ONBOARDED_KEY = "streekmart:onboarded:v2";
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function App() {
-  // Custom brand font (Inter). Block render until the family is ready
+  // Custom brand fonts (Manrope + Instrument Serif). Block render until the family is ready
   // so we never paint with the device default and then re-flow text
   // when the font swaps in.
   const [fontsLoaded] = useFonts({
-    Nunito_400Regular,
-    Nunito_500Medium,
-    Nunito_600SemiBold,
-    Nunito_700Bold,
-    Nunito_800ExtraBold,
-    Nunito_900Black,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+    InstrumentSerif_400Regular,
   });
   if (!fontsLoaded) return null;
   return (

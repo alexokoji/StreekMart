@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -11,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { BackHeader } from "../components/BackHeader";
@@ -74,6 +75,9 @@ function slugify(s: string): string {
 export function AddProductScreen() {
   const t = useTheme();
   const nav = useNavigation<Nav>();
+  // With an id this is the edit form (same fields, PUT instead of POST) —
+  // mirrors the web's /seller/products/[id]/edit.
+  const editId = useRoute<RouteProp<RootStackParamList, "AddProduct">>().params?.id;
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -88,6 +92,47 @@ export function AddProductScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(!!editId);
+
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      try {
+        const { product: p } = await api.get<{ product: Record<string, any> }>(`/api/products/${editId}`);
+        const parse = (j: unknown) => {
+          try {
+            const v = JSON.parse(String(j ?? "[]"));
+            return Array.isArray(v) ? v : [];
+          } catch {
+            return [];
+          }
+        };
+        setName(p.name ?? "");
+        setDescription(p.description ?? "");
+        setPrice(String(p.price ?? ""));
+        setSalePrice(p.salePrice ? String(p.salePrice) : "");
+        setCategory(p.category ?? "");
+        setUnit(p.unit ?? "piece");
+        setStatus(p.status ?? "ACTIVE");
+        setStockCount(p.stock != null ? String(p.stock) : "");
+        setSizes(parse(p.sizesJson));
+        setImages(parse(p.imagesJson));
+        setVariants(
+          (parse(p.attributesJson) as Array<{ name: string; options: string[] }>).map((g) => ({
+            id: slugify(g.name) || String(Math.random()),
+            label: g.name,
+            options: g.options ?? [],
+          })),
+        );
+      } catch (err) {
+        Alert.alert("Couldn't load product", err instanceof Error ? err.message : "Try again.", [
+          { text: "OK", onPress: () => nav.goBack() },
+        ]);
+      } finally {
+        setLoadingEdit(false);
+      }
+    })();
+  }, [editId, nav]);
 
   function toggleSize(s: string) {
     setSizes((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
@@ -199,6 +244,14 @@ export function AddProductScreen() {
         sizes,
         images,
       };
+      if (editId) {
+        // Edit sends the attribute list even when empty so removing every
+        // variant group clears them (the server leaves omitted fields alone).
+        body.attributes = attributes;
+        await api.put(`/api/products/${editId}`, body);
+        Alert.alert("Saved", `${name} has been updated.`, [{ text: "OK", onPress: () => nav.goBack() }]);
+        return;
+      }
       if (attributes.length > 0) body.attributes = attributes;
       // Same endpoint as the web's ProductForm POST.
       await api.post("/api/products", body);
@@ -212,9 +265,18 @@ export function AddProductScreen() {
     }
   }
 
+  if (loadingEdit) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg }}>
+        <BackHeader title="Edit product" />
+        <ActivityIndicator color={t.cta} style={{ marginTop: 60 }} />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <BackHeader title="Add product" />
+      <BackHeader title={editId ? "Edit product" : "Add product"} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
@@ -272,7 +334,7 @@ export function AddProductScreen() {
           <View
             style={[
               styles.textarea,
-              { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" },
+              { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" },
             ]}
           >
             <TextInput

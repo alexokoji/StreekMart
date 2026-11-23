@@ -30,7 +30,7 @@ type FavoriteResp = {
   }>;
 };
 
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 
 export function WishlistScreen() {
   const t = useTheme();

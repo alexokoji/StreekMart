@@ -194,7 +194,7 @@ export function DesignerProfileScreen() {
             ) : null}
           </Field>
           <Field label="Bio">
-            <View style={[styles.textarea, { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" }]}>
+            <View style={[styles.textarea, { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" }]}>
               <TextInput
                 value={profile.bio ?? ""}
                 onChangeText={(v) => patch("bio", v)}

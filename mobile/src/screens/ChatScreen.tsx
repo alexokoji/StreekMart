@@ -202,7 +202,7 @@ export function ChatScreen() {
             <View
               style={[
                 styles.inputWrap,
-                { backgroundColor: t.scheme === "dark" ? t.card : "#f2f2f6" },
+                { backgroundColor: t.scheme === "dark" ? t.card : "#EDE8DE" },
               ]}
             >
               <TextInput

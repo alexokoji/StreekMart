@@ -61,7 +61,7 @@ type LogisticsRate = {
   provider?: string;
 };
 
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 
 export function CheckoutScreen() {
   const t = useTheme();
@@ -293,7 +293,7 @@ export function CheckoutScreen() {
         return;
       }
       // No redirectUrl and not wallet-paid → stub mode, orders auto-confirmed.
-      Alert.alert("Order placed", "Stub-mode checkout confirmed. Check Orders for status.");
+      Alert.alert("Order placed", "Your order is confirmed. Track it in Orders.");
       nav.navigate("Orders");
     } catch (err) {
       Alert.alert("Checkout failed", err instanceof Error ? err.message : "Try again.");

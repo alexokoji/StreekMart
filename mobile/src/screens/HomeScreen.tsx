@@ -13,11 +13,10 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../state/ThemeContext";
-import { LogoBar } from "../components/LogoBar";
-import { Input } from "../components/Input";
-import { Chip } from "../components/Chip";
-import { CalloutCard } from "../components/CalloutCard";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../state/AuthContext";
 import { Countdown, endOfTodayMs } from "../components/Countdown";
+import { ProductCard } from "../components/ProductCard";
 import { ProductCardSkeleton } from "../components/Skeleton";
 import { OfflineBanner } from "../components/OfflineBanner";
 import { api } from "../api/client";
@@ -65,7 +64,7 @@ type HomeData = {
 
 // Bottom padding so the centre Search FAB never overlaps the last
 // content card. ~ 6px breathing room above the tab bar + FAB radius.
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 
 export function HomeScreen() {
   const t = useTheme();
@@ -137,7 +136,7 @@ export function HomeScreen() {
   if (loading && !data) {
     return (
       <View style={{ flex: 1, backgroundColor: t.bg }}>
-        <LogoBar />
+        <HomeHeader />
         <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: FAB_CLEARANCE }}>
           <View style={{ height: 50, backgroundColor: t.border, borderRadius: radius.md, opacity: 0.55 }} />
           <View style={{ height: 100, backgroundColor: t.border, borderRadius: radius.md, opacity: 0.55, marginTop: 8 }} />
@@ -155,12 +154,16 @@ export function HomeScreen() {
   }
 
   const d = data!;
+  const hero = d.featured[0] ?? d.newArrivals[0] ?? null;
+  const deals = d.flashSales.slice(0, 3);
+  const open = (id: string) => nav.navigate("ProductDetail", { id });
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
-      <LogoBar onMenu={() => nav.navigate("Menu" as never)} />
+      <HomeHeader />
       <ScrollView
         contentContainerStyle={{ paddingBottom: FAB_CLEARANCE }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             tintColor={t.cta}
@@ -174,124 +177,121 @@ export function HomeScreen() {
       >
         <OfflineBanner />
 
-        {/* Search row -- Pressable wraps the input so the whole pill
-            navigates to the dedicated Search screen rather than typing
-            inline here. */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
-          <Pressable onPress={() => goToTab(nav, "Search")}>
-            <View pointerEvents="none">
-              <Input
-                leftIcon={<Ionicons name="search" size={18} color={t.textMuted} />}
-                placeholder="Search any product..."
-                editable={false}
-              />
+        {/* Search pill: tapping opens the Search tab. */}
+        <Pressable
+          onPress={() => goToTab(nav, "Search")}
+          accessibilityRole="search"
+          accessibilityLabel="Search fabrics, designers and styles"
+          style={[styles.search, { backgroundColor: t.card, borderColor: t.border }]}
+        >
+          <Ionicons name="search" size={20} color={t.textMuted} />
+          <Text style={[type.bodyLg, { color: t.textMuted, flex: 1 }]} numberOfLines={1}>
+            Search fabrics, designers, styles
+          </Text>
+          <View style={[styles.searchCam, { backgroundColor: t.accentSoft }]}>
+            <Ionicons name="camera-outline" size={19} color={t.accent} />
+          </View>
+        </Pressable>
+
+        {/* Hero: a real featured product with an ink panel for the copy. */}
+        {hero ? (
+          <Pressable
+            onPress={() => nav.navigate("Trending", { rail: "new-arrivals", title: "New arrivals" })}
+            style={[styles.hero, { backgroundColor: t.accentSoft }]}
+            accessibilityRole="button"
+            accessibilityLabel="Shop new arrivals"
+          >
+            {hero.image ? <Image source={{ uri: hero.image }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+            <View style={[styles.heroPanel, { backgroundColor: t.ink }]}>
+              <View style={{ flex: 1, gap: 6 }}>
+                <Text style={[type.micro, { color: t.gold }]}>JUST LANDED</Text>
+                <Text style={[type.h1, { color: t.inkText }]}>Fresh fabrics and styles, hand-picked for you</Text>
+              </View>
+              <View style={[styles.heroGo, { backgroundColor: t.gold }]}>
+                <Ionicons name="arrow-forward" size={20} color="#17121F" />
+              </View>
             </View>
           </Pressable>
-        </View>
+        ) : null}
 
-        {/* Featured header */}
-        <View style={styles.sectionHead}>
-          <Text style={[type.h2, { color: t.text }]}>All featured</Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Chip
-              label="Sort"
-              variant="filled"
-              leftIcon={<Ionicons name="swap-vertical" size={14} color={t.text} />}
-              onPress={() => nav.navigate("Trending", { rail: "featured", title: "All featured" })}
-            />
-            <Chip
-              label="Filter"
-              variant="filled"
-              leftIcon={<Ionicons name="options-outline" size={14} color={t.text} />}
-              onPress={() => nav.navigate("Trending", { rail: "featured", title: "All featured" })}
-            />
-          </View>
-        </View>
-
-        {/* Category circles */}
+        {/* Categories */}
         {d.categories.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 14, paddingBottom: 12 }}
+            contentContainerStyle={styles.catRow}
           >
             {d.categories.map((c, i) => (
-              <CategoryCircle
-                key={c.name}
-                name={c.name}
-                tint={["violet", "fuchsia", "gold", "info"][i % 4] as TintName}
-                onPress={() => nav.navigate("Categories")}
-              />
+              <CategoryCircle key={c.name} name={c.name} index={i} onPress={() => nav.navigate("Categories")} />
             ))}
           </ScrollView>
         ) : null}
 
-        {/* Hero promo banner (placeholder copy + brand gradient) */}
-        <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
-          <PromoBanner
-            title="50% OFF"
-            subtitle="Top picks across new arrivals"
-            ctaLabel="Shop now"
-            onPress={() => nav.navigate("Trending", { rail: "new-arrivals", title: "New arrivals" })}
-          />
-        </View>
-
-        {/* Deal of the Day with live countdown */}
-        <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-          <CalloutCard
-            tone="info"
-            title="Deal of the Day"
-            caption={`Ends in ${formatCountdownLabel()}`}
-            onPress={() => nav.navigate("Trending", { rail: "flash-sales", title: "Deal of the Day" })}
-          />
-          {/* Live ticker beneath the static label so the seconds animate */}
-          <View style={{ marginTop: 8, alignSelf: "flex-end" }}>
-            <Countdown targetMs={endOfTodayMs()} label="ends in" />
-          </View>
-        </View>
-
-        {/* Featured 2x grid */}
+        {/* Trending grid */}
         {d.featured.length > 0 ? (
-          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-            <FlatList
-              data={d.featured.slice(0, 4)}
-              keyExtractor={(p) => p.id}
-              numColumns={2}
-              scrollEnabled={false}
-              columnWrapperStyle={{ gap: 12 }}
-              contentContainerStyle={{ gap: 12 }}
-              renderItem={({ item }) => (
-                <View style={{ flex: 1 }}>
-                  <GridCard item={item} onPress={() => nav.navigate("ProductDetail", { id: item.id })} />
-                </View>
-              )}
+          <>
+            <SectionHead
+              title="Trending now"
+              action="See all"
+              onAction={() => nav.navigate("Trending", { rail: "featured", title: "All featured" })}
             />
-          </View>
+            <View style={styles.grid}>
+              {d.featured.slice(0, 4).map((item) => (
+                <View key={item.id} style={styles.gridCell}>
+                  <ProductCard
+                    product={{ ...item, sellerName: undefined }}
+                    onPress={() => open(item.id)}
+                  />
+                </View>
+              ))}
+            </View>
+          </>
         ) : null}
 
-        {/* Special Offers row */}
-        <SpecialOffer />
+        {/* Deal of the day: only when there are real flash sales. */}
+        {deals.length > 0 ? (
+          <Pressable
+            onPress={() => nav.navigate("Trending", { rail: "flash-sales", title: "Deal of the Day" })}
+            style={[styles.deal, { backgroundColor: t.ink }]}
+          >
+            <View style={styles.dealTop}>
+              <View>
+                <Text style={[type.micro, { color: t.gold }]}>DEAL OF THE DAY</Text>
+                <Text style={[type.h1, { color: t.inkText, marginTop: 2 }]}>Today only</Text>
+              </View>
+              <Countdown targetMs={endOfTodayMs()} color={t.gold} />
+            </View>
+            <View style={styles.dealRow}>
+              {deals.map((p) => (
+                <View key={p.id} style={{ flex: 1, gap: 8 }}>
+                  <View style={[styles.dealImg, { backgroundColor: t.bgElevated }]}>
+                    {p.image ? <Image source={{ uri: p.image }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
+                  </View>
+                  <Text style={[type.price, { color: t.inkText, fontSize: 14 }]}>
+                    ₦{Math.round(p.salePrice ?? p.price).toLocaleString("en-NG")}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Pressable>
+        ) : null}
 
-        {/* Trending Products callout + horizontal rail */}
-        <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-          <CalloutCard
-            tone="promo"
-            title="Trending products"
-            caption="Restocked weekly"
-            onPress={() => nav.navigate("Trending", { rail: "best-sellers", title: "Trending products" })}
-          />
-        </View>
-        <HorizontalRail items={d.trending.length > 0 ? d.trending : d.flashSales} onItemPress={(id) => nav.navigate("ProductDetail", { id })} />
+        {/* Best sellers */}
+        {(d.trending.length > 0 || d.flashSales.length > 0) ? (
+          <>
+            <SectionHead
+              title="Best sellers"
+              action="See all"
+              onAction={() => nav.navigate("Trending", { rail: "best-sellers", title: "Trending products" })}
+            />
+            <HorizontalRail items={d.trending.length > 0 ? d.trending : d.flashSales} onItemPress={open} />
+          </>
+        ) : null}
 
-        {/* Designers rail */}
+        {/* Designers */}
         {d.designers.length > 0 ? (
           <>
-            <View style={styles.sectionHead}>
-              <Text style={[type.h2, { color: t.text }]}>Designers to follow</Text>
-              <Pressable onPress={() => goToTab(nav, "Feed")} hitSlop={6}>
-                <Text style={[type.small, { color: t.cta, fontWeight: "700" }]}>Open feed ›</Text>
-              </Pressable>
-            </View>
+            <SectionHead title="Designers to follow" action="Open feed" onAction={() => goToTab(nav, "Feed")} />
             <DesignersRail
               items={d.designers}
               onPress={(designer) =>
@@ -306,66 +306,95 @@ export function HomeScreen() {
           </>
         ) : null}
 
-        {/* New arrivals header + horizontal rail */}
         {d.newArrivals.length > 0 ? (
           <>
-            <View style={styles.sectionHead}>
-              <Text style={[type.h2, { color: t.text }]}>New arrivals</Text>
-              <Pressable
-                onPress={() => nav.navigate("Trending", { rail: "new-arrivals", title: "New arrivals" })}
-                hitSlop={6}
-              >
-                <Text style={[type.small, { color: t.cta, fontWeight: "700" }]}>View all ›</Text>
-              </Pressable>
-            </View>
-            <HorizontalRail items={d.newArrivals} onItemPress={(id) => nav.navigate("ProductDetail", { id })} />
+            <SectionHead
+              title="New arrivals"
+              action="See all"
+              onAction={() => nav.navigate("Trending", { rail: "new-arrivals", title: "New arrivals" })}
+            />
+            <HorizontalRail items={d.newArrivals} onItemPress={open} />
           </>
         ) : null}
 
-        {/* Personalised rails -- signed-in only. */}
         {d.recentlyViewed.length > 0 ? (
           <>
-            <View style={styles.sectionHead}>
-              <Text style={[type.h2, { color: t.text }]}>Recently viewed</Text>
-            </View>
-            <HorizontalRail items={d.recentlyViewed} onItemPress={(id) => nav.navigate("ProductDetail", { id })} />
+            <SectionHead title="Recently viewed" />
+            <HorizontalRail items={d.recentlyViewed} onItemPress={open} />
           </>
         ) : null}
         {d.buyAgain.length > 0 ? (
           <>
-            <View style={styles.sectionHead}>
-              <Text style={[type.h2, { color: t.text }]}>Buy it again</Text>
-            </View>
-            <HorizontalRail items={d.buyAgain} onItemPress={(id) => nav.navigate("ProductDetail", { id })} />
+            <SectionHead title="Buy it again" />
+            <HorizontalRail items={d.buyAgain} onItemPress={open} />
           </>
         ) : null}
         {d.following.length > 0 ? (
           <>
-            <View style={styles.sectionHead}>
-              <Text style={[type.h2, { color: t.text }]}>From stores you follow</Text>
-            </View>
-            <HorizontalRail items={d.following} onItemPress={(id) => nav.navigate("ProductDetail", { id })} />
+            <SectionHead title="From stores you follow" />
+            <HorizontalRail items={d.following} onItemPress={open} />
           </>
         ) : null}
         {d.forYou.length > 0 ? (
           <>
-            <View style={styles.sectionHead}>
-              <Text style={[type.h2, { color: t.text }]}>For you</Text>
-            </View>
-            <HorizontalRail items={d.forYou} onItemPress={(id) => nav.navigate("ProductDetail", { id })} />
+            <SectionHead title="For you" />
+            <HorizontalRail items={d.forYou} onItemPress={open} />
           </>
         ) : null}
-
-        {/* Sponsored card */}
-        <View style={{ paddingHorizontal: 16, marginTop: 18 }}>
-          <Sponsored onPress={() => nav.navigate("Trending", { rail: "featured", title: "Featured" })} />
-        </View>
       </ScrollView>
     </View>
   );
 }
 
-type TintName = "violet" | "fuchsia" | "gold" | "info";
+// Greeting row: who you are, a bell for notifications, avatar to Account.
+function HomeHeader() {
+  const t = useTheme();
+  const nav = useNavigation<Nav>();
+  const { user } = useAuth();
+  const first = user?.name?.split(" ")[0];
+  return (
+    <SafeAreaView edges={["top"]} style={{ backgroundColor: t.bg }}>
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={[type.small, { color: t.textMuted }]}>{first ? "Welcome back" : "Welcome to StreekMart"}</Text>
+          <Text style={[type.h1, { color: t.text }]} numberOfLines={1}>
+            {first ? `Hi, ${first}` : "What are you wearing?"}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => (user ? nav.navigate("Notifications") : nav.navigate("Login"))}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+          style={[styles.roundBtn, { backgroundColor: t.card, borderColor: t.border }]}
+        >
+          <Ionicons name="notifications-outline" size={21} color={t.text} />
+        </Pressable>
+        <Pressable
+          onPress={() => nav.navigate("Menu")}
+          accessibilityRole="button"
+          accessibilityLabel="Menu"
+          style={[styles.roundBtn, { backgroundColor: t.card, borderColor: t.border }]}
+        >
+          <Ionicons name="menu" size={22} color={t.text} />
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function SectionHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  const t = useTheme();
+  return (
+    <View style={styles.sectionHead}>
+      <Text style={[type.h1, { color: t.text }]}>{title}</Text>
+      {action && onAction ? (
+        <Pressable onPress={onAction} hitSlop={8} style={{ minHeight: 44, justifyContent: "center" }}>
+          <Text style={[type.bodyStrong, { color: t.accent }]}>{action}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
 
 // Maps a category display name to a vector-icon glyph. Fuzzy match by
 // keyword so admin can name a category whatever and we pick a sensible
@@ -414,29 +443,16 @@ function categoryIcon(name: string): IconRef {
   return { lib: "material", name: "tag-outline" };
 }
 
-// Round category tile. Tinted disc with a category-specific icon.
-function CategoryCircle({
-  name,
-  tint,
-  onPress,
-}: {
-  name: string;
-  tint: TintName;
-  onPress: () => void;
-}) {
+// Round category tile: a soft disc with the category icon.
+const CAT_BG = ["#EEE8FB", "#FFF1CC", "#E3F5EA", "#FBE7E5", "#E4EAFB"];
+function CategoryCircle({ name, index, onPress }: { name: string; index: number; onPress: () => void }) {
   const t = useTheme();
-  const bg =
-    tint === "violet"
-      ? t.accentSoft
-      : tint === "fuchsia"
-        ? "rgba(217,70,239,0.18)"
-        : tint === "gold"
-          ? "rgba(207,159,50,0.20)"
-          : "rgba(124,58,237,0.18)";
-  const fg = tint === "violet" ? t.accent : tint === "fuchsia" ? t.promo : tint === "gold" ? t.premium : t.cta;
+  const dark = t.scheme === "dark";
+  const bg = dark ? t.card : CAT_BG[index % CAT_BG.length];
+  const fg = dark ? t.accent : "#4C1D95";
   const icon = categoryIcon(name);
   return (
-    <Pressable onPress={onPress} style={{ alignItems: "center", width: 72 }}>
+    <Pressable onPress={onPress} style={{ alignItems: "center", width: 74 }} accessibilityRole="button" accessibilityLabel={name}>
       <View style={[styles.catDisc, { backgroundColor: bg }]}>
         {icon.lib === "ionicons" ? (
           <Ionicons name={icon.name} size={28} color={fg} />
@@ -444,193 +460,65 @@ function CategoryCircle({
           <MaterialCommunityIcons name={icon.name} size={28} color={fg} />
         )}
       </View>
-      <Text style={[type.small, { color: t.text, marginTop: 6 }]} numberOfLines={1}>
+      <Text style={[type.small, { color: t.text, marginTop: 8 }]} numberOfLines={1}>
         {name}
       </Text>
     </Pressable>
   );
 }
 
-// Pink hero banner with text on the left, decorative bag on the right.
-function PromoBanner({
-  title,
-  subtitle,
-  ctaLabel,
-  onPress,
-}: {
-  title: string;
-  subtitle: string;
-  ctaLabel: string;
-  onPress: () => void;
-}) {
-  const t = useTheme();
-  return (
-    <Pressable onPress={onPress} style={[styles.heroBanner, { backgroundColor: t.promo }]}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: t.ctaText, fontSize: 28, fontWeight: "800" }}>{title}</Text>
-        <Text style={{ color: t.ctaText, opacity: 0.9, marginTop: 4 }}>{subtitle}</Text>
-        <View style={[styles.heroCta, { borderColor: "rgba(255,255,255,0.55)" }]}>
-          <Text style={{ color: t.ctaText, fontWeight: "700" }}>{ctaLabel} ›</Text>
-        </View>
-      </View>
-      <View style={[styles.heroIcon, { backgroundColor: "rgba(255,255,255,0.16)" }]}>
-        <Ionicons name="bag-handle" size={38} color={t.ctaText} />
-      </View>
-    </Pressable>
-  );
-}
-
-// Special Offers strip -- a wide card with a gold side accent and a
-// short pitch line.
-function SpecialOffer() {
-  const t = useTheme();
-  return (
-    <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-      <View style={[styles.specialCard, { backgroundColor: t.card, borderColor: t.border }]}>
-        <View style={[styles.specialBadge, { backgroundColor: t.premium }]}>
-          <Ionicons name="star" size={20} color="#fff" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[type.bodyStrong, { color: t.text }]}>Special offers</Text>
-          <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>
-            Hand-picked deals from verified sellers, refreshed every morning.
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
-// Sponsored placement at the bottom of the home feed. Until we have an
-// actual paid-promotion image to load we render a brand gradient card.
-function Sponsored({ onPress }: { onPress: () => void }) {
-  const t = useTheme();
-  return (
-    <Pressable onPress={onPress} style={[styles.sponsored, { backgroundColor: t.accent }]}>
-      <Text style={{ color: t.ctaText, fontSize: 30, fontWeight: "800" }}>Up to 50% off</Text>
-      <Text style={{ color: t.ctaText, opacity: 0.85, marginTop: 6 }}>Sponsored</Text>
-    </Pressable>
-  );
-}
-
-// Card shape used by both the inline featured grid and the Trending
-// screen. Kept inline rather than imported from ProductCard so this
-// home view can iterate on the layout without rippling into other
-// surfaces.
-function GridCard({ item, onPress }: { item: Item; onPress: () => void }) {
-  const t = useTheme();
-  const eff = item.salePrice ?? item.price;
-  return (
-    <Pressable onPress={onPress} style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-      <View style={[styles.cardImageWrap, { backgroundColor: t.bg }]}>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.cardImage} contentFit="cover" />
-        ) : null}
-      </View>
-      <View style={{ padding: 10, gap: 4 }}>
-        <Text style={[type.body, { color: t.text }]} numberOfLines={2}>{item.name}</Text>
-        <Text style={[type.bodyStrong, { color: t.cta }]}>
-          ₦{Math.round(eff).toLocaleString("en-NG")}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-// Horizontal scroll of small product tiles -- used for Trending, New
-// arrivals, and the personalised rails.
-function HorizontalRail({
-  items,
-  onItemPress,
-}: {
-  items: Item[];
-  onItemPress: (id: string) => void;
-}) {
-  const t = useTheme();
+// Horizontal scroll of product tiles for the secondary rails.
+function HorizontalRail({ items, onItemPress }: { items: Item[]; onItemPress: (id: string) => void }) {
   if (items.length === 0) return null;
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingVertical: 8 }}
+      contentContainerStyle={{ paddingHorizontal: 20, gap: 14, paddingBottom: 4 }}
     >
-      {items.map((p) => {
-        const eff = p.salePrice ?? p.price;
-        return (
-          <Pressable
-            key={p.id}
-            onPress={() => onItemPress(p.id)}
-            style={[styles.miniCard, { backgroundColor: t.card, borderColor: t.border }]}
-          >
-            <View style={[styles.miniImageWrap, { backgroundColor: t.bg }]}>
-              {p.image ? <Image source={{ uri: p.image }} style={styles.miniImage} contentFit="cover" /> : null}
-            </View>
-            <View style={{ padding: 8 }}>
-              <Text style={[type.small, { color: t.text }]} numberOfLines={1}>{p.name}</Text>
-              <Text style={[type.bodyStrong, { color: t.cta, marginTop: 2 }]}>
-                ₦{Math.round(eff).toLocaleString("en-NG")}
-              </Text>
-            </View>
-          </Pressable>
-        );
-      })}
+      {items.map((p) => (
+        <View key={p.id} style={{ width: 150 }}>
+          <ProductCard product={{ ...p, sellerName: undefined }} onPress={() => onItemPress(p.id)} />
+        </View>
+      ))}
     </ScrollView>
   );
 }
 
-// Horizontal scroll of designer profile cards — banner image + avatar
-// + name + follower count. Tapping a card opens the seller's public
-// profile so buyers can browse their pieces.
-function DesignersRail({
-  items,
-  onPress,
-}: {
-  items: DesignerItem[];
-  onPress: (d: DesignerItem) => void;
-}) {
+// Designers: round avatars with a violet ring and a gold verified dot.
+function DesignersRail({ items, onPress }: { items: DesignerItem[]; onPress: (d: DesignerItem) => void }) {
   const t = useTheme();
   if (items.length === 0) return null;
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingVertical: 8 }}
+      contentContainerStyle={{ paddingHorizontal: 20, gap: 18, paddingVertical: 6 }}
     >
       {items.map((d) => {
         const display = d.businessName ?? d.name;
-        const initial = display.slice(0, 1).toUpperCase();
         return (
           <Pressable
             key={d.id}
             onPress={() => onPress(d)}
-            style={[styles.designerCard, { backgroundColor: t.card, borderColor: t.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${display}, ${d.followerCount} followers`}
+            style={{ width: 80, alignItems: "center", gap: 8 }}
           >
-            <View style={[styles.designerBanner, { backgroundColor: t.accentSoft }]}>
-              {d.bannerUrl ? (
-                <Image source={{ uri: d.bannerUrl }} style={styles.designerBannerImg} contentFit="cover" />
-              ) : null}
-            </View>
-            <View style={styles.designerAvatarWrap}>
+            <View style={[styles.avRing, { borderColor: t.cta, backgroundColor: t.bg }]}>
               {d.avatarUrl ? (
-                <Image source={{ uri: d.avatarUrl }} style={styles.designerAvatar} contentFit="cover" />
+                <Image source={{ uri: d.avatarUrl }} style={styles.avImg} contentFit="cover" />
               ) : (
-                <View style={[styles.designerAvatar, { backgroundColor: t.cta, alignItems: "center", justifyContent: "center" }]}>
-                  <Text style={{ color: t.ctaText, fontWeight: "800", fontSize: 18 }}>{initial}</Text>
+                <View style={[styles.avImg, { backgroundColor: t.cta, alignItems: "center", justifyContent: "center" }]}>
+                  <Text style={{ color: t.ctaText, fontSize: 26, fontFamily: "InstrumentSerif_400Regular" }}>
+                    {display.slice(0, 1).toUpperCase()}
+                  </Text>
                 </View>
               )}
             </View>
-            <View style={{ paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4 }}>
-              <Text style={[type.bodyStrong, { color: t.text }]} numberOfLines={1}>{display}</Text>
-              {d.tagline ? (
-                <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]} numberOfLines={1}>
-                  {d.tagline}
-                </Text>
-              ) : (
-                <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>
-                  {d.followerCount.toLocaleString("en-NG")} followers
-                </Text>
-              )}
-            </View>
+            <Text style={[type.small, { color: t.text, textAlign: "center" }]} numberOfLines={2}>
+              {display}
+            </Text>
           </Pressable>
         );
       })}
@@ -638,104 +526,33 @@ function DesignersRail({
   );
 }
 
-function formatCountdownLabel(): string {
-  const ms = endOfTodayMs() - Date.now();
-  const h = Math.max(0, Math.floor(ms / 3_600_000));
-  const m = Math.max(0, Math.floor((ms % 3_600_000) / 60_000));
-  return `${h}h ${m}m`;
-}
-
 const styles = StyleSheet.create({
-  sectionHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 8,
-  },
-  catDisc: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 18,
-    borderRadius: radius.lg,
-    overflow: "hidden",
-  },
-  heroCta: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
+  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 20, paddingTop: 6, paddingBottom: 12 },
+  roundBtn: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
+  search: {
+    marginHorizontal: 20,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 1,
-    marginTop: 12,
-  },
-  heroIcon: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  specialCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 14,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingLeft: 18,
+    paddingRight: 8,
   },
-  specialBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sponsored: {
-    paddingVertical: 28,
-    paddingHorizontal: 18,
-    borderRadius: radius.lg,
-  },
-  card: {
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  cardImageWrap: { aspectRatio: 1 },
-  cardImage: { width: "100%", height: "100%" },
-  miniCard: {
-    width: 150,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  miniImageWrap: { aspectRatio: 1 },
-  miniImage: { width: "100%", height: "100%" },
-  designerCard: {
-    width: 170,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: "hidden",
-  },
-  designerBanner: { height: 64 },
-  designerBannerImg: { width: "100%", height: "100%" },
-  designerAvatarWrap: {
-    paddingHorizontal: 10,
-    marginTop: -22,
-  },
-  designerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: "#ffffff",
-    overflow: "hidden",
-  },
+  searchCam: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  hero: { marginHorizontal: 20, marginTop: 16, height: 230, borderRadius: radius.xl, overflow: "hidden", justifyContent: "flex-end" },
+  heroPanel: { margin: 12, borderRadius: radius.lg, padding: 16, flexDirection: "row", alignItems: "flex-end", gap: 12 },
+  heroGo: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  catRow: { paddingHorizontal: 20, gap: 10, paddingTop: 22 },
+  catDisc: { width: 66, height: 66, borderRadius: 33, alignItems: "center", justifyContent: "center" },
+  sectionHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12 },
+  grid: { flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 20, gap: 14 },
+  gridCell: { width: "47.6%" },
+  deal: { marginHorizontal: 20, marginTop: 26, borderRadius: radius.xl, padding: 18, gap: 16 },
+  dealTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  dealRow: { flexDirection: "row", gap: 10 },
+  dealImg: { aspectRatio: 1, borderRadius: radius.md, overflow: "hidden" },
+  avRing: { width: 72, height: 72, borderRadius: 36, borderWidth: 2.5, padding: 3 },
+  avImg: { width: "100%", height: "100%", borderRadius: 33, overflow: "hidden" },
 });

@@ -32,7 +32,7 @@ import type { RootStackParamList } from "../navigation/RootNav";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 const { width: SCREEN_W } = Dimensions.get("window");
 
 // Server shape per /api/posts. We only pull the fields the feed needs;

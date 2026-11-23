@@ -41,7 +41,7 @@ export function Chip({
             : isFilled
               ? t.scheme === "dark"
                 ? t.bgElevated
-                : "#f2f2f6"
+                : "#EDE8DE"
               : "transparent",
           borderColor: selected ? t.cta : t.border,
           borderWidth: 1,

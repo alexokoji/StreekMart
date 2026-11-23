@@ -1,45 +1,49 @@
-// StreekMart mobile theme tokens.
+// StreekMart mobile design tokens (redesign).
 //
-// Palette mirrors the web tailwind.config.ts so the app and site look
-// like they came from the same brand. Primary identity is violet
-// (matches the btn-primary and brand chips on the site); fuchsia + gold
-// are the accent + premium colors; burgundy is danger.
+// Direction: an editorial fashion marketplace. Warm "bone" backgrounds, ink
+// text, violet as the single primary action colour and gold reserved for
+// trust and deals (verified badges, delivery codes, countdowns, cart badge).
+// Product imagery carries the colour; the interface stays quiet.
+//
+// Every screen reads colours through the Theme object, so changing a value
+// here re-skins the whole app. Key names are unchanged from v2.
 
 export type ColorScheme = "light" | "dark";
 
 export const palette = {
-  violet50: "#f5f3ff",
-  violet100: "#ede9fe",
-  violet200: "#ddd6fe",
-  violet400: "#a78bfa",
-  violet500: "#8b5cf6",
-  violet600: "#7c3aed",
-  violet700: "#6d28d9",
-  violet900: "#4c1d95",
-  violet950: "#2e1065",
-  fuchsia400: "#e879f9",
-  fuchsia500: "#d946ef",
-  fuchsia600: "#c026d3",
-  gold200: "#e9d089",
-  gold400: "#cf9f32",
-  gold500: "#b9881e",
-  burgundy: "#6b1a2a",
-  burgundy500: "#8b1d33",
-  white: "#ffffff",
-  ink50: "#f7f7f8",
-  ink100: "#e4e4e8",
-  ink200: "#cccccf",
-  ink300: "#a3a3a8",
-  ink400: "#737378",
-  ink500: "#525258",
-  ink600: "#404048",
-  ink700: "#262630",
-  ink800: "#171720",
-  ink900: "#0a0a14",
-  successBg: "#dcfce7",
-  successFg: "#0a7434",
-  warningBg: "#fff7d8",
-  warningFg: "#92590b",
+  bone: "#F6F3ED",
+  boneDeep: "#EDE8DE",
+  white: "#FFFFFF",
+  ink: "#17121F",
+  ink2: "#2B2338",
+  muted: "#5E5870",
+  faint: "#8E88A0",
+  line: "#E6E1D8",
+  violet50: "#F5F3FF",
+  violet100: "#EEE8FB",
+  violet200: "#DDD6FE",
+  violet400: "#A78BFA",
+  violet500: "#8B5CF6",
+  violet600: "#7C3AED",
+  violet700: "#6D28D9",
+  violet900: "#4C1D95",
+  violet950: "#2B1760",
+  fuchsia400: "#E879F9",
+  fuchsia500: "#D946EF",
+  gold: "#F2C14E",
+  goldSoft: "#FFF1CC",
+  goldInk: "#7A5200",
+  emerald: "#177A4B",
+  emeraldSoft: "#E3F5EA",
+  emeraldInk: "#0B6B37",
+  brick: "#C2392F",
+  brickSoft: "#FBE7E5",
+  brickInk: "#8E2219",
+  // Dark mode surfaces
+  night: "#14101F",
+  night2: "#1D1730",
+  night3: "#2A2240",
+  nightLine: "#352C4D",
 };
 
 export type Theme = {
@@ -64,82 +68,95 @@ export type Theme = {
   auroraGradient: [string, string, string, string];
   shadow: string;
   statusBarStyle: "dark" | "light";
+  // New in the redesign
+  ink: string;      // solid dark surface (tab bar, hero panels)
+  inkText: string;  // text on `ink`
+  gold: string;     // trust + deals
+  goldSoft: string;
 };
 
 export const lightTheme: Theme = {
   scheme: "light",
-  bg: palette.ink50,
+  bg: palette.bone,
   bgElevated: palette.white,
   card: palette.white,
-  border: palette.ink100,
-  text: palette.ink900,
-  textMuted: palette.ink500,
-  textFaint: palette.ink300,
-  accent: palette.violet600,
+  border: palette.line,
+  text: palette.ink,
+  textMuted: palette.muted,
+  textFaint: palette.faint,
+  accent: palette.violet700,
   accentSoft: palette.violet100,
   cta: palette.violet600,
   ctaPressed: palette.violet700,
   ctaText: palette.white,
-  promo: palette.fuchsia500,
-  premium: palette.gold400,
-  success: { fg: palette.successFg, bg: palette.successBg },
-  warning: { fg: palette.warningFg, bg: palette.warningBg },
-  danger: { fg: palette.burgundy, bg: "#fbeef0" },
-  auroraGradient: [palette.violet900, palette.violet600, palette.fuchsia500, palette.gold400],
-  shadow: "rgba(76, 29, 149, 0.12)",
+  promo: palette.violet950,
+  premium: palette.gold,
+  success: { fg: palette.emeraldInk, bg: palette.emeraldSoft },
+  warning: { fg: palette.goldInk, bg: palette.goldSoft },
+  danger: { fg: palette.brickInk, bg: palette.brickSoft },
+  auroraGradient: [palette.violet950, palette.violet700, palette.violet600, palette.gold],
+  shadow: "rgba(23, 18, 31, 0.14)",
   statusBarStyle: "dark",
+  ink: palette.ink,
+  inkText: palette.white,
+  gold: palette.gold,
+  goldSoft: palette.goldSoft,
 };
 
 export const darkTheme: Theme = {
   scheme: "dark",
-  bg: palette.ink900,
-  bgElevated: palette.ink800,
-  card: palette.ink700,
-  border: palette.ink600,
-  text: palette.white,
-  textMuted: palette.ink300,
-  textFaint: palette.ink500,
+  bg: palette.night,
+  bgElevated: palette.night2,
+  card: palette.night2,
+  border: palette.nightLine,
+  text: palette.bone,
+  textMuted: "#B7B0C8",
+  textFaint: "#8E88A0",
   accent: palette.violet400,
   accentSoft: palette.violet950,
   cta: palette.violet600,
   ctaPressed: palette.violet700,
   ctaText: palette.white,
-  promo: palette.fuchsia400,
-  premium: palette.gold200,
-  success: { fg: "#86efac", bg: "rgba(10, 116, 52, 0.20)" },
-  warning: { fg: palette.gold200, bg: "rgba(146, 89, 11, 0.20)" },
-  danger: { fg: "#fda4af", bg: "rgba(107, 26, 42, 0.30)" },
-  auroraGradient: [palette.violet950, palette.violet700, palette.fuchsia600, palette.gold500],
+  promo: palette.violet400,
+  premium: palette.gold,
+  success: { fg: "#86EFAC", bg: "rgba(23, 122, 75, 0.25)" },
+  warning: { fg: palette.gold, bg: "rgba(242, 193, 78, 0.16)" },
+  danger: { fg: "#FDA4AF", bg: "rgba(194, 57, 47, 0.25)" },
+  auroraGradient: [palette.night, palette.violet900, palette.violet700, palette.gold],
   shadow: "rgba(0, 0, 0, 0.55)",
   statusBarStyle: "light",
+  ink: palette.night3,
+  inkText: palette.bone,
+  gold: palette.gold,
+  goldSoft: "rgba(242, 193, 78, 0.16)",
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 36 };
-export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 };
+// Softer, rounder shapes: icon tiles 14, cards 22, hero panels 30, pills full.
+export const radius = { sm: 12, md: 16, lg: 22, xl: 30, pill: 999 };
 
-// Brand font — Nunito. Trebuchet MS isn't available on iOS/Android by
-// default, so we use Nunito (humanist sans, similar character, free via
-// Google Fonts). React Native ignores fontWeight when a custom
-// fontFamily is set, so each variant points at the specific weight
-// build. App.tsx loads the family and monkey-patches Text so even raw
-// `<Text style={{ fontWeight: "700" }}>` resolves to Nunito_700Bold.
+// Fonts: Manrope for the interface, Instrument Serif for titles and section
+// heads. React Native ignores fontWeight once a custom fontFamily is set, so
+// each weight points at its own build. App.tsx loads the families and patches
+// Text so raw `fontWeight: "700"` styles still resolve to the right file.
 export const fontFamily = {
-  regular: "Nunito_400Regular",
-  medium: "Nunito_500Medium",
-  semibold: "Nunito_600SemiBold",
-  bold: "Nunito_700Bold",
-  extrabold: "Nunito_800ExtraBold",
-  black: "Nunito_900Black",
+  regular: "Manrope_400Regular",
+  medium: "Manrope_500Medium",
+  semibold: "Manrope_600SemiBold",
+  bold: "Manrope_700Bold",
+  extrabold: "Manrope_800ExtraBold",
+  black: "Manrope_800ExtraBold",
+  serif: "InstrumentSerif_400Regular",
 } as const;
 
-// Map a fontWeight value to its specific family name so the bold
-// glyphs actually render bold. Exported because App.tsx's Text render
-// override uses the same mapping.
 export function nunitoFamilyFor(weight: number | string | undefined): string {
+  return fontFamilyFor(weight);
+}
+
+export function fontFamilyFor(weight: number | string | undefined): string {
   if (weight == null) return fontFamily.regular;
   const n = typeof weight === "string" ? Number(weight) : weight;
   if (Number.isNaN(n)) return fontFamily.regular;
-  if (n >= 900) return fontFamily.black;
   if (n >= 800) return fontFamily.extrabold;
   if (n >= 700) return fontFamily.bold;
   if (n >= 600) return fontFamily.semibold;
@@ -148,12 +165,15 @@ export function nunitoFamilyFor(weight: number | string | undefined): string {
 }
 
 export const type = {
-  display: { fontSize: 28, fontFamily: fontFamily.extrabold, fontWeight: "800" as const },
-  h1: { fontSize: 22, fontFamily: fontFamily.bold, fontWeight: "700" as const },
-  h2: { fontSize: 18, fontFamily: fontFamily.bold, fontWeight: "700" as const },
+  // Serif display + titles. Instrument Serif has a single (regular) weight.
+  display: { fontSize: 36, lineHeight: 38, fontFamily: fontFamily.serif },
+  h1: { fontSize: 28, lineHeight: 31, fontFamily: fontFamily.serif },
+  h2: { fontSize: 22, lineHeight: 26, fontFamily: fontFamily.serif },
+  // Interface text.
   bodyLg: { fontSize: 16, fontFamily: fontFamily.regular, fontWeight: "400" as const },
   body: { fontSize: 14, fontFamily: fontFamily.regular, fontWeight: "400" as const },
-  bodyStrong: { fontSize: 14, fontFamily: fontFamily.semibold, fontWeight: "600" as const },
-  small: { fontSize: 12, fontFamily: fontFamily.regular, fontWeight: "400" as const },
-  micro: { fontSize: 10, fontFamily: fontFamily.semibold, fontWeight: "600" as const },
+  bodyStrong: { fontSize: 14, fontFamily: fontFamily.bold, fontWeight: "700" as const },
+  small: { fontSize: 12, fontFamily: fontFamily.medium, fontWeight: "500" as const },
+  micro: { fontSize: 11, letterSpacing: 0.8, fontFamily: fontFamily.extrabold, fontWeight: "800" as const },
+  price: { fontSize: 16, fontFamily: fontFamily.extrabold, fontWeight: "800" as const },
 };

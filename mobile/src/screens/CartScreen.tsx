@@ -52,7 +52,7 @@ type CartItem = {
 type CartResp = { items: CartItem[]; totalCents?: number };
 
 // FAB clearance for the centre Search tab + room for the sticky total bar.
-const FAB_CLEARANCE = 110;
+const FAB_CLEARANCE = 24;
 const FOOTER_HEIGHT = 96;
 
 export function CartScreen() {

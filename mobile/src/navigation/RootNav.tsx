@@ -44,13 +44,16 @@ import { SellerProductsScreen } from "../screens/SellerProductsScreen";
 import { AddProductScreen } from "../screens/AddProductScreen";
 import { SellerPayoutsScreen } from "../screens/SellerPayoutsScreen";
 import { WithdrawScreen } from "../screens/WithdrawScreen";
+import { SellerOrdersScreen } from "../screens/SellerOrdersScreen";
+import { SellerOrderDetailScreen } from "../screens/SellerOrderDetailScreen";
+import { WebPageScreen } from "../screens/WebPageScreen";
 import { SellerPromotionsScreen } from "../screens/SellerPromotionsScreen";
 import { SellerSettingsScreen } from "../screens/SellerSettingsScreen";
 import { NewPostScreen } from "../screens/NewPostScreen";
 import { DesignerPostsScreen } from "../screens/DesignerPostsScreen";
 import { DesignerCommissionsScreen } from "../screens/DesignerCommissionsScreen";
 import { DesignerFollowersScreen } from "../screens/DesignerFollowersScreen";
-import { DesignerEarningsScreen } from "../screens/DesignerEarningsScreen";
+import { DesignerEarningsScreen, BuyerWalletScreen } from "../screens/DesignerEarningsScreen";
 import { DesignerProfileScreen } from "../screens/DesignerProfileScreen";
 import { SellerProfileScreen } from "../screens/SellerProfileScreen";
 import { EditProfileScreen } from "../screens/EditProfileScreen";
@@ -110,9 +113,14 @@ export type RootStackParamList = {
 
   // Seller dashboard actions
   SellerProducts: undefined;
-  AddProduct: undefined;
+  AddProduct: { id?: string } | undefined;
+  SellerOrders: { tab?: "ACTIVE" | "COMPLETED" } | undefined;
+  SellerOrderDetail: { id: string };
+  // Any website page, opened signed-in inside the app.
+  WebPage: { path: string; title: string };
   SellerPayouts: undefined;
   Withdraw: { availableCents: number };
+  Wallet: undefined;
   SellerPromotions: undefined;
   SellerSettings: undefined;
 
@@ -303,6 +311,10 @@ export function RootNav({
           <Stack.Screen name="AddProduct" component={AddProductScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerPayouts" component={SellerPayoutsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Withdraw" component={WithdrawScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="SellerOrderDetail" component={SellerOrderDetailScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Wallet" component={BuyerWalletScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="WebPage" component={WebPageScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerPromotions" component={SellerPromotionsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} options={{ headerShown: false }} />
 

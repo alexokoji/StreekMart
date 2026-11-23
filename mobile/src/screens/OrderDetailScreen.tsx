@@ -1,15 +1,17 @@
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import type { RouteProp } from "@react-navigation/native";
 import { useFocusEffect, useRoute } from "@react-navigation/native";
 import { BackHeader } from "../components/BackHeader";
 import { Button } from "../components/Button";
+import { Input } from "../components/Input";
+import { Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../state/ThemeContext";
 import { api } from "../api/client";
 import { firstImage } from "../lib/productImage";
 import { sellerDisplayName } from "../lib/sellerName";
-import { maybePromptForRating } from "../lib/rating";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
@@ -32,6 +34,8 @@ type OrderDetail = {
   seller: { id: string; name: string; businessName?: string | null };
 };
 
+type Update = { id: string; kind: string; message: string; etaAt: string | null; createdAt: string };
+
 const STEPS = [
   { key: "PENDING", label: "Order placed" },
   { key: "PAID", label: "Payment confirmed" },
@@ -50,13 +54,14 @@ export function OrderDetailScreen() {
   const { id } = route.params;
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [code, setCode] = useState("");
-  const [confirming, setConfirming] = useState(false);
+  const [updates, setUpdates] = useState<Update[]>([]);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await api.get<{ order: OrderDetail }>(`/api/orders/${id}`);
       setOrder(data.order);
+      api.get<{ updates: Update[] }>(`/api/orders/${id}/updates`).then((u) => setUpdates(u.updates ?? [])).catch(() => {});
     } catch {
       setOrder(null);
     } finally {
@@ -66,24 +71,32 @@ export function OrderDetailScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  async function confirm() {
+  function cancelOrder() {
     if (!order) return;
-    if (code.length !== 4) {
-      Alert.alert("Invalid code", "Enter the 4-digit code from the delivery receipt.");
-      return;
-    }
-    setConfirming(true);
-    try {
-      await api.post(`/api/orders/${order.id}/confirm-by-code`, { code });
-      await load();
-      Alert.alert("Confirmed", "Thanks for confirming delivery.", [
-        { text: "OK", onPress: () => { maybePromptForRating(); } },
-      ]);
-    } catch (err) {
-      Alert.alert("Could not confirm", err instanceof Error ? err.message : "Try again.");
-    } finally {
-      setConfirming(false);
-    }
+    Alert.alert(
+      "Cancel this order?",
+      order.status === "PENDING"
+        ? "You haven't paid yet, so nothing will be charged."
+        : "If it's still within the delivery window the seller may need to agree first. Paid orders are refunded to your wallet.",
+      [
+        { text: "Keep order", style: "cancel" },
+        {
+          text: "Cancel order",
+          style: "destructive",
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              await api.patch(`/api/orders/${order.id}`, { status: "CANCELLED" });
+              await load();
+            } catch (err) {
+              Alert.alert("Couldn't cancel", err instanceof Error ? err.message : "Try again.");
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   if (loading) {
@@ -170,40 +183,88 @@ export function OrderDetailScreen() {
           </>
         ) : null}
 
-        {order.status === "SHIPPED" ? (
-          <>
-            <Text style={[type.h2, { color: t.text, marginTop: 22, marginBottom: 4 }]}>Confirm delivery</Text>
-            <Text style={[type.small, { color: t.textMuted, marginBottom: 8 }]}>
-              Enter the 4-digit code from the delivery person to confirm receipt.
-            </Text>
-            <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-              <TextInput
-                value={code}
-                onChangeText={(v) => setCode(v.replace(/\D/g, "").slice(0, 4))}
-                keyboardType="number-pad"
-                maxLength={4}
-                placeholder="1234"
-                placeholderTextColor={t.textFaint}
-                style={[styles.codeInput, { color: t.text, backgroundColor: t.bg, borderColor: t.border }]}
-              />
-              <Button label="Confirm delivery" loading={confirming} disabled={code.length !== 4} onPress={confirm} style={{ marginTop: 10 }} />
-            </View>
-          </>
-        ) : null}
-
-        {order.status === "PAID" && order.deliveryCode ? (
+        {(order.status === "PAID" || order.status === "SHIPPED") && order.deliveryCode ? (
           <>
             <Text style={[type.h2, { color: t.text, marginTop: 22, marginBottom: 4 }]}>Delivery code</Text>
             <Text style={[type.small, { color: t.textMuted, marginBottom: 8 }]}>
-              Share this with the delivery person on arrival.
+              Share this with the dispatch rider when they arrive. They key it in to mark your order delivered.
             </Text>
             <View style={[styles.card, { backgroundColor: t.cta }]}>
               <Text style={[styles.codeBig, { color: t.ctaText }]}>{order.deliveryCode}</Text>
             </View>
           </>
         ) : null}
+
+        {order.status === "COMPLETED" ? <SellerRating orderId={order.id} /> : null}
+
+        {updates.length > 0 ? (
+          <>
+            <Text style={[type.h2, { color: t.text, marginTop: 22, marginBottom: 8 }]}>Updates from the seller</Text>
+            <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, gap: 10 }]}>
+              {updates.map((u) => (
+                <View key={u.id}>
+                  <Text style={[type.body, { color: t.text }]}>{u.message}</Text>
+                  <Text style={[type.small, { color: t.textMuted, marginTop: 2 }]}>
+                    {new Date(u.createdAt).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })}
+                    {u.etaAt ? ` · ETA ${new Date(u.etaAt).toLocaleDateString("en-NG", { month: "short", day: "numeric" })}` : ""}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {order.status === "PENDING" || order.status === "PAID" || order.status === "SHIPPED" ? (
+          <Button
+            label="Cancel order"
+            variant="secondary"
+            loading={cancelling}
+            onPress={cancelOrder}
+            style={{ marginTop: 22 }}
+          />
+        ) : null}
       </ScrollView>
     </View>
+  );
+}
+
+// Rate the seller once the order is completed — same endpoint as the web's
+// SellerRatingForm (POST /api/seller-reviews, editable for 30 days).
+function SellerRating({ orderId }: { orderId: string }) {
+  const t = useTheme();
+  const [rating, setRating] = useState(0);
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function submit() {
+    if (rating < 1) return Alert.alert("Pick a rating", "Tap the stars to rate this seller.");
+    setBusy(true);
+    try {
+      await api.post("/api/seller-reviews", { orderId, rating, body: body.trim() || undefined });
+      setDone(true);
+    } catch (err) {
+      Alert.alert("Couldn't save", err instanceof Error ? err.message : "Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Text style={[type.h2, { color: t.text, marginTop: 22, marginBottom: 8 }]}>Rate this seller</Text>
+      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border, gap: 12 }]}>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Pressable key={n} onPress={() => setRating(n)} hitSlop={6} accessibilityLabel={`${n} stars`}>
+              <Ionicons name={n <= rating ? "star" : "star-outline"} size={32} color={t.premium} />
+            </Pressable>
+          ))}
+        </View>
+        <Input placeholder="Say a little about your experience (optional)" value={body} onChangeText={setBody} multiline />
+        <Button label={done ? "Thanks, saved" : "Submit rating"} onPress={submit} loading={busy} disabled={done} />
+      </View>
+    </>
   );
 }
 
