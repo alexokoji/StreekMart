@@ -21,6 +21,7 @@ import {
 } from "@/lib/productAttributes";
 import { markRefereeQualified } from "@/lib/referrals";
 import { routeOrdersToSuppliers } from "@/lib/suppliers/service";
+import { payOutDirectOrder } from "@/lib/directPayout";
 
 // How many days a buyer has to wait between payment and the option to
 // self-cancel an undelivered order. Conservative default — long enough for
@@ -122,6 +123,17 @@ export async function finalizePaidOrders(args: {
           },
         }),
       ]);
+      // Direct-pay seller: no escrow. The sale is paid straight out to their
+      // bank (and the ledger records it), so skip the held-funds credit.
+      if (o.directPayout) {
+        try {
+          const r = await payOutDirectOrder(o.id);
+          if (!r.ok) console.error("[direct-pay] payout not completed", { orderId: o.id, reason: r.reason });
+        } catch (err) {
+          console.error("[direct-pay] payout threw", { orderId: o.id, err });
+        }
+        return;
+      }
       // Product-only credit (subtract delivery from the total so we don't
       // double-count it; `recordSale` applies the platform fee).
       const totalCents = Math.round(o.totalPrice * 100);

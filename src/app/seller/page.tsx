@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { timeAgo } from "@/lib/utils";
 import { Price } from "@/components/Price";
 import { VerificationGate } from "@/components/VerificationGate";
+import { StorefrontLinkCard } from "@/components/seller/StorefrontLinkCard";
 
 export default async function SellerDashboardPage() {
   const user = await requireUser("SELLER");
@@ -35,6 +36,8 @@ export default async function SellerDashboardPage() {
       </div>
 
       <VerificationGate kind="seller" verified={user.sellerVerified} />
+
+      <StorefrontLinkCard handle={user.slug ?? user.id} />
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Products" value={productCount} />

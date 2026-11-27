@@ -12,6 +12,8 @@ import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { ThemeProvider } from "@/state/ThemeContext";
 import { getCurrentUser } from "@/lib/auth";
+import { getStoreLock } from "@/lib/storefrontServer";
+import { StoreHeader } from "@/components/layout/StoreHeader";
 import { getServerCurrencyContext } from "@/lib/currencyServer";
 
 // Runs before hydration (inline, blocking) so the `dark` class lands on
@@ -86,9 +88,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, currencyCtx] = await Promise.all([
+  const [user, currencyCtx, storeLock] = await Promise.all([
     getCurrentUser(),
     getServerCurrencyContext(),
+    getStoreLock(),
   ]);
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`} suppressHydrationWarning>
@@ -109,6 +112,21 @@ export default async function RootLayout({
         */}
         <ThemeProvider>
           <CurrencyProvider ctx={currencyCtx}>
+            {storeLock ? (
+              <>
+                {/* Locked to one seller's storefront: a minimal header and no
+                    marketplace navigation, search or discovery widgets. */}
+                {user && !user.emailVerifiedAt && (
+                  <EmailVerificationBanner email={user.email} />
+                )}
+                <StoreHeader lock={storeLock} user={user} />
+                <main className="mx-auto w-full max-w-[1800px] px-4 py-6 pb-16 sm:px-6 lg:px-10">
+                  {children}
+                </main>
+                <LegalStrip />
+              </>
+            ) : (
+              <>
             <TopPromoStrip />
             {user && !user.emailVerifiedAt && (
               <EmailVerificationBanner email={user.email} />
@@ -133,6 +151,8 @@ export default async function RootLayout({
             <FloatingSupport />
             {/* Pointer companion — desktop, fine-pointer, motion-allowed only. */}
             <CursorGlow />
+              </>
+            )}
           </CurrencyProvider>
         </ThemeProvider>
       </body>

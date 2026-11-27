@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySession } from "./lib/jwt";
+import {
+  STORE_COOKIE,
+  STORE_COOKIE_MAX_AGE,
+  isAllowedWhileLocked,
+  shopHandleFromPath,
+} from "./lib/storefront";
 
 const SESSION_COOKIE = "upclo_session";
 
@@ -24,6 +30,31 @@ const AUTH_ONLY_PREFIXES = [
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ---- Storefront lock ----------------------------------------------------
+  // Opening a seller's storefront link (/shop/<handle>) locks the visitor to
+  // that seller. While locked, anything outside the allowed paths bounces
+  // back to the storefront, so they can't wander into the wider marketplace.
+  const shopHandle = shopHandleFromPath(pathname);
+  if (shopHandle) {
+    const res = NextResponse.next();
+    res.cookies.set(STORE_COOKIE, shopHandle, {
+      path: "/",
+      maxAge: STORE_COOKIE_MAX_AGE,
+      sameSite: "lax",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    });
+    return res;
+  }
+  const lockedTo = req.cookies.get(STORE_COOKIE)?.value;
+  if (lockedTo && req.method === "GET" && !isAllowedWhileLocked(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = `/shop/${encodeURIComponent(lockedTo)}`;
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySession(token) : null;
 
@@ -57,16 +88,8 @@ function redirectToLogin(req: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/seller/:path*",
-    "/designer/:path*",
-    "/account/:path*",
-    "/cart/:path*",
-    "/wishlist/:path*",
-    "/favorites/:path*",
-    "/messages/:path*",
-    "/sketch/:path*",
-    "/api/cart/:path*",
-    "/api/me/:path*",
-  ],
+  // Every page request (the storefront lock applies site-wide). Static files
+  // and Next internals are skipped; auth gating above still only acts on its
+  // own prefixes.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.[a-zA-Z0-9]+$).*)"],
 };

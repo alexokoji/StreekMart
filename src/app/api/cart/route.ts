@@ -3,6 +3,8 @@ import { z } from "zod";
 import { ProductStatus } from "@/lib/enums";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
+import { getStoreLock } from "@/lib/storefrontServer";
+import { hasDirectPay } from "@/lib/directPay";
 import { parseJsonArray } from "@/lib/utils";
 import { unitConfig, validateQuantity } from "@/lib/units";
 import {
@@ -26,8 +28,10 @@ export async function GET() {
   if ("error" in guard) return guard.error;
 
   const cart = await getOrCreateCart(guard.session.sub);
+  // Visitors locked to a seller's storefront only see that seller's items.
+  const lock = await getStoreLock();
   const items = await prisma.cartItem.findMany({
-    where: { cartId: cart.id },
+    where: { cartId: cart.id, ...(lock ? { product: { sellerId: lock.sellerId } } : {}) },
     include: {
       product: {
         include: {
@@ -50,6 +54,13 @@ export async function GET() {
               region: true,
               country: true,
               sellerVerified: true,
+              // Direct-pay: only used to decide `direct` below; the bank
+              // details themselves are stripped before the response.
+              directPayEnabled: true,
+              directBankCode: true,
+              directAccountNumber: true,
+              directAccountName: true,
+              directDeliveryFeeCents: true,
             },
           },
         },
@@ -72,7 +83,19 @@ export async function GET() {
         category: it.product.category,
         unit: it.product.unit,
         image: parseJsonArray(it.product.imagesJson)[0] ?? null,
-        seller: it.product.seller,
+        seller: (() => {
+          const {
+            directPayEnabled: _e,
+            directBankCode: _b,
+            directAccountNumber: _a,
+            directAccountName: _n,
+            directDeliveryFeeCents,
+            ...pub
+          } = it.product.seller;
+          void _e; void _b; void _a; void _n;
+          const direct = hasDirectPay(it.product.seller);
+          return { ...pub, direct, directFeeCents: direct ? directDeliveryFeeCents : 0 };
+        })(),
         stock: it.product.stock,
         status: it.product.status,
       },
@@ -120,6 +143,14 @@ export async function POST(req: Request) {
   }
   if (product.sellerId === guard.session.sub) {
     return NextResponse.json({ error: "You can't add your own listing to your cart." }, { status: 400 });
+  }
+  // Locked to a seller's storefront: only that seller's products can be added.
+  const lock = await getStoreLock();
+  if (lock && product.sellerId !== lock.sellerId) {
+    return NextResponse.json(
+      { error: `You're shopping at ${lock.name}. Only their products can be added here.` },
+      { status: 403 },
+    );
   }
 
   const cart = await getOrCreateCart(guard.session.sub);

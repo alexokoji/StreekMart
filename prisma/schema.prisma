@@ -125,6 +125,20 @@ model User {
   // badge, and is allowed to set their own delivery fees. Lib/orders.ts
   // reads this when crediting the wallet; admin UI in /admin/users toggles.
   streekmartAffiliated Boolean @default(false)
+  // Direct-pay privilege. ONLY an admin can switch `directPayEnabled` on
+  // (src/app/api/admin/users/[id]/direct-pay). Once on, the seller adds their
+  // bank details and:
+  //   - their products skip the logistics provider (they deliver themselves,
+  //     charging `directDeliveryFeeCents` flat), and
+  //   - paid orders skip escrow and are paid straight out to their bank.
+  directPayEnabled      Boolean @default(false)
+  directBankCode        String?
+  directAccountNumber   String?
+  directAccountName     String?
+  directDeliveryFeeCents Int     @default(0)
+  // Platform cut on this seller's direct sales, in basis points. Null =
+  // use the platform default (PLATFORM_FEE_BPS).
+  directFeeBps          Int?
   // Location — collected at registration so buyers can be matched with
   // nearby sellers and sellers know where they're shipping. ISO-3166 alpha-2
   // for `country`. Nullable on legacy rows; the UI prompts users to fill in.
@@ -334,6 +348,8 @@ model PayoutRequest {
   // External reference returned by Monnify (transactionReference).
   externalRef     String?
   failureReason   String?
+  // Set for automatic direct-pay payouts (one per order).
+  orderId         String?  @unique
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -776,6 +792,9 @@ model Order {
   // has no rider) or "SELLER" (seller's own rider; fee credited to wallet
   // minus admin's DELIVERY_PLATFORM_CUT_BPS).
   deliveryFulfiller String @default("SELLER")
+  // True when this order was placed with a direct-pay seller: no logistics
+  // provider, no escrow, paid straight to the seller's bank on payment.
+  directPayout    Boolean  @default(false)
   // 4-char alphanumeric code the buyer shares with the dispatch rider on
   // arrival. The rider confirms delivery by entering this code — released
   // funds + COMPLETED status all flow from a verified match. Stored as a

@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth";
 import { ProfileSettingsForm } from "@/components/forms/ProfileSettingsForm";
 import { AddressBookManager } from "@/components/forms/AddressBookManager";
 import { ShareButton } from "@/components/ShareButton";
+import { DirectPayCard } from "@/components/seller/DirectPayCard";
+import { hasDirectPay } from "@/lib/directPay";
 
 export default async function SellerSettingsPage() {
   const user = await requireUser(Permission.SELLER);
@@ -16,6 +18,16 @@ export default async function SellerSettingsPage() {
         select: { id: true, requestedName: true, createdAt: true },
       })
     : null;
+  const direct = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      directPayEnabled: true,
+      directBankCode: true,
+      directAccountNumber: true,
+      directAccountName: true,
+      directDeliveryFeeCents: true,
+    },
+  });
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -30,11 +42,22 @@ export default async function SellerSettingsPage() {
           </p>
         </div>
         <ShareButton
-          path={`/u/${handle}`}
+          path={`/shop/${handle}`}
           title={`${user.name} on StreekMart`}
           text={user.bio ?? "Check out my StreekMart store."}
         />
       </div>
+      {direct?.directPayEnabled && (
+        <DirectPayCard
+          initial={{
+            bankCode: direct.directBankCode ?? "",
+            accountNumber: direct.directAccountNumber ?? "",
+            accountName: direct.directAccountName ?? "",
+            deliveryFeeNaira: direct.directDeliveryFeeCents / 100,
+            active: hasDirectPay(direct),
+          }}
+        />
+      )}
       <div className="card p-6">
         <ProfileSettingsForm
           initial={{

@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { getStoreLock } from "@/lib/storefrontServer";
 import { parseJsonArray } from "@/lib/utils";
+import { hasDirectPay } from "@/lib/directPay";
 import { Price } from "@/components/Price";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { CheckoutForm } from "./CheckoutForm";
@@ -13,12 +15,14 @@ export default async function CheckoutPage() {
   const user = await requireUser();
   const gateway = getGatewaySelector();
   const isStubMode = gateway.isStubMode();
+  const lock = await getStoreLock();
   const cart = await prisma.cart.findUnique({
     where: { userId: user.id },
     include: {
       items: {
+        where: lock ? { product: { sellerId: lock.sellerId } } : undefined,
         include: {
-          product: { include: { seller: { select: { id: true, name: true, businessName: true, city: true, country: true, region: true, sellerVerified: true } } } },
+          product: { include: { seller: { select: { id: true, name: true, businessName: true, city: true, country: true, region: true, sellerVerified: true, directPayEnabled: true, directBankCode: true, directAccountNumber: true, directAccountName: true, directDeliveryFeeCents: true } } } },
         },
       },
     },
@@ -42,7 +46,18 @@ export default async function CheckoutPage() {
   const uniqueSellerIds = Array.from(new Set(items.map((it) => it.seller.id)));
   const sellers = Array.from(
     new Map(items.map((it) => [it.seller.id, it.seller])).values(),
-  );
+  ).map((s) => ({
+    // Only non-sensitive fields go to the browser. Bank details never do.
+    id: s.id,
+    name: s.businessName ?? s.name,
+    city: s.city,
+    country: s.country,
+    region: s.region,
+    sellerVerified: s.sellerVerified,
+    // Direct-pay sellers deliver themselves, so checkout skips courier quotes.
+    direct: hasDirectPay(s),
+    directFeeCents: s.directDeliveryFeeCents,
+  }));
   const seller = uniqueSellerIds.length === 1 ? sellers[0] : null;
   const sellerSubtotals = sellers.map((sellerItem) => ({
     seller: sellerItem,
@@ -78,7 +93,7 @@ export default async function CheckoutPage() {
               {sellerSubtotals.map((group) => (
                 <div key={group.seller.id} className="rounded-lg border border-ink-100 p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-medium">{group.seller.businessName ?? group.seller.name}</p>
+                    <p className="font-medium">{group.seller.name}</p>
                     <span className="text-sm font-semibold"><Price amount={group.subtotal} /></span>
                   </div>
                   <p className="text-xs text-gray-500">{items.filter((item) => item.seller.id === group.seller.id).length} item(s)</p>

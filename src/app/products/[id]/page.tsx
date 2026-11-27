@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getStoreLock } from "@/lib/storefrontServer";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { displaySellerName } from "@/lib/businessName";
@@ -35,6 +36,12 @@ export default async function PublicProductPage({ params }: { params: { id: stri
     },
   });
   if (!product) notFound();
+
+  // Locked to a seller's storefront: only that seller's products are viewable.
+  const storeLock = await getStoreLock();
+  if (storeLock && product.sellerId !== storeLock.sellerId) {
+    redirect(`/shop/${storeLock.handle}`);
+  }
 
   prisma.product.update({ where: { id: product.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
   // Track recently-viewed for buyers. Anonymous views skip this (no userId).

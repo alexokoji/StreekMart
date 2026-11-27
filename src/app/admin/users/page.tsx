@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { timeAgo } from "@/lib/utils";
 import { ManualVerifyButtons } from "./ManualVerifyButtons";
+import { DirectPayControl } from "./DirectPayControl";
 
 export default async function AdminUsersPage({
   searchParams,
@@ -33,6 +34,10 @@ export default async function AdminUsersPage({
       designerVerified: true,
       sellerTier: true,
       designerTier: true,
+      directPayEnabled: true,
+      directFeeBps: true,
+      directBankCode: true,
+      directAccountNumber: true,
       isAdmin: true,
       streekmartAffiliated: true,
       suspendedAt: true,
@@ -91,6 +96,14 @@ export default async function AdminUsersPage({
               streekmartAffiliated={u.streekmartAffiliated}
               suspendedAt={u.suspendedAt}
             />
+            {u.isSeller && (
+              <DirectPayControl
+                userId={u.id}
+                enabled={u.directPayEnabled}
+                feeBps={u.directFeeBps}
+                hasBank={!!u.directBankCode && !!u.directAccountNumber}
+              />
+            )}
           </li>
         ))}
       </ul>

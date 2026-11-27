@@ -244,7 +244,7 @@ export default async function PublicProfilePage({
 
           <div className="flex flex-wrap items-center gap-2">
             <ShareButton
-              path={`/u/${handle}`}
+              path={`/shop/${handle}`}
               title={`${displayName} on StreekMart`}
               text={profile.bio ?? "Check out this StreekMart profile."}
             />

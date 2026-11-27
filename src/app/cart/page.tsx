@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { getStoreLock } from "@/lib/storefrontServer";
 import { parseJsonArray } from "@/lib/utils";
 import {
   formatAttributeSelection,
@@ -16,6 +17,8 @@ export const dynamic = "force-dynamic";
 
 export default async function CartPage() {
   const user = await requireUser();
+  // Locked to a seller's storefront: the bag shows only that seller's items.
+  const lock = await getStoreLock();
 
   // Lazy provision the cart on first visit.
   const cart = await prisma.cart.upsert({
@@ -24,6 +27,7 @@ export default async function CartPage() {
     update: {},
     include: {
       items: {
+        where: lock ? { product: { sellerId: lock.sellerId } } : undefined,
         include: {
           product: {
             include: {

@@ -69,6 +69,23 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Direct-pay orders were paid out to the seller's bank when the buyer paid,
+  // so there is no held money to return. A paid one can only be refunded by
+  // StreekMart support working it out with the seller.
+  if (
+    next === OrderStatus.CANCELLED &&
+    order.directPayout &&
+    (order.status === OrderStatus.PAID || order.status === OrderStatus.SHIPPED)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "This order was paid straight to the seller, so it can't be cancelled here. Contact StreekMart support for a refund.",
+      },
+      { status: 400 },
+    );
+  }
+
   // Buyer cancellation rules:
   //  - PENDING (not yet paid) → free to cancel.
   //  - PAID / SHIPPED → only after the delivery window has elapsed. Protects

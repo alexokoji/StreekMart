@@ -35,6 +35,9 @@ type CartSeller = {
   region?: string | null;
   country?: string | null;
   sellerVerified?: boolean | null;
+  // Direct-pay sellers deliver themselves: no courier quote, flat fee.
+  direct?: boolean;
+  directFeeCents?: number;
 };
 
 type CartItem = {
@@ -134,6 +137,7 @@ export function CheckoutScreen() {
     let cancelled = false;
     (async () => {
       for (const s of sellers) {
+        if (s.direct) continue; // seller delivers; nothing to quote
         // Always attempt the rates call. The /api/logistics/rates server
         // route can fill missing pickup city/state/country from the
         // seller's own user record when sellerId is provided, so a stale
@@ -338,12 +342,13 @@ export function CheckoutScreen() {
   // Delivery total = sum of the buyer's picked courier prices, all in
   // NGN kobo on the wire. Mirrors the web's setShippingKoboTotal hook.
   const deliveryKobo = sellers.reduce((acc, s) => {
+    if (s.direct) return acc + (s.directFeeCents ?? 0);
     const rateId = selectedBySeller[s.id];
     const rate = ratesBySeller[s.id]?.find((r) => r.id === rateId);
     return acc + (rate?.price ?? 0);
   }, 0);
   const deliveryFee = deliveryKobo / 100;
-  const allSellersPicked = sellers.every((s) => !!selectedBySeller[s.id]);
+  const allSellersPicked = sellers.every((s) => s.direct || !!selectedBySeller[s.id]);
   const total = Math.max(0, subtotal - discount) + deliveryFee;
 
   return (
@@ -462,6 +467,17 @@ export function CheckoutScreen() {
               const err = errorBySeller[s.id];
               const sel = selectedBySeller[s.id] ?? null;
               const sellerLabel = s.businessName?.trim() || s.name?.trim() || "Seller";
+              if (s.direct) {
+                return (
+                  <View key={s.id} style={[styles.card, { backgroundColor: t.success.bg, borderColor: t.border }]}>
+                    <Text style={[type.bodyStrong, { color: t.success.fg }]}>{sellerLabel} delivers this order themselves</Text>
+                    <Text style={[type.small, { color: t.success.fg, marginTop: 4 }]}>
+                      {(s.directFeeCents ?? 0) > 0 ? `Delivery fee ₦${Math.round((s.directFeeCents ?? 0) / 100).toLocaleString("en-NG")}. ` : "Free delivery. "}
+                      They'll contact you to arrange it.
+                    </Text>
+                  </View>
+                );
+              }
               return (
                 <View key={s.id} style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
                   <Text style={[type.bodyStrong, { color: t.text }]}>{sellerLabel}</Text>

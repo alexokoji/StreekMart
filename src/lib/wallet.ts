@@ -143,6 +143,13 @@ export async function releaseHeldFundsForOrder(orderId: string) {
   // already moved the funds.
   if (order.completedAt) return;
 
+  // Direct-pay orders were paid straight to the seller's bank on payment, so
+  // nothing is held. Just stamp the completion.
+  if (order.directPayout) {
+    await prisma.order.update({ where: { id: order.id }, data: { completedAt: new Date() } });
+    return;
+  }
+
   const grossCents = Math.round(order.totalPrice * 100);
   const net = grossCents - platformFeeCents(grossCents);
 
@@ -169,6 +176,9 @@ export async function reverseHeldFundsForOrder(orderId: string) {
   // becomes a dispute.
   if (order.completedAt) {
     throw new Error("Cannot reverse — order was already marked completed.");
+  }
+  if (order.directPayout) {
+    throw new Error("Cannot reverse — this order was paid straight to the seller.");
   }
 
   const grossCents = Math.round(order.totalPrice * 100);

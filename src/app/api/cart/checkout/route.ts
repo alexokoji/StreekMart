@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
+import { getStoreLock } from "@/lib/storefrontServer";
+import { hasDirectPay } from "@/lib/directPay";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
 import { CheckoutBodySchema } from "@/lib/schemas/checkout";
 
@@ -77,6 +79,12 @@ export async function POST(req: Request) {
                   country: true,
                   city: true,
                   region: true,
+                  // Direct-pay privilege: skips logistics and escrow.
+                  directPayEnabled: true,
+                  directBankCode: true,
+                  directAccountNumber: true,
+                  directAccountName: true,
+                  directDeliveryFeeCents: true,
                 },
               },
             },
@@ -89,7 +97,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
   }
 
-  const live = cart.items.filter((it) => it.product.status === ProductStatus.ACTIVE);
+  // Locked to a seller's storefront: check out only that seller's items. Anything
+  // else in the cart is left untouched for a normal marketplace visit.
+  const lock = await getStoreLock();
+  const live = cart.items.filter(
+    (it) =>
+      it.product.status === ProductStatus.ACTIVE &&
+      (!lock || it.product.sellerId === lock.sellerId),
+  );
   if (live.length === 0) {
     return NextResponse.json(
       { error: "None of the items in your cart are available right now." },
@@ -112,8 +127,20 @@ export async function POST(req: Request) {
   const uniqueSellerIds = Array.from(new Set(live.map((it) => it.product.seller.id)));
   type Quote = { feeCents: number; zone: string; fulfiller: "PLATFORM" | "SELLER" };
   const quoteBySellerId = new Map<string, Quote>();
+  // Direct-pay sellers deliver themselves: no courier quote, no cross-border
+  // block, and they charge their own flat delivery fee.
+  const directSellerIds = new Set<string>();
   for (const sellerId of uniqueSellerIds) {
     const seller = live.find((it) => it.product.seller.id === sellerId)!.product.seller;
+    if (hasDirectPay(seller)) {
+      directSellerIds.add(sellerId);
+      quoteBySellerId.set(sellerId, {
+        feeCents: seller.directDeliveryFeeCents,
+        zone: "UNKNOWN",
+        fulfiller: "SELLER",
+      });
+      continue;
+    }
     const quote = await resolveDeliveryQuote({
       buyer,
       seller,
@@ -139,6 +166,8 @@ export async function POST(req: Request) {
     for (const choice of parsed.data.shippingChoices) {
       const sid = choice.sellerId;
       if (!sid) continue;
+      // Direct-pay sellers keep their own flat fee; ignore any courier pick.
+      if (directSellerIds.has(sid)) continue;
       const q = quoteBySellerId.get(sid);
       if (q && choice.priceCents != null) q.feeCents = choice.priceCents;
     }
@@ -177,6 +206,7 @@ export async function POST(req: Request) {
           deliveryFeeCents,
           deliveryZone: quote.zone,
           deliveryFulfiller: quote.fulfiller,
+          directPayout: directSellerIds.has(it.product.seller.id),
           status: OrderStatus.PENDING,
           shippingAddress: parsed.data.shippingAddress,
           shippingFormattedAddress: parsed.data.shippingFormattedAddress,
@@ -227,7 +257,7 @@ export async function POST(req: Request) {
     const choicesBySeller = new Map(parsed.data.shippingChoices.map((c: any) => [c.sellerId, c]));
     for (const ord of orders) {
       const choice = choicesBySeller.get(ord.sellerId);
-      if (!choice) continue;
+      if (!choice || directSellerIds.has(ord.sellerId)) continue;
       try {
         await prisma.shippingRate.create({
           data: {

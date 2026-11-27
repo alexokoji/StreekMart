@@ -1,5 +1,6 @@
 "use client";
 
+import { Price } from "@/components/Price";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type PickedAddress } from "@/components/forms/GooglePlacesPicker";
@@ -26,7 +27,7 @@ export function CheckoutForm({
   sellers,
   subtotal,
 }: {
-  sellers?: { id: string; city?: string | null; country?: string | null; region?: string | null; name?: string | null; sellerVerified?: boolean }[];
+  sellers?: { id: string; city?: string | null; country?: string | null; region?: string | null; name?: string | null; sellerVerified?: boolean; direct?: boolean; directFeeCents?: number }[];
   subtotal?: number;
 }) {
   const router = useRouter();
@@ -136,8 +137,10 @@ export function CheckoutForm({
       const rate = ratesBySeller[sellerId]?.find((r) => r.id === rateId);
       return acc + (rate?.price ?? 0);
     }, 0);
-    setShippingKoboTotal(total);
-  }, [selectedBySeller, ratesBySeller, setShippingKoboTotal]);
+    // Direct-pay sellers charge their own flat delivery fee.
+    const directTotal = (sellers ?? []).reduce((a, s) => a + (s.direct ? s.directFeeCents ?? 0 : 0), 0);
+    setShippingKoboTotal(total + directTotal);
+  }, [selectedBySeller, ratesBySeller, sellers, setShippingKoboTotal]);
 
   useEffect(() => {
     let mounted = true;
@@ -168,6 +171,8 @@ export function CheckoutForm({
     let mounted = true;
     (async () => {
       for (const s of sellers) {
+        // Direct-pay sellers deliver themselves: no courier quote to fetch.
+        if (s.direct) continue;
         const sellerId = s.id;
         const sellerCity = s.city;
 
@@ -312,6 +317,23 @@ export function CheckoutForm({
           <label className="label">Delivery options</label>
           <div className="space-y-4">
             {sellers.map((s) => {
+              if (s.direct) {
+                return (
+                  <div key={s.id} className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                    <p className="text-sm font-medium text-emerald-900">
+                      {s.name ?? "This seller"} delivers this order themselves
+                    </p>
+                    <p className="text-xs text-emerald-800">
+                      {(s.directFeeCents ?? 0) > 0 ? (
+                        <>Delivery fee: <Price amount={(s.directFeeCents ?? 0) / 100} /></>
+                      ) : (
+                        "Free delivery"
+                      )}
+                      . They'll contact you to arrange it.
+                    </p>
+                  </div>
+                );
+              }
               const rs = ratesBySeller[s.id];
               const sel = selectedBySeller[s.id] ?? null;
               const selRate = selectedRateForSeller(s.id);
