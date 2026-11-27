@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
 import { Permission } from "@/lib/enums";
 import { hasDirectPay, isValidAccountNumber } from "@/lib/directPay";
+import { isKorapayLive, resolveBankAccount } from "@/lib/korapayBank";
 
 // GET /api/seller/direct-pay — the seller's direct-pay status and details.
 // PUT /api/seller/direct-pay — save bank details + flat delivery fee.
@@ -18,6 +19,7 @@ const SELECT = {
   directBankCode: true,
   directAccountNumber: true,
   directAccountName: true,
+  directAccountVerifiedAt: true,
   directDeliveryFeeCents: true,
   directFeeBps: true,
 } as const;
@@ -33,6 +35,7 @@ export async function GET() {
     bankCode: u.directBankCode,
     accountNumber: u.directAccountNumber,
     accountName: u.directAccountName,
+    verified: !!u.directAccountVerifiedAt,
     deliveryFeeCents: u.directDeliveryFeeCents,
     platformFeeBps: u.directFeeBps,
   });
@@ -41,7 +44,8 @@ export async function GET() {
 const Body = z.object({
   bankCode: z.string().trim().min(2).max(10),
   accountNumber: z.string().trim(),
-  accountName: z.string().trim().min(2).max(120),
+  // Ignored when the bank can confirm the name (live): we store the bank's own.
+  accountName: z.string().trim().max(120).optional(),
   // Flat delivery fee in naira the seller charges (0 = free delivery).
   deliveryFeeNaira: z.number().min(0).max(1_000_000),
 });
@@ -65,12 +69,26 @@ export async function PUT(req: Request) {
   if (!isValidAccountNumber(parsed.data.accountNumber)) {
     return NextResponse.json({ error: "Account numbers are 10 digits." }, { status: 400 });
   }
+  // Live: the bank tells us the account name. We never trust a typed name, so
+  // a wrong number or name can't send a seller's money to the wrong place.
+  let accountName = parsed.data.accountName ?? "";
+  let verified = false;
+  if (isKorapayLive()) {
+    const check = await resolveBankAccount(parsed.data.bankCode, parsed.data.accountNumber);
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.unavailable ? 503 : 400 });
+    accountName = check.accountName;
+    verified = true;
+  }
+  if (accountName.trim().length < 2) {
+    return NextResponse.json({ error: "Enter the account name." }, { status: 400 });
+  }
   await prisma.user.update({
     where: { id: guard.session.sub },
     data: {
       directBankCode: parsed.data.bankCode,
       directAccountNumber: parsed.data.accountNumber,
-      directAccountName: parsed.data.accountName,
+      directAccountName: accountName,
+      directAccountVerifiedAt: verified ? new Date() : null,
       directDeliveryFeeCents: Math.round(parsed.data.deliveryFeeNaira * 100),
     },
   });

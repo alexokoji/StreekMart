@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Price } from "@/components/Price";
 import { useCurrency } from "@/components/CurrencyProvider";
 import { timeAgo } from "@/lib/utils";
+import { BankAccountFields, type BankFieldsValue } from "@/components/forms/BankAccountFields";
 
 type Txn = {
   id: string;
@@ -95,7 +96,7 @@ export function WalletPanel({ mode = "seller" }: { mode?: "seller" | "buyer" }) 
             <Price amount={state.pendingWithdrawalsCents / 100} />
           </p>
           <p className="mt-1 text-[11px] text-ink-500">
-            Withdrawals waiting on Monnify confirmation.
+            Withdrawals waiting on bank confirmation.
           </p>
         </div>
         <div className="card p-6">
@@ -179,9 +180,7 @@ function PayoutForm({
   const ctx = useCurrency();
   const maxLocal = (maxCents / 100) * ctx.rate;
   const [amount, setAmount] = useState<string>((maxLocal * 0.5).toFixed(2));
-  const [bankCode, setBankCode] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountName, setAccountName] = useState("");
+  const [bank, setBank] = useState<BankFieldsValue>({ bankCode: "", accountNumber: "", accountName: "", ready: false });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -201,7 +200,7 @@ function PayoutForm({
       const res = await fetch("/api/wallet/payout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountCents: cents, bankCode, accountNumber, accountName }),
+        body: JSON.stringify({ amountCents: cents, bankCode: bank.bankCode, accountNumber: bank.accountNumber, accountName: bank.accountName }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -240,41 +239,15 @@ function PayoutForm({
             Max <Price amount={maxCents / 100} />
           </p>
         </div>
-        <div>
-          <label className="label">Bank code</label>
-          <input
-            className="input"
-            value={bankCode}
-            onChange={(e) => setBankCode(e.target.value)}
-            placeholder="e.g. 044 (Access Bank)"
-          />
-        </div>
-        <div>
-          <label className="label">Account number</label>
-          <input
-            className="input"
-            value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value)}
-            inputMode="numeric"
-          />
-        </div>
-        <div>
-          <label className="label">Account name</label>
-          <input
-            className="input"
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-          />
-        </div>
       </div>
+      <BankAccountFields onChange={setBank} />
       {err && <p className="text-sm text-burgundy-700">{err}</p>}
-      <button type="submit" className="btn-primary w-full" disabled={busy}>
-        {busy ? "Sending to Monnify…" : "Confirm withdrawal"}
+      <button type="submit" className="btn-primary w-full" disabled={busy || !bank.ready}>
+        {busy ? "Sending…" : "Confirm withdrawal"}
       </button>
       <p className="text-[11px] text-ink-500">
-        In dev mode (MONNIFY_LIVE unset) this records a stub transaction; in
-        production it disburses through Monnify.
-      </p>
+        The account name comes from your bank, so a wrong number can't send money to the
+        wrong person. Withdrawals usually arrive within minutes.</p>
     </form>
   );
 }

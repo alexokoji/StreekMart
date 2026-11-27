@@ -139,12 +139,18 @@ export async function finalizePaidOrders(args: {
       const totalCents = Math.round(o.totalPrice * 100);
       const productCents = totalCents - o.deliveryFeeCents;
       const isAffiliated = sellerAffiliation.get(o.sellerId) ?? false;
-      await recordSale({
+      const sale = await recordSale({
         sellerId: o.sellerId,
         grossCents: productCents,
         productName: o.product.name,
         orderId: o.id,
         skipHold: isAffiliated,
+      });
+      // Remember exactly what went into escrow so release/reversal move that
+      // amount and nothing else.
+      await prisma.order.update({
+        where: { id: o.id },
+        data: { heldCents: isAffiliated ? 0 : sale.net },
       });
       // Delivery fees stay with the platform — see the comment block above.
     }),

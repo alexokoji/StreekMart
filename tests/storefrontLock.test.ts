@@ -29,8 +29,14 @@ describe("shopHandleFromPath", () => {
 });
 
 describe("middleware storefront lock", () => {
-  const req = (path: string, cookie?: string) =>
-    new NextRequest(`https://streekmart.test${path}`, { headers: cookie ? { cookie: `${STORE_COOKIE}=${cookie}` } : {} });
+  const req = (path: string, cookie?: string, fetchHeaders: Record<string, string> = {}) =>
+    new NextRequest(`https://streekmart.test${path}`, {
+      headers: { ...(cookie ? { cookie: `${STORE_COOKIE}=${cookie}` } : {}), ...fetchHeaders },
+    });
+  // What a browser sends for each way of arriving.
+  const clickInsideSite = { "sec-fetch-site": "same-origin", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" };
+  const typedAddress = { "sec-fetch-site": "none", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" };
+  const fromSearchResult = { "sec-fetch-site": "cross-site", "sec-fetch-mode": "navigate", "sec-fetch-dest": "document" };
 
   it("sets the lock cookie when a storefront link is opened", async () => {
     const res = await middleware(req("/shop/ada"));
@@ -38,9 +44,9 @@ describe("middleware storefront lock", () => {
     expect(res.headers.get("set-cookie")).toContain(`${STORE_COOKIE}=ada`);
     expect(res.headers.get("set-cookie")?.toLowerCase()).toContain("httponly");
   });
-  it("sends a locked visitor back to the storefront when they try to leave", async () => {
+  it("sends a locked visitor back to the storefront when they click out of it", async () => {
     for (const path of ["/", "/search?q=lace", "/u/other", "/products/featured"]) {
-      const res = await middleware(req(path, "ada"));
+      const res = await middleware(req(path, "ada", clickInsideSite));
       expect(res.status, path).toBe(307);
       expect(new URL(res.headers.get("location")!).pathname, path).toBe("/shop/ada");
     }
@@ -52,6 +58,26 @@ describe("middleware storefront lock", () => {
       // go to login, which is the normal auth gate, not the lock).
       expect(res.headers.get("location") ?? "", path).not.toContain("/shop/");
     }
+  });
+  it("is a session cookie, not a long-lived one", async () => {
+    const res = await middleware(req("/shop/ada"));
+    expect(res.headers.get("set-cookie")?.toLowerCase()).not.toContain("max-age");
+    expect(res.headers.get("set-cookie")?.toLowerCase()).not.toContain("expires");
+  });
+  it("releases the visitor when they type the site address, use a bookmark or come from a search result", async () => {
+    for (const how of [typedAddress, fromSearchResult]) {
+      const res = await middleware(req("/", "ada", how));
+      expect(res.headers.get("location"), JSON.stringify(how)).toBeNull(); // not bounced
+      expect(res.headers.get("set-cookie")).toContain(`${STORE_COOKIE}=;`); // lock cleared
+    }
+  });
+  it("does not release the visitor mid-purchase (e.g. back from the payment page)", async () => {
+    const res = await middleware(req("/cart/checkout/return?ref=1", "ada", fromSearchResult));
+    expect(res.headers.get("set-cookie") ?? "").not.toContain(`${STORE_COOKIE}=;`);
+  });
+  it("re-locks every time the seller's link is used again", async () => {
+    const res = await middleware(req("/shop/ada", undefined, fromSearchResult));
+    expect(res.headers.get("set-cookie")).toContain(`${STORE_COOKIE}=ada`);
   });
   it("leaves normal visitors alone", async () => {
     const res = await middleware(req("/search"));

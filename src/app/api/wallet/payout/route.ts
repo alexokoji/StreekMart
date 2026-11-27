@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireApiUser } from "@/lib/auth";
-import { disburse, WITHDRAWAL_FEE_FLAT_CENTS } from "@/lib/monnify";
+import { WITHDRAWAL_FEE_FLAT_CENTS } from "@/lib/monnify";
+import { disburseToBank } from "@/lib/payoutGateway";
+import { isKorapayLive, resolveBankAccount } from "@/lib/korapayBank";
 import { availableBalanceCents, ensureWallet, recordTransaction } from "@/lib/wallet";
 import { withdrawalFeeBpsFor } from "@/lib/tiers";
 
@@ -31,7 +33,16 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { amountCents, bankCode, accountNumber, accountName } = parsed.data;
+  let { amountCents, bankCode, accountNumber, accountName } = parsed.data;
+
+  // Live mode: confirm with the bank that this is a real account and use the
+  // name the BANK has on file, so a mistyped number or name can't send money
+  // to the wrong place.
+  if (isKorapayLive()) {
+    const check = await resolveBankAccount(bankCode, accountNumber);
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.unavailable ? 503 : 400 });
+    accountName = check.accountName;
+  }
 
   // Withdrawal fee scales with the seller's tier:
   //   Tier 2 (blue) → 3% (300 bps)
@@ -98,12 +109,15 @@ export async function POST(req: Request) {
 
   // Step 2: dispatch to Monnify.
   try {
-    const result = await disburse({
+    const owner = await prisma.user.findUnique({ where: { id: guard.session.sub }, select: { email: true } });
+    const result = await disburseToBank({
       amountCents,
-      destinationAccountNumber: accountNumber,
-      destinationBankCode: bankCode,
+      accountNumber,
+      bankCode,
+      accountName,
       reference: reqRow.id,
       narration: "StreekMart wallet withdrawal",
+      customerEmail: owner?.email ?? "payouts@streekmart.online",
     });
     await prisma.payoutRequest.update({
       where: { id: reqRow.id },

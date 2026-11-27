@@ -4,6 +4,7 @@ import { ADMIN_PERMISSIONS } from "@/lib/staffPermissions";
 import { Price } from "@/components/Price";
 import { timeAgo } from "@/lib/utils";
 import { PLATFORM_FEE_BPS, WITHDRAWAL_FEE_BPS } from "@/lib/monnify";
+import { HeldFundsRepair } from "./HeldFundsRepair";
 
 export default async function AdminFeesPage() {
   await requireAdmin(ADMIN_PERMISSIONS.MANAGE_DELIVERY);
@@ -45,6 +46,8 @@ export default async function AdminFeesPage() {
           Sales fee {(PLATFORM_FEE_BPS / 100).toFixed(2)}% · withdrawal fee {(WITHDRAWAL_FEE_BPS / 100).toFixed(2)}%.
         </p>
       </div>
+
+      <HeldFundsRepair />
 
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Gross sales (lifetime)" value={<Price amount={grossSalesCents / 100} />} sub={`${salesAggregate._count} sale events`} />

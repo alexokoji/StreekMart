@@ -135,6 +135,8 @@ model User {
   directBankCode        String?
   directAccountNumber   String?
   directAccountName     String?
+  // Set when the bank itself confirmed the account name (Korapay lookup).
+  directAccountVerifiedAt DateTime?
   directDeliveryFeeCents Int     @default(0)
   // Platform cut on this seller's direct sales, in basis points. Null =
   // use the platform default (PLATFORM_FEE_BPS).
@@ -795,6 +797,10 @@ model Order {
   // True when this order was placed with a direct-pay seller: no logistics
   // provider, no escrow, paid straight to the seller's bank on payment.
   directPayout    Boolean  @default(false)
+  // Net amount credited to the seller's held (escrow) balance for this order,
+  // in cents. 0 for direct-pay and affiliated sellers. Release and reversal use
+  // exactly this, so the held balance can never drift.
+  heldCents       Int      @default(0)
   // 4-char alphanumeric code the buyer shares with the dispatch rider on
   // arrival. The rider confirms delivery by entering this code — released
   // funds + COMPLETED status all flow from a verified match. Stored as a

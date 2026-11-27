@@ -1,4 +1,6 @@
-// Pays a direct-pay order straight out to the seller's bank.
+// Pays a direct-pay order straight out to the seller's bank (via Korapay when
+// live). A transfer that is still processing is settled by the Korapay
+// webhook (transfer.success / transfer.failed).
 //
 // Called from finalizePaidOrders once the buyer's payment is confirmed. The
 // order's money has landed with the platform's payment gateway; for a normal
@@ -9,7 +11,7 @@
 // the seller's wallet to withdraw by hand.
 
 import { prisma } from "@/lib/db";
-import { disburse } from "@/lib/monnify";
+import { disburseToBank } from "@/lib/payoutGateway";
 import { PLATFORM_FEE_BPS } from "@/lib/monnify";
 import { recordTransaction } from "@/lib/wallet";
 import { directPayoutBreakdown, maskAccount } from "@/lib/directPay";
@@ -25,6 +27,7 @@ export async function payOutDirectOrder(orderId: string): Promise<
       seller: {
         select: {
           id: true,
+          email: true,
           directBankCode: true,
           directAccountNumber: true,
           directAccountName: true,
@@ -103,12 +106,14 @@ export async function payOutDirectOrder(orderId: string): Promise<
   });
 
   try {
-    const result = await disburse({
+    const result = await disburseToBank({
       amountCents: payoutCents,
-      destinationAccountNumber: s.directAccountNumber,
-      destinationBankCode: s.directBankCode,
+      accountNumber: s.directAccountNumber,
+      bankCode: s.directBankCode,
+      accountName: s.directAccountName,
       reference: reqRow.id,
       narration: `StreekMart order ${orderId.slice(-6).toUpperCase()}`,
+      customerEmail: s.email,
     });
     const status = result.status === "PAID" ? "PAID" : result.status === "FAILED" ? "FAILED" : "PROCESSING";
     await prisma.payoutRequest.update({

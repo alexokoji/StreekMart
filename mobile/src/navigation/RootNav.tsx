@@ -188,6 +188,9 @@ const linking: LinkingOptions<RootStackParamList> = {
       GetStarted: "welcome",
       Onboarding: "onboarding",
       ProductDetail: "products/:id",
+      // A seller's shareable storefront link opens their page in the app
+      // (the app never locks to one seller; only the website does).
+      SellerProfile: { path: "shop/:id", alias: ["u/:id"] },
       Login: "login",
       Register: "register",
       ForgotPassword: "forgot-password",

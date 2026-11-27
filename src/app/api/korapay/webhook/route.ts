@@ -10,6 +10,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { finalizePaidOrders } from "@/lib/orders";
+import { settlePayout } from "@/lib/payoutSettle";
+import { mapTransferStatus } from "@/lib/korapayBank";
 import crypto from "node:crypto";
 
 export async function POST(req: Request) {
@@ -43,6 +45,16 @@ export async function POST(req: Request) {
 
     // Extract event and transaction data
     const { event, data } = body;
+
+    // Payout results: a transfer we sent that was still processing has now
+    // succeeded or failed.
+    if (event === "transfer.success" || event === "transfer.failed") {
+      const outcome = mapTransferStatus(event === "transfer.success" ? "success" : "failed");
+      if (data?.reference && outcome !== "PROCESSING") {
+        await settlePayout(String(data.reference), outcome, data?.message);
+      }
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
 
     // Only process successful charge events
     if (event !== "charge.success") {

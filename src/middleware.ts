@@ -3,8 +3,9 @@ import type { NextRequest } from "next/server";
 import { verifySession } from "./lib/jwt";
 import {
   STORE_COOKIE,
-  STORE_COOKIE_MAX_AGE,
+  cookieHeaderWithout,
   isAllowedWhileLocked,
+  isFreshArrival,
   shopHandleFromPath,
 } from "./lib/storefront";
 
@@ -33,22 +34,42 @@ export async function middleware(req: NextRequest) {
 
   // ---- Storefront lock ----------------------------------------------------
   // Opening a seller's storefront link (/shop/<handle>) locks the visitor to
-  // that seller. While locked, anything outside the allowed paths bounces
-  // back to the storefront, so they can't wander into the wider marketplace.
+  // that seller, every time they use the link. While locked, anything outside
+  // the allowed paths bounces back to the storefront.
+  //
+  // The lock only holds for visits that came THROUGH the link. If the visitor
+  // arrives some other way (typing the site address, a bookmark, a search
+  // result) they are released and see the normal marketplace.
   const shopHandle = shopHandleFromPath(pathname);
   if (shopHandle) {
     const res = NextResponse.next();
     res.cookies.set(STORE_COOKIE, shopHandle, {
       path: "/",
-      maxAge: STORE_COOKIE_MAX_AGE,
       sameSite: "lax",
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      // No maxAge: a session cookie, gone when the browser closes.
     });
     return res;
   }
   const lockedTo = req.cookies.get(STORE_COOKIE)?.value;
   if (lockedTo && req.method === "GET" && !isAllowedWhileLocked(pathname)) {
+    const fresh = isFreshArrival({
+      site: req.headers.get("sec-fetch-site"),
+      mode: req.headers.get("sec-fetch-mode"),
+      dest: req.headers.get("sec-fetch-dest"),
+    });
+    if (fresh) {
+      // They typed the address / used a bookmark / came from elsewhere:
+      // release the lock for this page and from now on.
+      const headers = new Headers(req.headers);
+      const rest = cookieHeaderWithout(req.headers.get("cookie"), STORE_COOKIE);
+      if (rest) headers.set("cookie", rest);
+      else headers.delete("cookie");
+      const res = NextResponse.next({ request: { headers } });
+      res.cookies.set(STORE_COOKIE, "", { path: "/", maxAge: 0 });
+      return res;
+    }
     const url = req.nextUrl.clone();
     url.pathname = `/shop/${encodeURIComponent(lockedTo)}`;
     url.search = "";

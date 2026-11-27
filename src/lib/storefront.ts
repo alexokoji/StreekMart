@@ -11,7 +11,9 @@
 // and the server-side resolver.
 
 export const STORE_COOKIE = "sm_store";
-export const STORE_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+// The lock is a SESSION cookie (no expiry): it ends when the browser closes.
+// It also ends the moment the visitor arrives some other way than the seller's
+// link, e.g. by typing the site address (see `isFreshArrival`).
 
 // Paths a locked visitor may still open. Anything else is sent back to the
 // storefront. /products/<id> is allowed here (the product page itself checks
@@ -75,4 +77,31 @@ export function shopHandleFromPath(pathname: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * True when this request is the visitor arriving from OUTSIDE the site rather
+ * than clicking around inside it: typing the address, opening a bookmark
+ * (`Sec-Fetch-Site: none`), or following a link from another site such as a
+ * search result (`cross-site`). Browsers send these headers on every
+ * navigation; if they're missing (very old browsers) we can't tell, and the
+ * lock simply holds until the browser is closed.
+ */
+export function isFreshArrival(h: {
+  site: string | null;
+  mode: string | null;
+  dest: string | null;
+}): boolean {
+  const navigation = h.mode === "navigate" && (h.dest === "document" || h.dest === null);
+  return navigation && (h.site === "none" || h.site === "cross-site");
+}
+
+/** The cookie header with one cookie removed (so this very request is unlocked). */
+export function cookieHeaderWithout(header: string | null, name: string): string {
+  if (!header) return "";
+  return header
+    .split(";")
+    .map((c) => c.trim())
+    .filter((c) => c && !c.startsWith(`${name}=`))
+    .join("; ");
 }

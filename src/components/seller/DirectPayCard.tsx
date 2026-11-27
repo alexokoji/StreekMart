@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BANKS } from "@/lib/banks";
+import { BankAccountFields, type BankFieldsValue } from "@/components/forms/BankAccountFields";
 
 // Seller's direct-pay setup, shown only once an admin has enabled the
 // privilege. Bank details here are where each paid order is sent.
@@ -12,9 +12,7 @@ export function DirectPayCard({
   initial: { bankCode: string; accountNumber: string; accountName: string; deliveryFeeNaira: number; active: boolean };
 }) {
   const router = useRouter();
-  const [bankCode, setBankCode] = useState(initial.bankCode);
-  const [accountNumber, setAccountNumber] = useState(initial.accountNumber);
-  const [accountName, setAccountName] = useState(initial.accountName);
+  const [bank, setBank] = useState<BankFieldsValue>({ bankCode: initial.bankCode, accountNumber: initial.accountNumber, accountName: initial.accountName, ready: false });
   const [fee, setFee] = useState(String(initial.deliveryFeeNaira || 0));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -27,7 +25,7 @@ export function DirectPayCard({
       const res = await fetch("/api/seller/direct-pay", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bankCode, accountNumber, accountName, deliveryFeeNaira: Number(fee) || 0 }),
+        body: JSON.stringify({ bankCode: bank.bankCode, accountNumber: bank.accountNumber, accountName: bank.accountName, deliveryFeeNaira: Number(fee) || 0 }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setMsg({ ok: false, text: d.error ?? "Couldn't save." });
@@ -55,32 +53,17 @@ export function DirectPayCard({
           </p>
         )}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label" htmlFor="dp-bank">Bank</label>
-          <select id="dp-bank" className="input" value={bankCode} onChange={(e) => setBankCode(e.target.value)} required>
-            <option value="">Choose your bank</option>
-            {BANKS.map((b) => (
-              <option key={b.value} value={b.value}>{b.label}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="label" htmlFor="dp-acct">Account number</label>
-          <input id="dp-acct" className="input" inputMode="numeric" maxLength={10} value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))} required />
-        </div>
-        <div>
-          <label className="label" htmlFor="dp-name">Account name</label>
-          <input id="dp-name" className="input" value={accountName} onChange={(e) => setAccountName(e.target.value)} required />
-        </div>
-        <div>
-          <label className="label" htmlFor="dp-fee">Delivery fee you charge (₦)</label>
-          <input id="dp-fee" className="input" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} />
-          <p className="mt-1 text-[11px] text-ink-500">Flat, once per order. Enter 0 for free delivery.</p>
-        </div>
+      <BankAccountFields
+        initial={{ bankCode: initial.bankCode, accountNumber: initial.accountNumber, accountName: initial.accountName }}
+        onChange={setBank}
+      />
+      <div className="sm:max-w-xs">
+        <label className="label" htmlFor="dp-fee">Delivery fee you charge (₦)</label>
+        <input id="dp-fee" className="input" inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} />
+        <p className="mt-1 text-[11px] text-ink-500">Flat, once per order. Enter 0 for free delivery.</p>
       </div>
       {msg && <p className={msg.ok ? "text-sm text-emerald-700" : "text-sm text-burgundy-700"}>{msg.text}</p>}
-      <button className="btn-primary" disabled={busy}>{busy ? "Saving…" : "Save bank details"}</button>
+      <button className="btn-primary" disabled={busy || !bank.ready}>{busy ? "Saving…" : "Save bank details"}</button>
     </form>
   );
 }

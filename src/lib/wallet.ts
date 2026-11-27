@@ -132,32 +132,59 @@ export async function availableBalanceCents(userId: string): Promise<number> {
   return Math.max(0, w.balanceCents - w.heldCents);
 }
 
+// ---- Held (escrow) amounts ------------------------------------------------
+//
+// When an order is paid, `recordSale` credits the seller's wallet and, unless
+// they bypass escrow, adds the NET (product revenue minus platform cut) to
+// `wallet.heldCents`. The delivery fee is never part of it: it belongs to the
+// platform (or, for direct-pay sellers, is paid out straight away).
+// `Order.heldCents` records that exact amount at payment time so release and
+// reversal move precisely what was held, and the balance can't drift.
+
+type HeldOrder = {
+  totalPrice: number;
+  deliveryFeeCents: number;
+  directPayout: boolean;
+  heldCents: number;
+};
+
+/** What the seller was paid for the goods alone (delivery excluded), in cents. */
+export function productCentsOf(order: Pick<HeldOrder, "totalPrice" | "deliveryFeeCents">): number {
+  return Math.max(0, Math.round(order.totalPrice * 100) - order.deliveryFeeCents);
+}
+
+/**
+ * How much of this order is sitting in the seller's escrow. Orders paid after
+ * this was introduced carry the exact figure. Older orders (heldCents = 0)
+ * are worked out the way `recordSale` credited them: product revenue minus the
+ * platform cut, and nothing at all for sellers who bypass escrow.
+ */
+export function heldCentsFor(order: HeldOrder, sellerBypassesEscrow: boolean): number {
+  if (order.directPayout || sellerBypassesEscrow) return 0;
+  if (order.heldCents > 0) return order.heldCents;
+  const p = productCentsOf(order);
+  return p - platformFeeCents(p);
+}
+
 // Release the held portion of a sale once the buyer confirms delivery (or
-// the seller marks the order COMPLETED). Idempotent — calling twice does
-// nothing the second time because `released` is recorded on the order.
+// the seller marks the order COMPLETED). Idempotent — completedAt marks it.
 export async function releaseHeldFundsForOrder(orderId: string) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { seller: { select: { streekmartAffiliated: true } } },
+  });
   if (!order) return;
-  // Already released? The order's status moving to COMPLETED is the trigger;
-  // we use completedAt as the idempotency marker — non-null means we've
-  // already moved the funds.
   if (order.completedAt) return;
 
-  // Direct-pay orders were paid straight to the seller's bank on payment, so
-  // nothing is held. Just stamp the completion.
-  if (order.directPayout) {
-    await prisma.order.update({ where: { id: order.id }, data: { completedAt: new Date() } });
-    return;
-  }
-
-  const grossCents = Math.round(order.totalPrice * 100);
-  const net = grossCents - platformFeeCents(grossCents);
-
+  const held = heldCentsFor(order, order.seller.streekmartAffiliated);
   await prisma.$transaction(async (tx) => {
-    await tx.wallet.update({
-      where: { userId: order.sellerId },
-      data: { heldCents: { decrement: net } },
-    });
+    // Direct-pay and escrow-bypass orders hold nothing: just stamp completion.
+    if (held > 0) {
+      await tx.wallet.update({
+        where: { userId: order.sellerId },
+        data: { heldCents: { decrement: held } },
+      });
+    }
     await tx.order.update({
       where: { id: order.id },
       data: { completedAt: new Date() },
@@ -166,11 +193,13 @@ export async function releaseHeldFundsForOrder(orderId: string) {
 }
 
 // Reverse a held sale when the buyer cancels a paid-but-undelivered order.
-// We zero out the held funds AND the seller's wallet credit (REFUND debit
-// for audit). The buyer's actual money refund happens out-of-band via the
-// payment gateway.
+// We take back the seller's wallet credit (REFUND debit for audit) and clear
+// what was held. The buyer's refund is credited to their wallet separately.
 export async function reverseHeldFundsForOrder(orderId: string) {
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { seller: { select: { streekmartAffiliated: true } } },
+  });
   if (!order) return;
   // Already released to the seller? Can't claw back automatically — that
   // becomes a dispute.
@@ -181,12 +210,14 @@ export async function reverseHeldFundsForOrder(orderId: string) {
     throw new Error("Cannot reverse — this order was paid straight to the seller.");
   }
 
-  const grossCents = Math.round(order.totalPrice * 100);
-  const fee = platformFeeCents(grossCents);
-  const net = grossCents - fee;
+  // The wallet credit was product revenue less the platform cut; only the
+  // held part (if any) is released from escrow.
+  const productCents = productCentsOf(order);
+  const fee = platformFeeCents(productCents);
+  const net = productCents - fee;
+  const held = heldCentsFor(order, order.seller.streekmartAffiliated);
 
   await prisma.$transaction(async (tx) => {
-    // Net refund to the platform (negative for the seller).
     await recordTransaction({
       tx,
       userId: order.sellerId,
@@ -196,7 +227,6 @@ export async function reverseHeldFundsForOrder(orderId: string) {
       refType: "order",
       refId: order.id,
     });
-    // Roll back the platform fee too.
     if (fee > 0) {
       await recordTransaction({
         tx,
@@ -208,10 +238,12 @@ export async function reverseHeldFundsForOrder(orderId: string) {
         refId: order.id,
       });
     }
-    await tx.wallet.update({
-      where: { userId: order.sellerId },
-      data: { heldCents: { decrement: net } },
-    });
+    if (held > 0) {
+      await tx.wallet.update({
+        where: { userId: order.sellerId },
+        data: { heldCents: { decrement: held } },
+      });
+    }
   });
 }
 
