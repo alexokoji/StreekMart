@@ -60,23 +60,31 @@ export function MenuScreen() {
           <Row label="Trending products" onPress={() => goToTab(nav, "Search")} />
         </Group>
 
-        {user ? (
-          <Group title="Your account">
-            <Row label="Orders" onPress={() => nav.navigate("Orders")} />
-            <Row label="Notifications" onPress={() => nav.navigate("Notifications")} />
-            <Row label="Coupons" onPress={() => nav.navigate("Coupons")} />
-            <Row label="Addresses" onPress={() => nav.navigate("Addresses")} />
-            <Row label="Payment methods" onPress={() => nav.navigate("PaymentMethods")} />
-            <Row label="Messages" onPress={() => nav.navigate("Chats")} />
-          </Group>
-        ) : null}
-
         {user && (user.isSeller || user.isDesigner) ? (
           <Group title="Dashboards">
             {user.isSeller ? <Row label="Seller dashboard" onPress={() => nav.navigate("SellerDashboard")} /> : null}
             {user.isDesigner ? <Row label="Designer dashboard" onPress={() => nav.navigate("DesignerDashboard")} /> : null}
           </Group>
         ) : null}
+
+        {user && user.isSeller ? (
+          <Group title="Seller tools">
+            <Row label="Seller preorders" onPress={() => nav.navigate("Preorders", { role: "seller" })} />
+            <Row label="Shop managers" onPress={() => nav.navigate("Managers", { scope: "seller" })} />
+          </Group>
+        ) : null}
+        {user && user.isDesigner ? (
+          <Group title="Designer tools">
+            <Row label="Designer preorders" onPress={() => nav.navigate("Preorders", { role: "designer" })} />
+            <Row label="Team managers" onPress={() => nav.navigate("Managers", { scope: "designer" })} />
+          </Group>
+        ) : null}
+
+        <Group title="Help">
+          <Row label="Help and support" onPress={() => nav.navigate("Support")} />
+          <Row label="Terms" onPress={() => nav.navigate("Legal", { doc: "terms" })} />
+          <Row label="Privacy policy" onPress={() => nav.navigate("Legal", { doc: "privacy" })} />
+        </Group>
 
         <Group title="App">
           <Row label="Settings" onPress={() => nav.navigate("Settings")} />

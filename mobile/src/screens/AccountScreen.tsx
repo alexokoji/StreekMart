@@ -1,10 +1,10 @@
 import React from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../state/ThemeContext";
 import { useAuth } from "../state/AuthContext";
 import { DailyCheckIn } from "../components/DailyCheckIn";
@@ -23,7 +23,7 @@ const FAB_CLEARANCE = 24;
 export function AccountScreen() {
   const t = useTheme();
   const nav = useNavigation<Nav>();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   if (!user) {
     return (
@@ -110,27 +110,6 @@ export function AccountScreen() {
         {/* Daily rewards */}
         <DailyCheckIn />
 
-        {/* Role banners — surfaced above the groups so sellers /
-            designers see the entry point without scrolling. */}
-        {user.isSeller ? (
-          <RoleBanner
-            tone="primary"
-            icon={<Ionicons name="storefront" size={22} color="#fff" />}
-            label="Seller dashboard"
-            sub="Add products, view orders, payouts"
-            onPress={() => nav.navigate("SellerDashboard")}
-          />
-        ) : null}
-        {user.isDesigner ? (
-          <RoleBanner
-            tone="promo"
-            icon={<MaterialCommunityIcons name="palette" size={22} color="#fff" />}
-            label="Designer dashboard"
-            sub="Posts, commissions, followers"
-            onPress={() => nav.navigate("DesignerDashboard")}
-          />
-        ) : null}
-
         {/* Shopping group */}
         <Group title="Shopping">
           <Row icon={<Ionicons name="cube-outline" size={18} />} label="My orders" onPress={() => nav.navigate("Orders")} />
@@ -164,53 +143,11 @@ export function AccountScreen() {
           <Row icon={<Ionicons name="card-outline" size={18} />} label="Payment methods" onPress={() => nav.navigate("PaymentMethods")} last />
         </Group>
 
-        {/* Role dashboards and the tools that belong to each role */}
-        {user.isSeller || user.isDesigner ? (
-          <Group title="Selling tools">
-            {user.isSeller ? (
-              <>
-                <Row icon={<Ionicons name="time-outline" size={18} />} label="Seller preorders" onPress={() => nav.navigate("Preorders", { role: "seller" })} />
-                <Row icon={<Ionicons name="people-outline" size={18} />} label="Shop managers" onPress={() => nav.navigate("Managers", { scope: "seller" })} last={!user.isDesigner} />
-              </>
-            ) : null}
-            {user.isDesigner ? (
-              <>
-                <Row icon={<Ionicons name="time-outline" size={18} />} label="Designer preorders" onPress={() => nav.navigate("Preorders", { role: "designer" })} />
-                <Row icon={<Ionicons name="people-outline" size={18} />} label="Team managers" onPress={() => nav.navigate("Managers", { scope: "designer" })} last />
-              </>
-            ) : null}
-          </Group>
-        ) : null}
-
-        {/* Help and legal: all built into the app */}
-        <Group title="Help">
-          <Row icon={<Ionicons name="help-buoy-outline" size={18} />} label="Help and support" onPress={() => nav.navigate("Support")} />
-          <Row icon={<Ionicons name="document-text-outline" size={18} />} label="Terms" onPress={() => nav.navigate("Legal", { doc: "terms" })} />
-          <Row icon={<Ionicons name="lock-closed-outline" size={18} />} label="Privacy policy" onPress={() => nav.navigate("Legal", { doc: "privacy" })} last />
-        </Group>
-
         <Group title="Your account">
           {!(user.isSeller && user.isDesigner) ? (
             <Row icon={<Ionicons name="swap-horizontal-outline" size={18} />} label={user.isSeller || user.isDesigner ? "Add another account type" : "Become a seller or designer"} onPress={() => nav.navigate("AccountType")} />
           ) : null}
           <Row icon={<Ionicons name="trash-outline" size={18} />} label="Delete my data" tone="danger" onPress={() => nav.navigate("DeleteAccount")} last />
-        </Group>
-
-        {/* App + sign out */}
-        <Group title="App">
-          <Row icon={<Ionicons name="settings-outline" size={18} />} label="Settings" onPress={() => nav.navigate("Settings")} />
-          <Row
-            icon={<Ionicons name="log-out-outline" size={18} />}
-            label="Sign out"
-            tone="danger"
-            last
-            onPress={() =>
-              Alert.alert("Sign out?", "You'll need to sign in again on next launch.", [
-                { text: "Cancel", style: "cancel" },
-                { text: "Sign out", style: "destructive", onPress: () => logout() },
-              ])
-            }
-          />
         </Group>
       </ScrollView>
     </SafeAreaView>
@@ -228,36 +165,6 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
         {children}
       </View>
     </View>
-  );
-}
-
-function RoleBanner({
-  tone,
-  icon,
-  label,
-  sub,
-  onPress,
-}: {
-  tone: "primary" | "promo";
-  icon: React.ReactNode;
-  label: string;
-  sub: string;
-  onPress: () => void;
-}) {
-  const t = useTheme();
-  const bg = tone === "promo" ? t.promo : t.cta;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.roleBanner, { backgroundColor: bg, opacity: pressed ? 0.9 : 1 }]}
-    >
-      <View style={styles.roleBannerIcon}>{icon}</View>
-      <View style={{ flex: 1 }}>
-        <Text style={[type.bodyStrong, { color: "#fff" }]}>{label}</Text>
-        <Text style={[type.small, { color: "rgba(255,255,255,0.85)", marginTop: 2 }]}>{sub}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color="#fff" />
-    </Pressable>
   );
 }
 
