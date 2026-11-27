@@ -2,7 +2,7 @@ import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import type { RouteProp } from "@react-navigation/native";
-import { useFocusEffect, useRoute } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import { BackHeader } from "../components/BackHeader";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
@@ -17,6 +17,8 @@ import type { RootStackParamList } from "../navigation/RootNav";
 
 type OrderDetail = {
   id: string;
+  transferReference?: string | null;
+  transferStatus?: string | null;
   status: string;
   totalPrice: number;
   quantity: number;
@@ -49,6 +51,7 @@ function stepIndex(status: string) {
 }
 
 export function OrderDetailScreen() {
+  const nav = useNavigation<any>();
   const t = useTheme();
   const route = useRoute<RouteProp<RootStackParamList, "OrderDetail">>();
   const { id } = route.params;
@@ -212,6 +215,14 @@ export function OrderDetailScreen() {
               ))}
             </View>
           </>
+        ) : null}
+
+        {order.status === "PENDING" && order.transferReference ? (
+          <Button
+            label={order.transferStatus === "PROOF_SUBMITTED" ? "Waiting for seller to confirm" : "Pay by bank transfer"}
+            onPress={() => nav.navigate("Transfer", { reference: order.transferReference! })}
+            style={{ marginTop: 22 }}
+          />
         ) : null}
 
         {order.status === "PENDING" || order.status === "PAID" || order.status === "SHIPPED" ? (

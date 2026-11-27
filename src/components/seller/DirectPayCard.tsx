@@ -30,7 +30,7 @@ export function DirectPayCard({
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setMsg({ ok: false, text: d.error ?? "Couldn't save." });
       else {
-        setMsg({ ok: true, text: "Saved. New orders now pay straight to this account." });
+        setMsg({ ok: true, text: "Saved. Customers will now transfer to this account." });
         router.refresh();
       }
     } finally {
@@ -44,8 +44,9 @@ export function DirectPayCard({
         <h2 className="font-display text-lg font-semibold">Direct payments</h2>
         <p className="mt-1 text-sm text-ink-600">
           Enabled for your shop by StreekMart. Your products skip our delivery partners: you deliver
-          yourself and charge the delivery fee below. When a customer pays, the money is sent straight
-          to your bank account instead of being held until delivery.
+          yourself and charge the delivery fee below. Customers pay by transfer straight into your bank
+          account and upload their receipt. You check the transfer reference against your bank alert,
+          then confirm the payment and ship.
         </p>
         {!initial.active && (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">

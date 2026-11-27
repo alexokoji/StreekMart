@@ -73,7 +73,9 @@ export default async function CheckoutPage() {
         <Link href="/cart" className="text-sm text-brand-700 hover:underline">← Back to cart</Link>
         <h1 className="text-2xl font-bold">Checkout</h1>
         <p className="text-sm text-gray-600">
-          {!isStubMode
+          {sellers.length > 0 && sellers.every((x) => x.direct)
+            ? "This seller takes payment directly. After you place the order you'll get their bank details and a reference code, pay by transfer, then upload your receipt."
+            : !isStubMode
             ? "You'll be redirected to Korapay to complete payment securely."
             : "Korapay is in stub mode — orders will auto-confirm without a real charge. Set KORAPAY_LIVE=1 in .env for the real flow."}
         </p>

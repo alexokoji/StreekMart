@@ -21,6 +21,7 @@ const PERMISSION_GATES: Array<{ prefix: string; require: "isSeller" | "isDesigne
 const AUTH_ONLY_PREFIXES = [
   "/account",
   "/cart",
+  "/pay",
   "/wishlist",
   "/favorites",
   "/messages",

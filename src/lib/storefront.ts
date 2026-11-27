@@ -22,6 +22,7 @@ export const STORE_COOKIE = "sm_store";
 const ALLOWED_PREFIXES = [
   "/shop/",
   "/cart",
+  "/pay/",
   "/login",
   "/register",
   "/forgot-password",

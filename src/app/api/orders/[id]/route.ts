@@ -69,6 +69,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // A bank-transfer order becomes PAID only when the seller confirms the
+  // transfer (POST /api/orders/transfer/:ref/review), never by a status flip.
+  if (next === OrderStatus.PAID && order.transferReference && order.status === OrderStatus.PENDING) {
+    return NextResponse.json(
+      { error: "Confirm this order from its bank-transfer payment check instead." },
+      { status: 400 },
+    );
+  }
+
   // Direct-pay orders were paid out to the seller's bank when the buyer paid,
   // so there is no held money to return. A paid one can only be refunded by
   // StreekMart support working it out with the seller.

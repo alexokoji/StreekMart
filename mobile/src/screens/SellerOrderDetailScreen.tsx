@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Text, View } from "react-native";
-import { useFocusEffect, useRoute, type RouteProp } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import { FormScreen } from "../components/FormScreen";
 import { Input } from "../components/Input";
 import { Button } from "../components/Button";
@@ -23,6 +23,8 @@ type Order = {
   shippingAddress?: string | null;
   notes?: string | null;
   paymentMethod?: string;
+  transferReference?: string | null;
+  transferStatus?: string | null;
   selectedAttributesJson?: string;
   product: { name: string };
   buyer: { name: string; email: string };
@@ -47,6 +49,7 @@ const KINDS = [
 export function SellerOrderDetailScreen() {
   const t = useTheme();
   const { id } = useRoute<RouteProp<RootStackParamList, "SellerOrderDetail">>().params;
+  const nav = useNavigation<any>();
   const [order, setOrder] = useState<Order | null>(null);
   const [updates, setUpdates] = useState<Update[]>([]);
   const [busy, setBusy] = useState(false);
@@ -112,7 +115,9 @@ export function SellerOrderDetailScreen() {
     );
   }
 
-  const actions = NEXT[order.status] ?? [];
+  // A direct-pay order is confirmed through its bank transfer, not by hand.
+  const isTransfer = order.status === "PENDING" && !!order.transferReference;
+  const actions = (NEXT[order.status] ?? []).filter((a) => !(isTransfer && a.status === "PAID"));
   const address = order.shippingFormattedAddress ?? order.shippingAddress ?? "No address on file";
   const Card = ({ children }: { children: React.ReactNode }) => (
     <View style={{ backgroundColor: t.card, borderColor: t.border, borderWidth: 1, borderRadius: radius.lg, padding: 14, marginBottom: 12 }}>
@@ -143,6 +148,15 @@ export function SellerOrderDetailScreen() {
         {order.notes ? <Text style={[type.small, { color: t.textMuted, marginTop: 6 }]}>Note: {order.notes}</Text> : null}
       </Card>
 
+      {isTransfer ? (
+        <Card>
+          <Text style={[type.bodyStrong, { color: t.text }]}>
+            {order.transferStatus === "PROOF_SUBMITTED" ? "The buyer says they've paid" : order.transferStatus === "REJECTED" ? "Payment rejected" : "Waiting for the buyer's transfer"}
+          </Text>
+          <Text style={[type.small, { color: t.textMuted, marginTop: 4 }]}>Reference {order.transferReference}</Text>
+          <Button label="Check payment" style={{ marginTop: 10 }} onPress={() => nav.navigate("Transfer", { reference: order.transferReference })} />
+        </Card>
+      ) : null}
       {actions.length > 0 ? (
         <View style={{ gap: 10, marginBottom: 12 }}>
           {actions.map((a) => (

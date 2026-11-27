@@ -10,6 +10,8 @@ type OrderRow = {
   product: { id: string; name: string };
   buyer: { id: string; name: string };
   shipment?: { status: string } | null;
+  transferStatus?: string | null;
+  transferReference?: string | null;
 };
 
 export function OrderList({ orders, empty }: { orders: OrderRow[]; empty: string }) {
@@ -35,6 +37,11 @@ export function OrderList({ orders, empty }: { orders: OrderRow[]; empty: string
             <span className={`badge ${!o.shipment && o.status === "PAID" ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-700"}`}>
               {!o.shipment && o.status === "PAID" ? "Shipment pending" : o.status}
             </span>
+            {o.status === "PENDING" && o.transferReference ? (
+              <Link href={`/pay/transfer/${o.transferReference}`} className="block text-xs font-semibold text-violet-700 hover:underline">
+                {o.transferStatus === "PROOF_SUBMITTED" ? "Check payment →" : o.transferStatus === "REJECTED" ? "Rejected" : "Awaiting transfer"}
+              </Link>
+            ) : null}
           </div>
           </div>
         </div>

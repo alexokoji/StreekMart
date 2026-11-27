@@ -801,6 +801,17 @@ model Order {
   // in cents. 0 for direct-pay and affiliated sellers. Release and reversal use
   // exactly this, so the held balance can never drift.
   heldCents       Int      @default(0)
+  // Direct-pay bank transfer (the buyer pays the seller's account, no gateway).
+  // NULL for normal orders. AWAITING_TRANSFER → PROOF_SUBMITTED → CONFIRMED,
+  // or REJECTED (buyer can upload a new receipt). `transferReference` is the
+  // short code the buyer puts in the transfer narration so the seller can match
+  // the credit alert to this order; one code per seller per checkout.
+  transferStatus   String?
+  transferReference String?
+  transferProofUrl String?
+  transferSenderName String?
+  transferProofAt  DateTime?
+  transferRejectReason String?
   // 4-char alphanumeric code the buyer shares with the dispatch rider on
   // arrival. The rider confirms delivery by entering this code — released
   // funds + COMPLETED status all flow from a verified match. Stored as a
@@ -823,6 +834,7 @@ model Order {
   updatedAt       DateTime @updatedAt
 
   @@index([paymentReference])
+  @@index([transferReference])
 }
 
 // -------------------- Shipments (Logistics) --------------------

@@ -7,6 +7,7 @@ import { getGatewaySelector } from "@/lib/gatewaySelector";
 import { finalizePaidOrders } from "@/lib/orders";
 import { getStoreLock } from "@/lib/storefrontServer";
 import { hasDirectPay } from "@/lib/directPay";
+import { newTransferReference, transferTotal } from "@/lib/directTransfer";
 import { resolveDeliveryQuote } from "@/lib/locationServer";
 import { CheckoutBodySchema } from "@/lib/schemas/checkout";
 
@@ -178,6 +179,10 @@ export async function POST(req: Request) {
   // order from each seller carries the full fee + fulfiller; the rest get
   // 0 and inherit the same fulfiller (kept on every row for analytics).
   const sellerSeen = new Set<string>();
+  // One transfer reference per direct-pay seller: everything bought from that
+  // seller is covered by a single transfer the buyer matches by this code.
+  const transferRefBySeller = new Map<string, string>();
+  for (const id of directSellerIds) transferRefBySeller.set(id, newTransferReference());
 
   const orders = await prisma.$transaction(
     live.map((it) => {
@@ -219,13 +224,50 @@ export async function POST(req: Request) {
           // the buyer actually ordered.
           selectedAttributesJson: it.selectedAttributesJson ?? "{}",
           paymentMethod: parsed.data.paymentMethod,
-          paymentReference,
+          // Direct-pay orders skip the gateway: their own reference, awaiting the
+          // buyer's bank transfer to the seller.
+          paymentReference: directSellerIds.has(it.product.seller.id)
+            ? transferRefBySeller.get(it.product.seller.id)!
+            : paymentReference,
+          ...(directSellerIds.has(it.product.seller.id)
+            ? {
+                transferStatus: "AWAITING_TRANSFER",
+                transferReference: transferRefBySeller.get(it.product.seller.id)!,
+                paymentGateway: "BANK_TRANSFER",
+              }
+            : {}),
         },
       });
     }),
   );
 
-  const totalCents = Math.round(orders.reduce((s, o) => s + o.totalPrice, 0) * 100);
+  // Direct-pay orders are paid by bank transfer to the seller, outside the
+  // gateway. Hand the buyer what they need to pay and match the payment.
+  const directOrders = orders.filter((o) => o.directPayout);
+  const gatewayOrders = orders.filter((o) => !o.directPayout);
+  const transfers = Array.from(transferRefBySeller.entries()).map(([sellerId, reference]) => ({
+    reference,
+    sellerId,
+    amount: transferTotal(directOrders.filter((o) => o.sellerId === sellerId)),
+    orderIds: directOrders.filter((o) => o.sellerId === sellerId).map((o) => o.id),
+  }));
+  if (directOrders.length > 0) {
+    // They're placed; take them out of the cart now. The seller is told once the
+    // buyer uploads a receipt.
+    await prisma.cartItem.deleteMany({
+      where: { cart: { userId: guard.session.sub }, productId: { in: directOrders.map((o) => o.productId) } },
+    });
+  }
+  if (gatewayOrders.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      directTransfer: true,
+      transfers,
+      orders: orders.map((o) => ({ id: o.id })),
+    });
+  }
+
+  const totalCents = Math.round(gatewayOrders.reduce((s, o) => s + o.totalPrice, 0) * 100);
 
   // Buyer pays the full amount directly. Wallet is only for seller payouts and refunds.
   let remainingCents = totalCents;
@@ -341,6 +383,7 @@ export async function POST(req: Request) {
         paymentReference,
         redirectUrl: txn.checkoutUrl,
         orders: orders.map((o) => ({ id: o.id })),
+        transfers,
       });
     } catch (err) {
       // If the gateway hand-off fails we cancel the freshly created orders

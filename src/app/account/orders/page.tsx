@@ -109,6 +109,13 @@ export default async function BuyerOrdersPage() {
                       View tracking →
                     </Link>
                   </p>
+                  {o.status === "PENDING" && o.transferReference ? (
+                    <p className="mt-1 text-sm">
+                      <Link href={`/pay/transfer/${o.transferReference}`} className="font-semibold text-violet-700 hover:underline">
+                        {o.transferStatus === "PROOF_SUBMITTED" ? "Waiting for the seller to confirm →" : "Pay by bank transfer →"}
+                      </Link>
+                    </p>
+                  ) : null}
                   <OrderActions
                     orderId={o.id}
                     status={o.status}

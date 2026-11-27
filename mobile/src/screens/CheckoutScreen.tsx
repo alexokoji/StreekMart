@@ -270,6 +270,8 @@ export function CheckoutScreen() {
         paymentReference?: string;
         redirectUrl?: string;
         paidByWallet?: boolean;
+        directTransfer?: boolean;
+        transfers?: { reference: string }[];
       }>("/api/cart/checkout", {
         shippingAddress: addr.formattedAddress,
         shippingFormattedAddress: addr.formattedAddress,
@@ -280,6 +282,11 @@ export function CheckoutScreen() {
         shippingChoices,
         ...(promoApplied ? { promoCode: promoApplied.code } : {}),
       });
+      // Direct-pay seller: no gateway. Pay their bank account, then upload the receipt.
+      if (resp.directTransfer && resp.transfers?.[0]?.reference) {
+        nav.replace("Transfer", { reference: resp.transfers[0].reference });
+        return;
+      }
       if (resp.paidByWallet) {
         Alert.alert("Order placed", "Paid in full from your wallet. Check Orders for status.");
         nav.navigate("Orders");

@@ -50,18 +50,6 @@ export function DirectPayControl({
       <span className={enabled ? "badge bg-emerald-50 text-emerald-700" : "badge bg-ink-100 text-ink-600"}>
         {enabled ? (hasBank ? "On · bank added" : "On · waiting for bank details") : "Off"}
       </span>
-      <label className="ml-auto flex items-center gap-1 text-ink-600">
-        Platform cut
-        <input
-          value={fee}
-          onChange={(e) => setFee(e.target.value)}
-          inputMode="decimal"
-          placeholder="default"
-          className="input w-20 py-1 text-xs"
-          aria-label="Platform cut percent for this seller"
-        />
-        %
-      </label>
       {enabled ? (
         <>
           <button className="btn-secondary px-3 py-1 text-xs" disabled={busy} onClick={() => save(true)}>

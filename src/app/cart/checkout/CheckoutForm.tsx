@@ -118,6 +118,13 @@ export function CheckoutForm({
       // Live payment gateway returns a hosted-checkout URL; stub mode returns just
       // the paymentReference. Either way the buyer ends up on the return
       // page where the order group resolves.
+      // Direct-pay seller: no gateway. The buyer pays the seller's bank account
+      // and uploads the receipt on the transfer page.
+      if (data.directTransfer && data.transfers?.[0]?.reference) {
+        router.replace(`/pay/transfer/${encodeURIComponent(data.transfers[0].reference)}`);
+        router.refresh();
+        return;
+      }
       if (typeof data.redirectUrl === "string" && data.redirectUrl) {
         window.location.href = data.redirectUrl;
         return;

@@ -48,6 +48,7 @@ import { SellerOrdersScreen } from "../screens/SellerOrdersScreen";
 import { SellerOrderDetailScreen } from "../screens/SellerOrderDetailScreen";
 import { LegalScreen } from "../screens/LegalScreen";
 import { SupportScreen } from "../screens/SupportScreen";
+import { TransferScreen } from "../screens/TransferScreen";
 import { DeleteAccountScreen } from "../screens/DeleteAccountScreen";
 import { AccountTypeScreen } from "../screens/AccountTypeScreen";
 import { ManagersScreen } from "../screens/ManagersScreen";
@@ -125,6 +126,7 @@ export type RootStackParamList = {
   // Built into the app (nothing opens the website):
   Legal: { doc: "privacy" | "terms" };
   Support: undefined;
+  Transfer: { reference: string };
   DeleteAccount: undefined;
   AccountType: undefined;
   Managers: { scope: "seller" | "designer" };
@@ -335,6 +337,7 @@ export function RootNav({
           <Stack.Screen name="Wallet" component={BuyerWalletScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Legal" component={LegalScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Support" component={SupportScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Transfer" component={TransferScreen} options={{ headerShown: false }} />
           <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ headerShown: false }} />
           <Stack.Screen name="AccountType" component={AccountTypeScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Managers" component={ManagersScreen} options={{ headerShown: false }} />
