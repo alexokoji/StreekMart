@@ -66,7 +66,7 @@ export function SearchScreen() {
       const name = uri.split("/").pop() ?? "upload.jpg";
       const mime = asset.mimeType ?? "image/jpeg";
       form.append("file", { uri, name, type: mime } as unknown as Blob);
-      const apiUrl = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ?? "https://www.streekmart.online";
+      const apiUrl = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ?? "https://www.streekmart.com";
       const token = await getAuthToken();
       const res = await fetch(apiUrl + "/api/search/image-upload", {
         method: "POST",

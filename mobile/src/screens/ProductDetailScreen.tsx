@@ -271,7 +271,7 @@ export function ProductDetailScreen() {
 
   async function shareProduct() {
     if (!product) return;
-    const url = `https://www.streekmart.online/products/${product.id}`;
+    const url = `https://www.streekmart.com/products/${product.id}`;
     if (!(await Sharing.isAvailableAsync())) {
       Alert.alert("Share", url);
       return;

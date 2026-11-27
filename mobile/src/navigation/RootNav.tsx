@@ -173,7 +173,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: ["streekmart://", "https://streekmart.online", "https://www.streekmart.online"],
+  prefixes: ["streekmart://", "https://streekmart.com", "https://www.streekmart.com"],
   config: {
     screens: {
       Tabs: {

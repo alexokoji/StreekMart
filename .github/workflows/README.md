@@ -18,7 +18,7 @@ Both workflows need two repo-level secrets. Add them at
 
 | Secret | Value |
 | --- | --- |
-| `CRON_BASE_URL` | The site's prod origin, no trailing slash. e.g. `https://streekmart.online` |
+| `CRON_BASE_URL` | The site's prod origin, no trailing slash. e.g. `https://streekmart.com` |
 | `CRON_SECRET` | A long random string. Generate with `openssl rand -hex 32`. Add the **same value** to your Vercel project env as `CRON_SECRET`. |
 
 The web app reads `CRON_SECRET` (via `src/lib/cron.ts`) and rejects any

@@ -5,7 +5,10 @@
     "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "streekmart",
+    "scheme": [
+      "streekmart",
+      "com.streekmart.app"
+    ],
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
       "**/*"
@@ -29,12 +32,12 @@
       },
       "usesAppleSignIn": true,
       "associatedDomains": [
-        "applinks:streekmart.online"
+        "applinks:streekmart.com"
       ]
     },
     "android": {
       "package": "com.streekmart.app",
-      "versionCode": 4,
+      "versionCode": 5,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -57,11 +60,11 @@
           "data": [
             {
               "scheme": "https",
-              "host": "streekmart.online"
+              "host": "streekmart.com"
             },
             {
               "scheme": "https",
-              "host": "www.streekmart.online"
+              "host": "www.streekmart.com"
             }
           ],
           "category": [
@@ -72,7 +75,7 @@
       ]
     },
     "extra": {
-      "apiUrl": "https://www.streekmart.online",
+      "apiUrl": "https://www.streekmart.com",
       "oauth": {
         "googleIosClientId": "",
         "googleAndroidClientId": "",

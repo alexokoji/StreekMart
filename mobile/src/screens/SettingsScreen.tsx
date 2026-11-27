@@ -149,7 +149,7 @@ export function SettingsScreen() {
         {/* About */}
         <Group title="About">
           <InfoRow icon={<Ionicons name="information-circle-outline" size={18} />} label="App version" value="2.0.0 (native)" />
-          <InfoRow icon={<Ionicons name="globe-outline" size={18} />} label="Server" value="streekmart.online" last />
+          <InfoRow icon={<Ionicons name="globe-outline" size={18} />} label="Server" value="streekmart.com" last />
         </Group>
 
         {user ? (

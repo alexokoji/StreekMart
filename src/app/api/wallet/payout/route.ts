@@ -117,7 +117,7 @@ export async function POST(req: Request) {
       accountName,
       reference: reqRow.id,
       narration: "StreekMart wallet withdrawal",
-      customerEmail: owner?.email ?? "payouts@streekmart.online",
+      customerEmail: owner?.email ?? "payouts@streekmart.com",
     });
     await prisma.payoutRequest.update({
       where: { id: reqRow.id },

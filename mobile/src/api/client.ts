@@ -9,7 +9,7 @@ import * as SecureStore from "expo-secure-store";
 
 const API_URL =
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
-  "https://www.streekmart.online";
+  "https://www.streekmart.com";
 
 const TOKEN_KEY = "streekmart:session";
 const APP_UA_TAG = "StreekMartApp/2.0 (Native)";

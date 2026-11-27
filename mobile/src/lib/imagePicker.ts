@@ -29,7 +29,7 @@ import { getAuthToken } from "../api/client";
 
 const API_URL =
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
-  "https://www.streekmart.online";
+  "https://www.streekmart.com";
 
 // Single canonical endpoint — same path the web ImageUploader posts to.
 // POST multipart/form-data with field "file", returns { url, size, mime,
