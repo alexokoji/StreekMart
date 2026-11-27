@@ -8,6 +8,7 @@ import { PRODUCT_UNITS } from "@/lib/units";
 import { AttributesSchema } from "@/lib/productAttributes";
 import { buildFashionValidatorSystem, chat, isAiEnabled } from "@/lib/ai";
 import { isValidCategory, kindForCategoryAsync } from "@/lib/categories";
+import { isSizedCategory } from "@/lib/sizes";
 
 // GET /api/products?mine=1&sellerId=&category=&q=&kind=MATERIAL|PRODUCT
 export async function GET(req: Request) {
@@ -250,6 +251,16 @@ export async function POST(req: Request) {
   if (!(await isValidCategory(category))) {
     return NextResponse.json(
       { error: `"${category}" is not an allowed fashion category.`, validation: { allowed: false, reason: `"${category}" is not an allowed fashion category.` } },
+      { status: 422 },
+    );
+  }
+
+  // Sized categories (clothes, shoes, bags) must say which sizes are stocked:
+  // buyers pick one when they order, so a listing with none can't be bought
+  // properly.
+  if (isSizedCategory(category) && (!sizes || sizes.length === 0)) {
+    return NextResponse.json(
+      { error: `Pick the sizes you stock for ${category}. Buyers choose one when they order.` },
       { status: 422 },
     );
   }

@@ -7,6 +7,8 @@ import { requireApiUser } from "@/lib/auth";
 import { hasManagerPermission } from "@/lib/managersServer";
 import { PRODUCT_UNITS } from "@/lib/units";
 import { AttributesSchema } from "@/lib/productAttributes";
+import { isSizedCategory } from "@/lib/sizes";
+import { parseJsonArray } from "@/lib/utils";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const product = await prisma.product.findUnique({
@@ -101,6 +103,20 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       { error: `"${parsed.data.category}" is not an allowed fashion category.` },
       { status: 422 },
     );
+  }
+
+  // Sized categories must keep at least one size. Checked whenever the
+  // category or the sizes are part of the update (a status-only change is
+  // unaffected).
+  if (parsed.data.category !== undefined || parsed.data.sizes !== undefined) {
+    const nextCategory = parsed.data.category ?? product.category;
+    const nextSizes = parsed.data.sizes ?? parseJsonArray(product.sizesJson);
+    if (isSizedCategory(nextCategory) && nextSizes.length === 0) {
+      return NextResponse.json(
+        { error: `Pick the sizes you stock for ${nextCategory}. Buyers choose one when they order.` },
+        { status: 422 },
+      );
+    }
   }
 
   // Sale price sanity (against the next effective price). The seller may

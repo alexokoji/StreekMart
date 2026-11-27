@@ -8,6 +8,7 @@ import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SystemUI from "expo-system-ui";
 import { darkTheme, lightTheme, type Theme } from "../theme/tokens";
+import { setDefaultColors } from "../theme/defaultColors";
 
 export type ThemePreference = "system" | "light" | "dark";
 const STORAGE_KEY = "streekmart:theme-preference";
@@ -42,7 +43,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const theme = useMemo(() => {
     const effective = preference === "system" ? system ?? "light" : preference;
-    return effective === "dark" ? darkTheme : lightTheme;
+    const chosen = effective === "dark" ? darkTheme : lightTheme;
+    // Unstyled text and inputs follow the theme instead of defaulting to black.
+    setDefaultColors(chosen.text, chosen.textFaint);
+    return chosen;
   }, [preference, system]);
 
   // Paint the native window background with the theme so the Android

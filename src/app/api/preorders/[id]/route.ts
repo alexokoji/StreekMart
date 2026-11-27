@@ -55,6 +55,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       buyer: { select: { id: true, name: true, email: true } },
       designer: { select: { id: true, name: true, email: true } },
       post: { select: { id: true, title: true, imagesJson: true } },
+      product: { select: { id: true, name: true, imagesJson: true } },
     },
   });
   if (!preorder) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -46,7 +46,13 @@ import { SellerPayoutsScreen } from "../screens/SellerPayoutsScreen";
 import { WithdrawScreen } from "../screens/WithdrawScreen";
 import { SellerOrdersScreen } from "../screens/SellerOrdersScreen";
 import { SellerOrderDetailScreen } from "../screens/SellerOrderDetailScreen";
-import { WebPageScreen } from "../screens/WebPageScreen";
+import { LegalScreen } from "../screens/LegalScreen";
+import { SupportScreen } from "../screens/SupportScreen";
+import { DeleteAccountScreen } from "../screens/DeleteAccountScreen";
+import { AccountTypeScreen } from "../screens/AccountTypeScreen";
+import { ManagersScreen } from "../screens/ManagersScreen";
+import { PreordersScreen } from "../screens/PreordersScreen";
+import { PreorderDetailScreen } from "../screens/PreorderDetailScreen";
 import { SellerPromotionsScreen } from "../screens/SellerPromotionsScreen";
 import { SellerSettingsScreen } from "../screens/SellerSettingsScreen";
 import { NewPostScreen } from "../screens/NewPostScreen";
@@ -116,8 +122,14 @@ export type RootStackParamList = {
   AddProduct: { id?: string } | undefined;
   SellerOrders: { tab?: "ACTIVE" | "COMPLETED" } | undefined;
   SellerOrderDetail: { id: string };
-  // Any website page, opened signed-in inside the app.
-  WebPage: { path: string; title: string };
+  // Built into the app (nothing opens the website):
+  Legal: { doc: "privacy" | "terms" };
+  Support: undefined;
+  DeleteAccount: undefined;
+  AccountType: undefined;
+  Managers: { scope: "seller" | "designer" };
+  Preorders: { role: "buyer" | "seller" | "designer" };
+  PreorderDetail: { id: string; role: "buyer" | "seller" | "designer" };
   SellerPayouts: undefined;
   Withdraw: { availableCents: number };
   Wallet: undefined;
@@ -321,7 +333,13 @@ export function RootNav({
           <Stack.Screen name="SellerOrders" component={SellerOrdersScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerOrderDetail" component={SellerOrderDetailScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Wallet" component={BuyerWalletScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="WebPage" component={WebPageScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Legal" component={LegalScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Support" component={SupportScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="AccountType" component={AccountTypeScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Managers" component={ManagersScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Preorders" component={PreordersScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PreorderDetail" component={PreorderDetailScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerPromotions" component={SellerPromotionsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SellerSettings" component={SellerSettingsScreen} options={{ headerShown: false }} />
 

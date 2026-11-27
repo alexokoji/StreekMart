@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { SupportForm } from "./SupportForm";
+import { SUPPORT_FAQS } from "@/lib/legalContent";
 
 // Public support page. Reachable from the floating "?" button in the
 // bottom-right corner (FloatingSupport.tsx) and from any legal-page
@@ -46,30 +47,9 @@ export default async function SupportPage() {
       <section className="card p-6">
         <h2 className="font-display text-xl font-semibold">Frequent questions</h2>
         <div className="mt-4 space-y-4">
-          <Faq
-            q="Where&rsquo;s my order?"
-            a={`Open My orders, tap the order, and you'll see live delivery updates from the seller. Every order also has a delivery code you'll share with the rider on arrival. If the code is blank, payment hasn't cleared yet.`}
-          />
-          <Faq
-            q="A buyer paid but I (the seller) haven&rsquo;t been credited."
-            a={`Wallet credit clears once the buyer confirms delivery with the delivery code OR after the delivery window elapses (14 days from payment). Until then, your share sits in escrow on the order row.`}
-          />
-          <Faq
-            q="How do I get the blue check / gold check?"
-            a={`Submit Tier 2 verification (NIN, Passport, or Driver's License) from your seller or designer dashboard for the blue check. Tier 3 (gold) adds CAC documents and lifts your listing cap to 100 and your withdrawal fee to 1.5%.`}
-          />
-          <Faq
-            q="My buyer wants a colour / size I didn&rsquo;t list."
-            a={`Add it to the product's Variants panel from the edit page — the picker shows up on the product page and on the order, so you know exactly what to pack.`}
-          />
-          <Faq
-            q="I downloaded the Android APK but it won&rsquo;t install."
-            a={`On Android, allow installs from unknown sources for your browser (Settings → Apps → Browser → Install unknown apps). Once installed, future updates push themselves over-the-air automatically.`}
-          />
-          <Faq
-            q="Can I delete my account?"
-            a={`Email support@streekmart.com from the address on file. We honour deletion requests within 7 days; outstanding orders are settled first.`}
-          />
+          {SUPPORT_FAQS.map((f) => (
+            <Faq key={f.q} q={f.q} a={f.a} />
+          ))}
         </div>
       </section>
 

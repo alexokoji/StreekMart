@@ -23,12 +23,12 @@ import { SelectField, type SelectOption } from "../components/SelectField";
 import { useTheme } from "../state/ThemeContext";
 import { api } from "../api/client";
 import { pickImages, uploadImage } from "../lib/imagePicker";
+import { SIZE_SCALES, defaultScaleFor, isSizedCategory, scaleByValue, type SizeScale } from "../lib/sizes";
 import { radius, type } from "../theme/tokens";
 import type { RootStackParamList } from "../navigation/RootNav";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-const SUGGESTED_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free size"];
 
 // Same list as src/lib/units.ts on the web. Mobile mirrors the order
 // and labels so the picker matches the web's pricing-unit dropdown.
@@ -88,6 +88,9 @@ export function AddProductScreen() {
   const [status, setStatus] = useState("ACTIVE");
   const [stockCount, setStockCount] = useState("");
   const [sizes, setSizes] = useState<string[]>([]);
+  // Which size scale the seller's goods follow (alpha, shoe EU, bag...). It
+  // defaults from the category, exactly like the website's listing form.
+  const [sizeScale, setSizeScale] = useState<SizeScale>("alpha");
   const [variants, setVariants] = useState<VariantGroup[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -112,6 +115,7 @@ export function AddProductScreen() {
         setPrice(String(p.price ?? ""));
         setSalePrice(p.salePrice ? String(p.salePrice) : "");
         setCategory(p.category ?? "");
+        setSizeScale(defaultScaleFor(p.category ?? "") ?? "alpha");
         setUnit(p.unit ?? "piece");
         setStatus(p.status ?? "ACTIVE");
         setStockCount(p.stock != null ? String(p.stock) : "");
@@ -133,6 +137,27 @@ export function AddProductScreen() {
       }
     })();
   }, [editId, nav]);
+
+  // Picking a category switches to its recommended size scale and drops any
+  // sizes that don't exist on it; an unsized category (fabric, accessories)
+  // clears sizes entirely.
+  function changeCategory(next: string) {
+    setCategory(next);
+    const rec = defaultScaleFor(next);
+    if (rec) {
+      setSizeScale(rec);
+      const allowed = new Set(scaleByValue(rec).sizes);
+      setSizes((cur) => cur.filter((x) => allowed.has(x)));
+    } else {
+      setSizes([]);
+    }
+  }
+
+  function changeScale(next: SizeScale) {
+    setSizeScale(next);
+    const allowed = new Set(scaleByValue(next).sizes);
+    setSizes((cur) => cur.filter((x) => allowed.has(x)));
+  }
 
   function toggleSize(s: string) {
     setSizes((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
@@ -175,6 +200,9 @@ export function AddProductScreen() {
     if (!price.trim() || Number(price) <= 0) return "Enter a valid price.";
     if (salePrice && Number(salePrice) >= Number(price)) return "Sale price must be lower than price.";
     if (!category.trim()) return "Enter a category.";
+    if (isSizedCategory(category) && sizes.length === 0) {
+      return `Pick the sizes you stock for ${category}. Buyers choose one when they order.`;
+    }
     return null;
   }
 
@@ -241,7 +269,7 @@ export function AddProductScreen() {
         stock: stockCount ? Number(stockCount) : 0,
         unit,
         status,
-        sizes,
+        sizes: isSizedCategory(category) ? sizes : [],
         images,
       };
       if (editId) {
@@ -372,7 +400,7 @@ export function AddProductScreen() {
         </View>
 
         <Section label="Category">
-          <CategoryPicker value={category} onChange={setCategory} />
+          <CategoryPicker value={category} onChange={changeCategory} />
         </Section>
 
         <View style={{ flexDirection: "row", gap: 12 }}>
@@ -407,13 +435,29 @@ export function AddProductScreen() {
           />
         </Section>
 
-        <Section label="Available sizes (optional)">
-          <View style={styles.chipWrap}>
-            {SUGGESTED_SIZES.map((s) => (
-              <Chip key={s} label={s} selected={sizes.includes(s)} onPress={() => toggleSize(s)} />
-            ))}
-          </View>
-        </Section>
+        {isSizedCategory(category) ? (
+          <Section label="Available sizes (required)">
+            <Text style={[type.small, { color: t.textMuted, marginBottom: 8 }]}>
+              Pick every size you stock. Buyers choose one when they order.
+            </Text>
+            <SelectField
+              title="Size scale"
+              value={sizeScale}
+              onChange={(v) => changeScale(v as SizeScale)}
+              options={SIZE_SCALES.map((s) => ({ value: s.value, label: s.label }))}
+            />
+            <View style={[styles.chipWrap, { marginTop: 10 }]}>
+              {scaleByValue(sizeScale).sizes.map((s) => (
+                <Chip key={s} label={s} selected={sizes.includes(s)} onPress={() => toggleSize(s)} />
+              ))}
+            </View>
+            {sizes.length === 0 ? (
+              <Text style={[type.small, { color: t.danger.fg, marginTop: 8 }]}>
+                No sizes selected yet. Buyers can't order without them.
+              </Text>
+            ) : null}
+          </Section>
+        ) : null}
 
         <Section label="Variations (optional)">
           {variants.length === 0 ? (

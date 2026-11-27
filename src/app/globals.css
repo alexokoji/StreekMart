@@ -352,3 +352,39 @@ html.dark .hover\:bg-violet-50:hover { background-color: rgba(46, 16, 101, 0.35)
 html.dark .hover\:text-ink-900:hover,
 html.dark .hover\:text-ink-800:hover,
 html.dark .hover\:text-gray-900:hover { color: #ffffff !important; }
+
+/* ---- Dark-mode contrast gaps ----------------------------------------------
+   The secondary greys and brand-violet text colours below were still dark on
+   dark backgrounds (text-ink-500 alone appears ~430 times). */
+html.dark .text-ink-600 { color: #b8b8bd !important; }
+html.dark .text-ink-500 { color: #a3a3a8 !important; }
+html.dark .text-violet-600,
+html.dark .text-violet-700,
+html.dark .text-violet-800,
+html.dark .text-violet-900 { color: #c4b5fd !important; }
+html.dark .text-fuchsia-600,
+html.dark .text-fuchsia-700 { color: #f0abfc !important; }
+html.dark .text-gold-700,
+html.dark .text-gold-800,
+html.dark .text-gold-900 { color: #e9d089 !important; }
+html.dark .text-blue-600,
+html.dark .text-blue-700 { color: #93c5fd !important; }
+html.dark .text-green-600,
+html.dark .text-green-700,
+html.dark .text-green-800 { color: #86efac !important; }
+html.dark .text-orange-600,
+html.dark .text-orange-700 { color: #fdba74 !important; }
+html.dark .hover\:text-violet-700:hover,
+html.dark .hover\:text-violet-600:hover { color: #ddd6fe !important; }
+html.dark .hover\:text-ink-700:hover,
+html.dark .hover\:text-ink-600:hover { color: #ffffff !important; }
+html.dark .bg-violet-100 { background-color: rgba(76, 29, 149, 0.45) !important; }
+html.dark .bg-gold-100 { background-color: rgba(42, 28, 5, 0.5) !important; }
+html.dark .bg-green-50,
+html.dark .bg-green-100 { background-color: rgba(16, 185, 129, 0.15) !important; }
+html.dark .bg-blue-50,
+html.dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.15) !important; }
+html.dark .bg-orange-50,
+html.dark .bg-orange-100 { background-color: rgba(234, 88, 12, 0.15) !important; }
+html.dark .bg-red-100 { background-color: rgba(107, 26, 42, 0.35) !important; }
+html.dark input, html.dark textarea, html.dark select { color-scheme: dark; }

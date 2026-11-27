@@ -1,9 +1,10 @@
 // StreekMart mobile shell (v2 - native).
 
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { TextStyle } from "react-native";
 import { fontFamilyFor } from "./src/theme/tokens";
+import { getDefaultPlaceholderColor, getDefaultTextColor } from "./src/theme/defaultColors";
 
 // Force every <Text> to render in the brand font (Manrope) regardless of
 // how it was styled. RN won't auto-pick a bold member of a custom
@@ -22,8 +23,28 @@ if (originalRender) {
     const p = props as { style?: TextStyle | TextStyle[] };
     const flat = (StyleSheet.flatten(p.style) ?? {}) as TextStyle;
     const family = flat.fontFamily ?? fontFamilyFor(flat.fontWeight);
-    const nextStyle: TextStyle = { ...flat, fontFamily: family };
+    // No colour set? Use the theme's text colour, never RN's default black.
+    const nextStyle: TextStyle = { ...flat, fontFamily: family, color: flat.color ?? getDefaultTextColor() };
     return originalRender.call(this, { ...props, style: nextStyle }, ref);
+  };
+}
+// Same for TextInput: readable text and placeholder in light and dark mode.
+type RenderableInput = typeof TextInput & { render?: (props: object, ref: unknown) => React.ReactNode };
+const RenderableInputRef = TextInput as RenderableInput;
+const originalInputRender = RenderableInputRef.render;
+if (originalInputRender) {
+  RenderableInputRef.render = function patchedInput(props: object, ref: unknown) {
+    const p = props as { style?: TextStyle | TextStyle[]; placeholderTextColor?: string };
+    const flat = (StyleSheet.flatten(p.style) ?? {}) as TextStyle;
+    return originalInputRender.call(
+      this,
+      {
+        ...props,
+        placeholderTextColor: p.placeholderTextColor ?? getDefaultPlaceholderColor(),
+        style: { ...flat, fontFamily: flat.fontFamily ?? fontFamilyFor(flat.fontWeight), color: flat.color ?? getDefaultTextColor() },
+      },
+      ref,
+    );
   };
 }
 import { GestureHandlerRootView } from "react-native-gesture-handler";

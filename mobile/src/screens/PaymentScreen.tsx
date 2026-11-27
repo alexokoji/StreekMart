@@ -53,7 +53,12 @@ export function PaymentScreen() {
     // close the WebView and surface the buyer's Orders list.
     if (e.url.includes("/cart/checkout/return")) {
       nav.replace("Orders");
+      return;
     }
+    // Preorder payments return to /account/preorders/<id>: bring the buyer
+    // back to that preorder inside the app instead of loading the website.
+    const m = e.url.match(/\/account\/preorders\/([^/?#]+)/);
+    if (m) nav.replace("PreorderDetail", { id: m[1], role: "buyer" });
   }
 
   function cancel() {

@@ -93,3 +93,18 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, request: created });
 }
+
+// GET /api/account/role-change — the caller's current roles and any request
+// still waiting for an admin (so the app can show "awaiting review").
+export async function GET() {
+  const guard = await requireApiUser();
+  if ("error" in guard) return guard.error;
+  const [me, pending] = await Promise.all([
+    prisma.user.findUnique({ where: { id: guard.session.sub }, select: { isSeller: true, isDesigner: true } }),
+    prisma.roleChangeRequest.findFirst({
+      where: { userId: guard.session.sub, status: "PENDING" },
+      select: { id: true, toIsSeller: true, toIsDesigner: true, createdAt: true },
+    }),
+  ]);
+  return NextResponse.json({ isSeller: !!me?.isSeller, isDesigner: !!me?.isDesigner, pending });
+}

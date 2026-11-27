@@ -51,6 +51,10 @@ type Product = {
   seller: { id: string; name: string; businessName?: string | null; sellerVerified?: boolean };
   ratingAvg?: number;
   ratingCount?: number;
+  // Preorder: when enabled with a price and lead time, buyers can preorder.
+  preorderEnabled?: boolean;
+  preorderPriceCents?: number | null;
+  preorderLeadDays?: number | null;
 };
 
 // Build the carousel image list from either field, swallowing parse errors.
@@ -356,6 +360,25 @@ export function ProductDetailScreen() {
     }
   }
 
+  // Place a preorder (POST /api/preorders) and pay the design price in the
+  // app's payment screen. Same flow as the website's Preorder button.
+  async function preorder() {
+    if (!user) {
+      Alert.alert("Sign in", "You need an account to place a preorder.");
+      return;
+    }
+    setAdding(true);
+    try {
+      const r = await api.post<{ checkoutUrl?: string; preorder?: { id: string } }>("/api/preorders", { productId: product!.id });
+      if (r.checkoutUrl) nav.navigate("Payment", { url: r.checkoutUrl });
+      else if (r.preorder) nav.navigate("PreorderDetail", { id: r.preorder.id, role: "buyer" });
+    } catch (err) {
+      Alert.alert("Couldn't start the preorder", err instanceof Error ? err.message : "Try again.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   async function submitReview() {
     setSubmittingReview(true);
     try {
@@ -621,6 +644,26 @@ export function ProductDetailScreen() {
             </View>
           </Pressable>
         </View>
+
+        {product.preorderEnabled && product.preorderPriceCents && product.preorderLeadDays ? (
+          <View style={styles.block}>
+            <View style={{ backgroundColor: t.accentSoft, borderRadius: radius.lg, padding: 14, gap: 8 }}>
+              <Text style={[type.bodyStrong, { color: t.text }]}>
+                Preorder this piece for ₦{Math.round(product.preorderPriceCents / 100).toLocaleString("en-NG")}
+              </Text>
+              <Text style={[type.small, { color: t.textMuted }]}>
+                Made for you and ready in about {product.preorderLeadDays} days. You pay for delivery once it's ready.
+              </Text>
+              <Pressable
+                onPress={preorder}
+                disabled={adding}
+                style={({ pressed }) => [styles.ctaPill, { backgroundColor: t.cta, opacity: pressed || adding ? 0.85 : 1, flex: 0, alignSelf: "stretch" }]}
+              >
+                <Text style={{ color: t.ctaText, fontSize: 16, fontWeight: "800" }}>Preorder</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {/* Delivery info card */}
         <View style={styles.block}>

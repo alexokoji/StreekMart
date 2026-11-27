@@ -205,3 +205,45 @@ export async function POST(req: Request) {
     );
   }
 }
+
+// GET /api/preorders?role=buyer|seller|designer
+//
+// The caller's preorders, newest activity first. `buyer` = ones they placed;
+// `seller` = requests on their preorder-enabled products; `designer` =
+// requests on their preorder-enabled designs (posts). Same data the website's
+// list pages show. Detail and actions are on /api/preorders/[id].
+export async function GET(req: Request) {
+  const guard = await requireApiUser();
+  if ("error" in guard) return guard.error;
+  const role = new URL(req.url).searchParams.get("role") ?? "buyer";
+  const me = guard.session.sub;
+
+  const where =
+    role === "seller"
+      ? { designerId: me, productId: { not: null } }
+      : role === "designer"
+        ? { designerId: me, postId: { not: null } }
+        : { buyerId: me };
+
+  const rows = await prisma.preorder.findMany({
+    where,
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+    include: {
+      buyer: { select: { id: true, name: true } },
+      designer: { select: { id: true, name: true, businessName: true } },
+      product: { select: { name: true } },
+      post: { select: { title: true } },
+    },
+  });
+  return NextResponse.json({
+    preorders: rows.map((r) => ({
+      id: r.id,
+      title: r.product?.name ?? r.post?.title ?? "(removed)",
+      counterpartyName: role === "buyer" ? (r.designer.businessName?.trim() || r.designer.name) : r.buyer.name,
+      priceCents: r.priceCents,
+      status: r.status,
+      updatedAt: r.updatedAt,
+    })),
+  });
+}

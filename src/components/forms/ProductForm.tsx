@@ -162,6 +162,10 @@ export function ProductForm({ initial, mode, redirectBase = "/seller/products" }
       setErr("Enter a price greater than 0.");
       return;
     }
+    if (isSizedCategory(category) && sizes.length === 0) {
+      setErr(`Pick the sizes you stock for ${category}. Buyers choose one when they order.`);
+      return;
+    }
     setBusy(true);
     try {
       const payload = {
